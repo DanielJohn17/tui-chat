@@ -117,7 +117,7 @@ func (c *chatPane) Render(app *tui.App) *tui.Element {
 				tui.WithGap(1),
 			)
 			__tui_10 := tui.New(
-				tui.WithText("❯ you:"),
+				tui.WithText("\u276f you:"),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 			)
 			__tui_9.AddChild(__tui_10)

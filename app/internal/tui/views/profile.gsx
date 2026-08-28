@@ -41,7 +41,7 @@ templ (p *profile) Render() {
 			if p.editMode.Get() {
 				<span class="text-yellow font-bold">[Editing Mode]</span>
 			} else {
-				<span class="font-dim">Pressto edit</span>
+				<span class="font-dim">Press [e] to edit</span>
 			}
 		</div>
 		<hr />
@@ -64,7 +64,7 @@ templ (p *profile) Render() {
 				<div class="flex-col border-single px-2" width={48}>
 					<div class="flex justify-between">
 						<span class="font-bold text-white">Account Information</span>
-						<span class="text-green">● Active</span>
+						<span class="text-green font-bold">{"\u25cf Active"}</span>
 					</div>
 					<hr />
 					<div class="flex justify-between">
@@ -77,7 +77,7 @@ templ (p *profile) Render() {
 					</div>
 					<div class="flex justify-between">
 						<span class="font-dim">Password:</span>
-						<span class="font-dim">••••••••</span>
+						<span class="font-dim">{"\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}</span>
 					</div>
 				</div>
 				<span class="font-dim pt-1">Press [e] to edit profile details</span>

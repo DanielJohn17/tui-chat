@@ -39,7 +39,7 @@ var mockReplies = []string{
 	"Haha, nice one!",
 	"Thanks for sharing!",
 	"Interesting, I hadn't considered that.",
-	"👍",
+	"\U0001F44D",
 	"lol",
 	"Agreed!",
 }
@@ -152,6 +152,7 @@ func (a *app) Render(app *tui.App) *tui.Element {
 	__tui_0 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 		tui.WithHeightPercent(100.00),
+		tui.WithBackground(tui.NewStyle().Background(tui.Black)),
 	)
 	__tui_1 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
@@ -166,7 +167,7 @@ func (a *app) Render(app *tui.App) *tui.Element {
 		tui.WithGap(1),
 	)
 	__tui_3 := tui.New(
-		tui.WithText("⚡ TUI CHAT"),
+		tui.WithText("\u26a1 TUI CHAT"),
 		tui.WithTextGradient(tui.NewGradient(tui.Cyan, tui.Magenta).WithDirection(tui.GradientHorizontal)),
 		tui.WithTextStyle(tui.NewStyle().Bold()),
 	)
@@ -188,8 +189,8 @@ func (a *app) Render(app *tui.App) *tui.Element {
 		tui.WithGap(1),
 	)
 	__tui_7 := tui.New(
-		tui.WithText("● Online"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+		tui.WithText("\u25cf Online"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 	)
 	__tui_6.AddChild(__tui_7)
 	__tui_8 := tui.New(

@@ -96,15 +96,15 @@ func (a *app) Watchers() []tui.Watcher {
 }
 
 templ (a *app) Render() {
-	<div class="flex-col h-full">
+	<div class="flex-col h-full bg-black">
 		<div class="flex justify-between items-center px-1 shrink-0">
 			<div class="flex items-center gap-1">
-				<span class="font-bold text-gradient-cyan-magenta">⚡ TUI CHAT</span>
+				<span class="font-bold text-gradient-cyan-magenta">{"\u26a1 TUI CHAT"}</span>
 				<span class="font-dim text-cyan">|</span>
 				<span class="font-dim">terminal messenger</span>
 			</div>
 			<div class="flex items-center gap-1">
-				<span class="text-green">● Online</span>
+				<span class="text-green font-bold">{"\u25cf Online"}</span>
 				<span class="font-dim">|</span>
 				if a.view.Get() == viewChats {
 					<span class="font-bold text-cyan">[ Chat ]</span>
@@ -156,7 +156,7 @@ var mockReplies = []string{
 	"Haha, nice one!",
 	"Thanks for sharing!",
 	"Interesting, I hadn't considered that.",
-	"👍",
+	"\U0001F44D",
 	"lol",
 	"Agreed!",
 }

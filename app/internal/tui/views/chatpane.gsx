@@ -61,7 +61,7 @@ templ (c *chatPane) Render() {
 					</div>
 				} else if msg.Self {
 					<div class="flex gap-1">
-						<span class="text-cyan font-bold">❯ you:</span>
+						<span class="text-cyan font-bold">{"\u276f you:"}</span>
 						<span class="text-white">{msg.Text}</span>
 					</div>
 				} else {

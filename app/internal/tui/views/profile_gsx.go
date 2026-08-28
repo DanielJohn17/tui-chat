@@ -65,7 +65,7 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 		__tui_1.AddChild(__tui_3)
 	} else {
 		__tui_4 := tui.New(
-			tui.WithText("Pressto edit"),
+			tui.WithText("Press [e] to edit"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
 		__tui_1.AddChild(__tui_4)
@@ -169,8 +169,8 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 		)
 		__tui_19.AddChild(__tui_20)
 		__tui_21 := tui.New(
-			tui.WithText("● Active"),
-			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+			tui.WithText("\u25cf Active"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
 		__tui_19.AddChild(__tui_21)
 		__tui_18.AddChild(__tui_19)
@@ -218,7 +218,7 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 		)
 		__tui_29.AddChild(__tui_30)
 		__tui_31 := tui.New(
-			tui.WithText("••••••••"),
+			tui.WithText("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
 		__tui_29.AddChild(__tui_31)

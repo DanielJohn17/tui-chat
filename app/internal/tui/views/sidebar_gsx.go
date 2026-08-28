@@ -90,7 +90,7 @@ func Sidebar(c client.Client, selectedChat *tui.State[int]) *SidebarView {
 			_ = i
 			if i == selectedChat.Get() {
 				__tui_5 := tui.New(
-					tui.WithText("❯ #"+ch.Name),
+					tui.WithText("\u276f #"+ch.Name),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 				)
 				__loop_0.AddChild(__tui_5)
@@ -121,8 +121,8 @@ func Sidebar(c client.Client, selectedChat *tui.State[int]) *SidebarView {
 		tui.WithFlexShrink(0),
 	)
 	__tui_10 := tui.New(
-		tui.WithText("●"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+		tui.WithText("\u25cf"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 	)
 	__tui_9.AddChild(__tui_10)
 	__tui_11 := tui.New(

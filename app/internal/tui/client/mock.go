@@ -24,7 +24,7 @@ func NewMock() Client {
 				{Text: "Sounds awesome, let me know if you need help", Sender: "alice", Self: true},
 			},
 			1: {
-				{Text: "This is #random — anything goes", Sender: "system", Self: false},
+				{Text: "This is #random - anything goes", Sender: "system", Self: false},
 				{Text: "check out this meme I found", Sender: "charlie", Self: false},
 				{Text: "lol that's hilarious", Sender: "alice", Self: true},
 			},
@@ -36,7 +36,7 @@ func NewMock() Client {
 				{Text: "Fixed it, thanks for the review!", Sender: "bob", Self: false},
 			},
 			3: {
-				{Text: "Off-topic — talk about anything here", Sender: "system", Self: false},
+				{Text: "Off-topic - talk about anything here", Sender: "system", Self: false},
 				{Text: "anyone watching the new season?", Sender: "charlie", Self: false},
 				{Text: "No spoilers! I'm only on episode 3", Sender: "alice", Self: true},
 			},

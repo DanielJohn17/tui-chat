@@ -14,7 +14,7 @@ templ Sidebar(c client.Client, selectedChat *tui.State[int]) {
 		<div class="flex-col gap-1">
 			for i, ch := range c.Chats() {
 				if i == selectedChat.Get() {
-					<span class="text-cyan font-bold">{"❯ #" + ch.Name}</span>
+					<span class="text-cyan font-bold">{"\u276f #" + ch.Name}</span>
 				} else {
 					<span class="font-dim">{"  #" + ch.Name}</span>
 				}
@@ -23,7 +23,7 @@ templ Sidebar(c client.Client, selectedChat *tui.State[int]) {
 		<div class="grow"></div>
 		<hr />
 		<div class="flex items-center gap-1 shrink-0">
-			<span class="text-green">●</span>
+			<span class="text-green font-bold">{"\u25cf"}</span>
 			<span class="font-bold text-white">{c.Profile().Username}</span>
 		</div>
 	</div>
