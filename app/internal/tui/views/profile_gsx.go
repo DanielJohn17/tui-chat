@@ -47,93 +47,190 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 		tui.WithPaddingTRBL(0, 2, 0, 2),
 	)
 	__tui_1 := tui.New(
-		tui.WithText("Profile"),
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithFlexShrink(0),
+	)
+	__tui_2 := tui.New(
+		tui.WithText("User Profile"),
 		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
 	)
-	__tui_0.AddChild(__tui_1)
+	__tui_1.AddChild(__tui_2)
 	if p.editMode.Get() {
-		__tui_2 := tui.New(
-			tui.WithText("Username"),
+		__tui_3 := tui.New(
+			tui.WithText("[Editing Mode]"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
+		)
+		__tui_1.AddChild(__tui_3)
+	} else {
+		__tui_4 := tui.New(
+			tui.WithText("Pressto edit"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_0.AddChild(__tui_2)
-		__tui_3 := app.MountPersistent(p, 0, func() tui.Component {
+		__tui_1.AddChild(__tui_4)
+	}
+	__tui_0.AddChild(__tui_1)
+	__tui_5 := tui.New(
+		tui.WithHR(),
+	)
+	__tui_0.AddChild(__tui_5)
+	if p.editMode.Get() {
+		__tui_6 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+			tui.WithGap(1),
+		)
+		__tui_7 := tui.New(
+			tui.WithText("Username"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+		)
+		__tui_6.AddChild(__tui_7)
+		__tui_8 := app.MountPersistent(p, 0, func() tui.Component {
 			return tui.NewInput(
 				tui.WithInputValue(p.username),
-				tui.WithInputPlaceholder("Username"),
+				tui.WithInputPlaceholder("Enter username..."),
 				tui.WithInputBorder(tui.BorderRounded),
+				tui.WithInputWidth(45),
+				tui.WithInputFocusColor(tui.Cyan),
+				tui.WithInputAutoFocus(true),
 			)
 		})
-		__tui_0.AddChild(__tui_3)
-		__tui_4 := tui.New(
+		__tui_6.AddChild(__tui_8)
+		__tui_9 := tui.New(
 			tui.WithText("Account Code"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
 		)
-		__tui_0.AddChild(__tui_4)
-		__tui_5 := app.MountPersistent(p, 1, func() tui.Component {
+		__tui_6.AddChild(__tui_9)
+		__tui_10 := app.MountPersistent(p, 1, func() tui.Component {
 			return tui.NewInput(
 				tui.WithInputValue(p.accountCode),
-				tui.WithInputPlaceholder("Account Code"),
+				tui.WithInputPlaceholder("Enter account code..."),
 				tui.WithInputBorder(tui.BorderRounded),
+				tui.WithInputWidth(45),
+				tui.WithInputFocusColor(tui.Cyan),
 			)
 		})
-		__tui_0.AddChild(__tui_5)
-		__tui_6 := tui.New(
+		__tui_6.AddChild(__tui_10)
+		__tui_11 := tui.New(
 			tui.WithText("Password"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
 		)
-		__tui_0.AddChild(__tui_6)
-		__tui_7 := app.MountPersistent(p, 2, func() tui.Component {
+		__tui_6.AddChild(__tui_11)
+		__tui_12 := app.MountPersistent(p, 2, func() tui.Component {
 			return tui.NewInput(
 				tui.WithInputValue(p.password),
-				tui.WithInputPlaceholder("Password"),
+				tui.WithInputPlaceholder("Enter password..."),
 				tui.WithInputBorder(tui.BorderRounded),
+				tui.WithInputWidth(45),
+				tui.WithInputFocusColor(tui.Cyan),
 			)
 		})
-		__tui_0.AddChild(__tui_7)
-		__tui_8 := tui.New(
-			tui.WithText("Tab between fields | Enter save | Esc cancel"),
-			tui.WithPaddingTRBL(0, 1, 0, 1),
-			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Dim()),
-		)
-		__tui_0.AddChild(__tui_8)
-	} else {
-		__tui_9 := tui.New(
-			tui.WithText("Username"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
-		)
-		__tui_0.AddChild(__tui_9)
-		__tui_10 := tui.New(
-			tui.WithText(p.username.Get()),
-			tui.WithPaddingTRBL(0, 1, 0, 1),
-		)
-		__tui_0.AddChild(__tui_10)
-		__tui_11 := tui.New(
-			tui.WithText("Account Code"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
-		)
-		__tui_0.AddChild(__tui_11)
-		__tui_12 := tui.New(
-			tui.WithText(p.accountCode.Get()),
-			tui.WithPaddingTRBL(0, 1, 0, 1),
-		)
-		__tui_0.AddChild(__tui_12)
+		__tui_6.AddChild(__tui_12)
 		__tui_13 := tui.New(
-			tui.WithText("Password"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithGap(2),
+			tui.WithPaddingTRBL(1, 0, 0, 0),
 		)
-		__tui_0.AddChild(__tui_13)
 		__tui_14 := tui.New(
-			tui.WithText("********"),
-			tui.WithPaddingTRBL(0, 1, 0, 1),
+			tui.WithText("[Enter] Save Changes"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
-		__tui_0.AddChild(__tui_14)
+		__tui_13.AddChild(__tui_14)
 		__tui_15 := tui.New(
-			tui.WithText("Press e to edit"),
-			tui.WithPaddingTRBL(0, 1, 0, 1),
+			tui.WithText("|"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_0.AddChild(__tui_15)
+		__tui_13.AddChild(__tui_15)
+		__tui_16 := tui.New(
+			tui.WithText("[Esc] Cancel"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Red).Bold()),
+		)
+		__tui_13.AddChild(__tui_16)
+		__tui_6.AddChild(__tui_13)
+		__tui_0.AddChild(__tui_6)
+	} else {
+		__tui_17 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+			tui.WithGap(1),
+		)
+		__tui_18 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+			tui.WithBorder(tui.BorderSingle),
+			tui.WithPaddingTRBL(0, 2, 0, 2),
+			tui.WithWidth(48),
+		)
+		__tui_19 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_20 := tui.New(
+			tui.WithText("Account Information"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+		)
+		__tui_19.AddChild(__tui_20)
+		__tui_21 := tui.New(
+			tui.WithText("● Active"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+		)
+		__tui_19.AddChild(__tui_21)
+		__tui_18.AddChild(__tui_19)
+		__tui_22 := tui.New(
+			tui.WithHR(),
+		)
+		__tui_18.AddChild(__tui_22)
+		__tui_23 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_24 := tui.New(
+			tui.WithText("Username:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_23.AddChild(__tui_24)
+		__tui_25 := tui.New(
+			tui.WithText(p.username.Get()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+		)
+		__tui_23.AddChild(__tui_25)
+		__tui_18.AddChild(__tui_23)
+		__tui_26 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_27 := tui.New(
+			tui.WithText("Account Code:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_26.AddChild(__tui_27)
+		__tui_28 := tui.New(
+			tui.WithText(p.accountCode.Get()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+		)
+		__tui_26.AddChild(__tui_28)
+		__tui_18.AddChild(__tui_26)
+		__tui_29 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_30 := tui.New(
+			tui.WithText("Password:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_29.AddChild(__tui_30)
+		__tui_31 := tui.New(
+			tui.WithText("••••••••"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_29.AddChild(__tui_31)
+		__tui_18.AddChild(__tui_29)
+		__tui_17.AddChild(__tui_18)
+		__tui_32 := tui.New(
+			tui.WithText("Press [e] to edit profile details"),
+			tui.WithPaddingTRBL(1, 0, 0, 0),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_17.AddChild(__tui_32)
+		__tui_0.AddChild(__tui_17)
 	}
 
 	return __tui_0

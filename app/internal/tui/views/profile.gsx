@@ -1,8 +1,6 @@
 package views
 
-import (
-	tui "github.com/grindlemire/go-tui"
-)
+import tui "github.com/grindlemire/go-tui"
 
 type profile struct {
 	username    *tui.State[string]
@@ -38,23 +36,52 @@ func (p *profile) KeyMap() tui.KeyMap {
 
 templ (p *profile) Render() {
 	<div class="flex-col grow px-2 gap-1">
-		<span class="font-bold text-cyan">Profile</span>
+		<div class="flex justify-between items-center shrink-0">
+			<span class="font-bold text-cyan">User Profile</span>
+			if p.editMode.Get() {
+				<span class="text-yellow font-bold">[Editing Mode]</span>
+			} else {
+				<span class="font-dim">Pressto edit</span>
+			}
+		</div>
+		<hr />
 		if p.editMode.Get() {
-			<span class="font-dim">Username</span>
-			<input value={p.username} placeholder="Username" border={tui.BorderRounded} />
-			<span class="font-dim">Account Code</span>
-			<input value={p.accountCode} placeholder="Account Code" border={tui.BorderRounded} />
-			<span class="font-dim">Password</span>
-			<input value={p.password} placeholder="Password" border={tui.BorderRounded} />
-			<span class="text-green font-dim px-1">Tab between fields | Enter save | Esc cancel</span>
+			<div class="flex-col gap-1">
+				<span class="font-bold text-white">Username</span>
+				<input value={p.username} placeholder="Enter username..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} autoFocus={true} />
+				<span class="font-bold text-white">Account Code</span>
+				<input value={p.accountCode} placeholder="Enter account code..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} />
+				<span class="font-bold text-white">Password</span>
+				<input value={p.password} placeholder="Enter password..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} />
+				<div class="flex gap-2 pt-1">
+					<span class="text-green font-bold">[Enter] Save Changes</span>
+					<span class="font-dim">|</span>
+					<span class="text-red font-bold">[Esc] Cancel</span>
+				</div>
+			</div>
 		} else {
-			<span class="font-dim">Username</span>
-			<span class="px-1">{p.username.Get()}</span>
-			<span class="font-dim">Account Code</span>
-			<span class="px-1">{p.accountCode.Get()}</span>
-			<span class="font-dim">Password</span>
-			<span class="px-1">********</span>
-			<span class="font-dim px-1">Press e to edit</span>
+			<div class="flex-col gap-1">
+				<div class="flex-col border-single px-2" width={48}>
+					<div class="flex justify-between">
+						<span class="font-bold text-white">Account Information</span>
+						<span class="text-green">● Active</span>
+					</div>
+					<hr />
+					<div class="flex justify-between">
+						<span class="font-dim">Username:</span>
+						<span class="font-bold text-cyan">{p.username.Get()}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="font-dim">Account Code:</span>
+						<span class="font-bold text-white">{p.accountCode.Get()}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="font-dim">Password:</span>
+						<span class="font-dim">••••••••</span>
+					</div>
+				</div>
+				<span class="font-dim pt-1">Press [e] to edit profile details</span>
+			</div>
 		}
 	</div>
 }

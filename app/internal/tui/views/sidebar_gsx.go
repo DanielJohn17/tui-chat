@@ -59,41 +59,78 @@ func Sidebar(c client.Client, selectedChat *tui.State[int]) *SidebarView {
 		tui.WithBorder(tui.BorderSingle),
 		tui.WithFlexShrink(0),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
-		tui.WithWidth(22),
+		tui.WithWidth(24),
 	)
 	__tui_1 := tui.New(
-		tui.WithText("Chats"),
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithFlexShrink(0),
+	)
+	__tui_2 := tui.New(
+		tui.WithText("CHANNELS"),
 		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 	)
+	__tui_1.AddChild(__tui_2)
 	__tui_0.AddChild(__tui_1)
-	__tui_2 := tui.New(
+	__tui_3 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_2)
-	__loop_0_style := __tui_0.LayoutStyle()
+	__tui_0.AddChild(__tui_3)
+	__tui_4 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+		tui.WithGap(1),
+	)
+	__loop_0_style := __tui_4.LayoutStyle()
 	__loop_0 := tui.New(tui.WithDirection(__loop_0_style.Direction), tui.WithGap(__loop_0_style.Gap))
-	__tui_0.AddChild(__loop_0)
+	__tui_4.AddChild(__loop_0)
 	__update___loop_0 := func() {
 		__loop_0.RemoveAllChildren()
 		for i, ch := range c.Chats() {
 			_ = i
 			if i == selectedChat.Get() {
-				__tui_3 := tui.New(
-					tui.WithText("> "+ch.Name),
+				__tui_5 := tui.New(
+					tui.WithText("❯ #"+ch.Name),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 				)
-				__loop_0.AddChild(__tui_3)
+				__loop_0.AddChild(__tui_5)
 			} else {
-				__tui_4 := tui.New(
-					tui.WithText("  "+ch.Name),
+				__tui_6 := tui.New(
+					tui.WithText("  #"+ch.Name),
 					tui.WithTextStyle(tui.NewStyle().Dim()),
 				)
-				__loop_0.AddChild(__tui_4)
+				__loop_0.AddChild(__tui_6)
 			}
 		}
 	}
 	__update___loop_0()
 	selectedChat.Bind(func(_ int) { __update___loop_0() })
+	__tui_0.AddChild(__tui_4)
+	__tui_7 := tui.New(
+		tui.WithFlexGrow(1),
+	)
+	__tui_0.AddChild(__tui_7)
+	__tui_8 := tui.New(
+		tui.WithHR(),
+	)
+	__tui_0.AddChild(__tui_8)
+	__tui_9 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithGap(1),
+		tui.WithFlexShrink(0),
+	)
+	__tui_10 := tui.New(
+		tui.WithText("●"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+	)
+	__tui_9.AddChild(__tui_10)
+	__tui_11 := tui.New(
+		tui.WithText(c.Profile().Username),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+	)
+	__tui_9.AddChild(__tui_11)
+	__tui_0.AddChild(__tui_9)
 
 	__bindApp := func(app *tui.App) {
 	}

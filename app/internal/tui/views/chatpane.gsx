@@ -2,10 +2,8 @@ package views
 
 import (
 	"fmt"
-
-	tui "github.com/grindlemire/go-tui"
-
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	tui "github.com/grindlemire/go-tui"
 )
 
 type chatPane struct {
@@ -49,21 +47,37 @@ templ (c *chatPane) Render() {
 	chatName := chatNameFor(c.client, c.selectedID.Get())
 	messages := c.client.Messages(c.selectedID.Get())
 	<div class="flex-col grow px-1">
-		<span class="font-bold text-cyan">{chatName}</span>
+		<div class="flex justify-between items-center shrink-0">
+			<span class="font-bold text-cyan">{chatName}</span>
+			<span class="font-dim">{fmt.Sprintf("%d messages", len(messages))}</span>
+		</div>
 		<hr />
-		<div class="flex-col grow overflow-y-scroll scrollbar-cyan" ref={c.msgRef}>
+		<div ref={c.msgRef} class="flex-col grow overflow-y-scroll scrollbar-cyan gap-1">
 			for _, msg := range messages {
-				if msg.Self {
-					<span class="text-cyan">{"> " + msg.Text}</span>
+				if msg.Sender == "system" {
+					<div class="flex gap-1">
+						<span class="text-yellow font-bold">[system]</span>
+						<span class="text-yellow font-dim">{msg.Text}</span>
+					</div>
+				} else if msg.Self {
+					<div class="flex gap-1">
+						<span class="text-cyan font-bold">❯ you:</span>
+						<span class="text-white">{msg.Text}</span>
+					</div>
 				} else {
-					<span class="font-dim">{msg.Sender + ": " + msg.Text}</span>
+					<div class="flex gap-1">
+						<span class="text-magenta font-bold">{msg.Sender + ":"}</span>
+						<span class="text-white">{msg.Text}</span>
+					</div>
 				}
 			}
 			if len(messages) == 0 {
-				<span class="font-dim">No messages yet</span>
+				<span class="font-dim">No messages yet in this channel. Send the first message!</span>
 			}
 		</div>
-		<input value={c.draft} onSubmit={c.onSubmit} placeholder="Type a message..." border={tui.BorderRounded} autoFocus={true} />
+		<div class="shrink-0 pt-1">
+			<input value={c.draft} onSubmit={c.onSubmit} placeholder="Type a message and press Enter..." border={tui.BorderRounded} width={100} focusColor={tui.Cyan} autoFocus={true} />
+		</div>
 	</div>
 }
 

@@ -156,54 +156,95 @@ func (a *app) Render(app *tui.App) *tui.Element {
 	__tui_1 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
 		tui.WithFlexShrink(0),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
 	)
 	__tui_2 := tui.New(
-		tui.WithText("TUI Chat"),
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithGap(1),
+	)
+	__tui_3 := tui.New(
+		tui.WithText("⚡ TUI CHAT"),
 		tui.WithTextGradient(tui.NewGradient(tui.Cyan, tui.Magenta).WithDirection(tui.GradientHorizontal)),
 		tui.WithTextStyle(tui.NewStyle().Bold()),
 	)
-	__tui_1.AddChild(__tui_2)
-	__tui_3 := tui.New(
-		tui.WithText(fmt.Sprintf("view: %s", viewName(a.view.Get()))),
+	__tui_2.AddChild(__tui_3)
+	__tui_4 := tui.New(
+		tui.WithText("|"),
+		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Cyan)),
+	)
+	__tui_2.AddChild(__tui_4)
+	__tui_5 := tui.New(
+		tui.WithText("terminal messenger"),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
-	__tui_1.AddChild(__tui_3)
+	__tui_2.AddChild(__tui_5)
+	__tui_1.AddChild(__tui_2)
+	__tui_6 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithGap(1),
+	)
+	__tui_7 := tui.New(
+		tui.WithText("● Online"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green)),
+	)
+	__tui_6.AddChild(__tui_7)
+	__tui_8 := tui.New(
+		tui.WithText("|"),
+		tui.WithTextStyle(tui.NewStyle().Dim()),
+	)
+	__tui_6.AddChild(__tui_8)
+	if a.view.Get() == viewChats {
+		__tui_9 := tui.New(
+			tui.WithText("[ Chat ]"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+		)
+		__tui_6.AddChild(__tui_9)
+	} else {
+		__tui_10 := tui.New(
+			tui.WithText("[ Profile ]"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
+		)
+		__tui_6.AddChild(__tui_10)
+	}
+	__tui_1.AddChild(__tui_6)
 	__tui_0.AddChild(__tui_1)
-	__tui_4 := tui.New(
+	__tui_11 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_4)
-	__tui_5 := tui.New(
+	__tui_0.AddChild(__tui_11)
+	__tui_12 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithFlexGrow(1),
 		tui.WithMinHeight(0),
 	)
-	__tui_6 := app.Mount(a, 0, func() tui.Component {
+	__tui_13 := app.Mount(a, 0, func() tui.Component {
 		return Sidebar(a.client, a.selectedChat)
 	})
-	__tui_5.AddChild(__tui_6)
+	__tui_12.AddChild(__tui_13)
 	if a.view.Get() == viewChats {
-		__tui_7 := app.Mount(a, 1, func() tui.Component {
+		__tui_14 := app.Mount(a, 1, func() tui.Component {
 			return ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
 		})
-		__tui_5.AddChild(__tui_7)
+		__tui_12.AddChild(__tui_14)
 	} else {
-		__tui_8 := app.Mount(a, 2, func() tui.Component {
+		__tui_15 := app.Mount(a, 2, func() tui.Component {
 			return Profile(a.username, a.accountCode, a.password, a.profileEdit, a.saveProfile, a.cancelProfile)
 		})
-		__tui_5.AddChild(__tui_8)
+		__tui_12.AddChild(__tui_15)
 	}
-	__tui_0.AddChild(__tui_5)
-	__tui_9 := tui.New(
+	__tui_0.AddChild(__tui_12)
+	__tui_16 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_9)
-	__tui_10 := app.Mount(a, 3, func() tui.Component {
+	__tui_0.AddChild(__tui_16)
+	__tui_17 := app.Mount(a, 3, func() tui.Component {
 		return StatusBar(a.view.Get(), a.profileEdit.Get())
 	})
-	__tui_0.AddChild(__tui_10)
+	__tui_0.AddChild(__tui_17)
 
 	return __tui_0
 }

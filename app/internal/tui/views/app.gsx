@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"time"
-
-	tui "github.com/grindlemire/go-tui"
-
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	tui "github.com/grindlemire/go-tui"
 )
 
 type viewMode int
@@ -18,15 +16,15 @@ const (
 )
 
 type app struct {
-	client        client.Client
-	view          *tui.State[viewMode]
-	selectedChat  *tui.State[int]
-	draft         *tui.State[string]
-	username      *tui.State[string]
-	accountCode   *tui.State[string]
-	password      *tui.State[string]
-	profileEdit   *tui.State[bool]
-	replyPending  *tui.State[int]
+	client       client.Client
+	view         *tui.State[viewMode]
+	selectedChat *tui.State[int]
+	draft        *tui.State[string]
+	username     *tui.State[string]
+	accountCode  *tui.State[string]
+	password     *tui.State[string]
+	profileEdit  *tui.State[bool]
+	replyPending *tui.State[int]
 }
 
 func App(c client.Client) *app {
@@ -99,9 +97,21 @@ func (a *app) Watchers() []tui.Watcher {
 
 templ (a *app) Render() {
 	<div class="flex-col h-full">
-		<div class="flex justify-between px-1 shrink-0">
-			<span class="font-bold text-gradient-cyan-magenta">TUI Chat</span>
-			<span class="font-dim">{fmt.Sprintf("view: %s", viewName(a.view.Get()))}</span>
+		<div class="flex justify-between items-center px-1 shrink-0">
+			<div class="flex items-center gap-1">
+				<span class="font-bold text-gradient-cyan-magenta">⚡ TUI CHAT</span>
+				<span class="font-dim text-cyan">|</span>
+				<span class="font-dim">terminal messenger</span>
+			</div>
+			<div class="flex items-center gap-1">
+				<span class="text-green">● Online</span>
+				<span class="font-dim">|</span>
+				if a.view.Get() == viewChats {
+					<span class="font-bold text-cyan">[ Chat ]</span>
+				} else {
+					<span class="font-bold text-magenta">[ Profile ]</span>
+				}
+			</div>
 		</div>
 		<hr />
 		<div class="flex grow min-h-0">
