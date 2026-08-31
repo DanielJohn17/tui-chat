@@ -3,6 +3,7 @@ module github.com/DanielJohn17/tui-chat/app
 go 1.27.0
 
 require (
+
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -34,4 +35,7 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
+	github.com/grindlemire/go-tui v0.19.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+
 )
