@@ -53,16 +53,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT
-  (id, name, username)
+  id, name, username
 FROM
   users
 WHERE
   username = $1
 `
 
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (interface{}, error) {
+type GetUserByUsernameRow struct {
+	ID       int64
+	Name     string
+	Username string
+}
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
-	var column_1 interface{}
-	err := row.Scan(&column_1)
-	return column_1, err
+	var i GetUserByUsernameRow
+	err := row.Scan(&i.ID, &i.Name, &i.Username)
+	return i, err
 }
