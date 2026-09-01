@@ -1,13 +1,13 @@
 // Package users
 package users
 
-type CreateUser struct {
+type CreateUserType struct {
 	Name     string
 	Username string
 	Password string
 }
 
-type CreateUserResponse struct {
+type CreateUserResponseType struct {
 	ID        int64
 	Name      string
 	Username  string
@@ -15,7 +15,7 @@ type CreateUserResponse struct {
 	UpdatedAT string
 }
 
-type GetUserResponse struct {
+type GetUserResponseType struct {
 	ID       int64
 	Name     string
 	Username string

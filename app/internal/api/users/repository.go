@@ -9,21 +9,26 @@ import (
 )
 
 type UserRepositoryInt interface {
-	CreateUser(ctx context.Context, user CreateUser) (*CreateUserResponse, error)
-	GetUserByUsername(ctx context.Context, username string) (*GetUserResponse, error)
+	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
+	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
+}
+
+type UserQuerier interface {
+	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error)
+	GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error)
 }
 
 type UserRepository struct {
-	q *database.Queries
+	q UserQuerier
 }
 
-func NewUserRepository(q *database.Queries) *UserRepository {
+func NewUserRepository(q UserQuerier) *UserRepository {
 	return &UserRepository{q: q}
 }
 
 var _ UserRepositoryInt = (*UserRepository)(nil)
 
-func (r *UserRepository) CreateUser(ctx context.Context, user CreateUser) (*CreateUserResponse, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error) {
 	userParams := database.CreateUserParams{
 		Name:     user.Name,
 		Username: user.Username,
@@ -36,7 +41,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user CreateUser) (*Crea
 		return nil, fmt.Errorf("error creating user")
 	}
 
-	return &CreateUserResponse{
+	return &CreateUserResponseType{
 		ID:        createdUser.ID,
 		Name:      createdUser.Name,
 		Username:  createdUser.Username,
@@ -45,12 +50,12 @@ func (r *UserRepository) CreateUser(ctx context.Context, user CreateUser) (*Crea
 	}, nil
 }
 
-func (r *UserRepository) GetUserByUsername(ctx context.Context, username string) (*GetUserResponse, error) {
+func (r *UserRepository) GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error) {
 	user, err := r.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		fmt.Printf("GetUserByUsername: %v\n", err)
 		return nil, fmt.Errorf("user not found")
 	}
 
-	return &GetUserResponse{ID: user.ID, Name: user.Name, Username: user.Username}, nil
+	return &GetUserResponseType{ID: user.ID, Name: user.Name, Username: user.Username}, nil
 }
