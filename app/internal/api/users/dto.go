@@ -1,6 +1,10 @@
 // Package users
 package users
 
+type URLParam struct {
+	Username string `uri:"username" binding:"required,alphanum,min=3,max=20"`
+}
+
 type CreateUserType struct {
 	Name     string
 	Username string
