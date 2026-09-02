@@ -12,10 +12,18 @@ type CreateUserResponseType struct {
 	Name      string
 	Username  string
 	CreatedAt string
-	UpdatedAT string
+	UpdatedAt string
 }
 
 type GetUserResponseType struct {
+	ID        int64
+	Name      string
+	Username  string
+	CreatedAt string
+	UpdatedAt string
+}
+
+type DeleteUserResponseType struct {
 	ID       int64
 	Name     string
 	Username string

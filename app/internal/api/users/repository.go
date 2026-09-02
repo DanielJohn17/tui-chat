@@ -11,11 +11,15 @@ import (
 type UserRepositoryInt interface {
 	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
 	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
+	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
+	DeleteUser(ctx context.Context, id int64) (*DeleteUserResponseType, error)
 }
 
 type UserQuerier interface {
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error)
 	GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error)
+	GetUserById(ctx context.Context, id int64) (database.GetUserByIdRow, error)
+	DeleteUser(ctx context.Context, id int64) (database.DeleteUserRow, error)
 }
 
 type UserRepository struct {
@@ -28,7 +32,10 @@ func NewUserRepository(q UserQuerier) *UserRepository {
 
 var _ UserRepositoryInt = (*UserRepository)(nil)
 
-func (r *UserRepository) CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error) {
+func (r *UserRepository) CreateUser(
+	ctx context.Context,
+	user CreateUserType,
+) (*CreateUserResponseType, error) {
 	userParams := database.CreateUserParams{
 		Name:     user.Name,
 		Username: user.Username,
@@ -46,11 +53,14 @@ func (r *UserRepository) CreateUser(ctx context.Context, user CreateUserType) (*
 		Name:      createdUser.Name,
 		Username:  createdUser.Username,
 		CreatedAt: createdUser.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAT: createdUser.UpdatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: createdUser.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
 }
 
-func (r *UserRepository) GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error) {
+func (r *UserRepository) GetUserByUsername(
+	ctx context.Context,
+	username string,
+) (*GetUserResponseType, error) {
 	user, err := r.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		fmt.Printf("GetUserByUsername: %v\n", err)
@@ -58,4 +68,37 @@ func (r *UserRepository) GetUserByUsername(ctx context.Context, username string)
 	}
 
 	return &GetUserResponseType{ID: user.ID, Name: user.Name, Username: user.Username}, nil
+}
+
+func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error) {
+	user, err := r.q.GetUserById(ctx, id)
+	if err != nil {
+		fmt.Printf("GetUserById: %v\n", err)
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return &GetUserResponseType{
+		ID:        user.ID,
+		Name:      user.Name,
+		Username:  user.Username,
+		CreatedAt: user.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt.Time.Format(time.RFC3339),
+	}, nil
+}
+
+func (r *UserRepository) DeleteUser(
+	ctx context.Context,
+	id int64,
+) (*DeleteUserResponseType, error) {
+	deletedUser, err := r.q.DeleteUser(ctx, id)
+	if err != nil {
+		fmt.Printf("DeleteUser: %v\n", err)
+		return nil, fmt.Errorf("error deleting user")
+	}
+
+	return &DeleteUserResponseType{
+		ID:       deletedUser.ID,
+		Name:     deletedUser.Name,
+		Username: deletedUser.Username,
+	}, nil
 }
