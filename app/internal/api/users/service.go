@@ -18,6 +18,11 @@ type UserServiceInt interface {
 		input string,
 	) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse)
 
+	GetUserByID(
+		ctx context.Context,
+		input int64,
+	) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse)
+
 	DeleteUser(
 		ctx context.Context,
 		input int64,
@@ -68,6 +73,26 @@ func (s *UserService) GetUserByUsername(
 	input string,
 ) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse) {
 	user, err := s.r.GetUserByUsername(ctx, input)
+	if err != nil {
+		return nil, &types.APIErrorResponse{
+			Status:  http.StatusNotFound,
+			Success: false,
+			Message: err.Error(),
+		}
+	}
+
+	return &types.APIResponse[GetUserResponseType]{
+		Status:  http.StatusFound,
+		Success: true,
+		Data:    *user,
+	}, nil
+}
+
+func (s *UserService) GetUserByID(
+	ctx context.Context,
+	input int64,
+) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse) {
+	user, err := s.r.GetUserByID(ctx, input)
 	if err != nil {
 		return nil, &types.APIErrorResponse{
 			Status:  http.StatusNotFound,

@@ -2,6 +2,7 @@ package users
 
 import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,9 +23,10 @@ var _ UserHandlerInt = (*UserHandler)(nil)
 
 func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 
-	req := c.MustGet("params").(URLParam)
+	ctx := c.Request.Context()
+	req := c.MustGet("params").(types.URLParamString)
 
-	apiResponse, apiError := h.s.GetUserByUsername(c, req.Username)
+	apiResponse, apiError := h.s.GetUserByUsername(ctx, req.Str)
 	if apiError != nil {
 		helpers.WriteError(c, *apiError)
 		return
@@ -34,5 +36,14 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserByID(c *gin.Context) {
+	ctx := c.Request.Context()
+	req := c.MustGet("params").(types.URLParamInt)
 
+	apiResponse, apiError := h.s.GetUserByID(ctx, int64(req.ID))
+	if apiError != nil {
+		helpers.WriteError(c, *apiError)
+		return
+	}
+
+	helpers.WriteJSON(c, *apiResponse)
 }
