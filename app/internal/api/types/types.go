@@ -1,6 +1,14 @@
 // Package types
 package types
 
+type URLParamString struct {
+	Str string `uri:"username" binding:"required,alphanum,min=3,max=20"`
+}
+
+type URLParamInt struct {
+	ID int `uri:"id" binding:"required,gt=0"`
+}
+
 type BaseResponse[T comparable] struct {
 	Status  int
 	Success bool `json:"success"`

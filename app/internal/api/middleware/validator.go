@@ -12,7 +12,7 @@ func ValidateAndBind[T comparable]() gin.HandlerFunc {
 
 		var params T
 
-		if err := c.ShouldBind(&params); err != nil {
+		if err := c.ShouldBindUri(&params); err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
