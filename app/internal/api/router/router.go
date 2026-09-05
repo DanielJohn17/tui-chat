@@ -2,6 +2,7 @@
 package router
 
 import (
+	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/middleware"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
@@ -10,6 +11,7 @@ import (
 
 type Handlers struct {
 	User users.UserHandlerInt
+	Auth auth.AuthHandlerInt
 }
 
 func NewRouter(h Handlers) *gin.Engine {
@@ -17,6 +19,10 @@ func NewRouter(h Handlers) *gin.Engine {
 
 	subRouter := router.Group("/api/v1")
 
+	subRouter.POST("/auth/register", h.Auth.RegisterUser)
+	subRouter.POST("/auth/login", h.Auth.LoginUser)
+
 	subRouter.GET("/users/:id", middleware.ValidateAndBind[types.URLParamInt](), h.User.GetUserByID)
+
 	return router
 }
