@@ -106,7 +106,7 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) (GetUserByIdRow, er
 
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT
-  id, name, username
+  id, name, username, password
 FROM
   users
 WHERE
@@ -117,11 +117,17 @@ type GetUserByUsernameRow struct {
 	ID       int64
 	Name     string
 	Username string
+	Password string
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i GetUserByUsernameRow
-	err := row.Scan(&i.ID, &i.Name, &i.Username)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Username,
+		&i.Password,
+	)
 	return i, err
 }

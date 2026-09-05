@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
@@ -10,7 +11,7 @@ import (
 
 type UserRepositoryInt interface {
 	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
-	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
+	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseAuthType, error)
 	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
 	DeleteUser(ctx context.Context, id int64) (*DeleteUserResponseType, error)
 }
@@ -44,7 +45,7 @@ func (r *UserRepository) CreateUser(
 
 	createdUser, err := r.q.CreateUser(ctx, userParams)
 	if err != nil {
-		fmt.Printf("CreateUser: %v\n", err)
+		log.Printf("==>CreateUser: %v\n", err)
 		return nil, fmt.Errorf("error creating user")
 	}
 
@@ -60,20 +61,25 @@ func (r *UserRepository) CreateUser(
 func (r *UserRepository) GetUserByUsername(
 	ctx context.Context,
 	username string,
-) (*GetUserResponseType, error) {
+) (*GetUserResponseAuthType, error) {
 	user, err := r.q.GetUserByUsername(ctx, username)
 	if err != nil {
-		fmt.Printf("GetUserByUsername: %v\n", err)
+		log.Printf("==>GetUserByUsername: %v\n", err)
 		return nil, fmt.Errorf("user not found")
 	}
 
-	return &GetUserResponseType{ID: user.ID, Name: user.Name, Username: user.Username}, nil
+	return &GetUserResponseAuthType{
+		ID:       user.ID,
+		Name:     user.Name,
+		Password: user.Password,
+		Username: user.Username,
+	}, nil
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error) {
 	user, err := r.q.GetUserById(ctx, id)
 	if err != nil {
-		fmt.Printf("GetUserById: %v\n", err)
+		log.Printf("=>>GetUserById: %v\n", err)
 		return nil, fmt.Errorf("user not found")
 	}
 
@@ -92,7 +98,7 @@ func (r *UserRepository) DeleteUser(
 ) (*DeleteUserResponseType, error) {
 	deletedUser, err := r.q.DeleteUser(ctx, id)
 	if err != nil {
-		fmt.Printf("DeleteUser: %v\n", err)
+		log.Printf("==>DeleteUser: %v\n", err)
 		return nil, fmt.Errorf("error deleting user")
 	}
 

@@ -27,6 +27,11 @@ type UserServiceInt interface {
 		ctx context.Context,
 		input int64,
 	) (*types.APIResponse[DeleteUserResponseType], *types.APIErrorResponse)
+
+	GetUserAuth(
+		ctx context.Context,
+		input string,
+	) (*GetUserResponseAuthType, error)
 }
 
 type UserService struct {
@@ -81,10 +86,16 @@ func (s *UserService) GetUserByUsername(
 		}
 	}
 
+	userResp := GetUserResponseType{
+		ID:       user.ID,
+		Name:     user.Name,
+		Username: user.Username,
+	}
+
 	return &types.APIResponse[GetUserResponseType]{
 		Status:  http.StatusFound,
 		Success: true,
-		Data:    *user,
+		Data:    userResp,
 	}, nil
 }
 
@@ -136,4 +147,17 @@ func (s *UserService) DeleteUser(
 		Success: true,
 		Data:    *deletedUser,
 	}, nil
+}
+
+func (s *UserService) GetUserAuth(
+	ctx context.Context,
+	input string,
+) (*GetUserResponseAuthType, error) {
+	user, err := s.r.GetUserByUsername(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+
 }

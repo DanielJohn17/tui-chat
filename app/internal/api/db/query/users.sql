@@ -12,7 +12,7 @@ RETURNING
 
 -- name: GetUserByUsername :one
 SELECT
-  id, name, username
+  id, name, username, password
 FROM
   users
 WHERE
