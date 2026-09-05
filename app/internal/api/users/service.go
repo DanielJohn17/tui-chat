@@ -93,7 +93,7 @@ func (s *UserService) GetUserByUsername(
 	}
 
 	return &types.APIResponse[GetUserResponseType]{
-		Status:  http.StatusFound,
+		Status:  http.StatusOK,
 		Success: true,
 		Data:    userResp,
 	}, nil
@@ -113,7 +113,7 @@ func (s *UserService) GetUserByID(
 	}
 
 	return &types.APIResponse[GetUserResponseType]{
-		Status:  http.StatusFound,
+		Status:  http.StatusOK,
 		Success: true,
 		Data:    *user,
 	}, nil

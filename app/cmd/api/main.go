@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/router"
@@ -37,9 +38,14 @@ func main() {
 	userService := users.NewUserService(userRepo)
 	userHandler := users.NewUserHandler(userService)
 
+	// auth
+	authService := auth.NewAuthService(userService)
+	authHandler := auth.NewAuthHander(authService)
+
 	// router
 	handlers := router.Handlers{
 		User: userHandler,
+		Auth: authHandler,
 	}
 
 	router := router.NewRouter(handlers)

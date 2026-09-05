@@ -123,7 +123,7 @@ func (s *AuthService) Login(
 	}
 
 	return &types.APIResponse[UserResponseType]{
-		Status:  http.StatusFound,
+		Status:  http.StatusOK,
 		Success: true,
 		Data:    data,
 	}, nil
