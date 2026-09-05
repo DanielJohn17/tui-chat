@@ -22,7 +22,14 @@ func NewRouter(h Handlers) *gin.Engine {
 	subRouter.POST("/auth/register", h.Auth.RegisterUser)
 	subRouter.POST("/auth/login", h.Auth.LoginUser)
 
-	subRouter.GET("/users/:id", middleware.ValidateAndBind[types.URLParamInt](), h.User.GetUserByID)
-
+	subRouter.Use(middleware.Auth())
+	{
+		// users routes
+		subRouter.GET(
+			"/users/:id",
+			middleware.ValidateAndBind[types.URLParamInt](),
+			h.User.GetUserByID,
+		)
+	}
 	return router
 }

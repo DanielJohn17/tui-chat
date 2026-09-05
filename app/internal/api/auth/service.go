@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
 	"golang.org/x/crypto/bcrypt"
@@ -56,10 +57,21 @@ func (s *AuthService) Register(ctx context.Context,
 	}
 
 	data := apiResponse.Data
+
+	token, err := helpers.CreateToken(helpers.UserToken{ID: data.ID, Username: data.Username})
+	if err != nil {
+		return nil, &types.APIErrorResponse{
+			Status:  http.StatusInternalServerError,
+			Success: false,
+			Message: "error creating token",
+		}
+	}
+
 	newData := UserResponseType{
 		ID:        data.ID,
 		Name:      data.Name,
 		Username:  data.Username,
+		Token:     token,
 		CreatedAt: data.CreatedAt,
 		UpdatedAt: data.UpdatedAt,
 	}
@@ -94,10 +106,20 @@ func (s *AuthService) Login(
 		}
 	}
 
+	token, err := helpers.CreateToken(helpers.UserToken{ID: user.ID, Username: user.Username})
+	if err != nil {
+		return nil, &types.APIErrorResponse{
+			Status:  http.StatusInternalServerError,
+			Success: false,
+			Message: "error creating token",
+		}
+	}
+
 	data := UserResponseType{
 		ID:       user.ID,
 		Name:     user.Name,
 		Username: user.Username,
+		Token:    token,
 	}
 
 	return &types.APIResponse[UserResponseType]{

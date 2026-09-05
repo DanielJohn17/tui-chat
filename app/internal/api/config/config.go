@@ -4,16 +4,19 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	DBUser     string
-	DBPassword string
-	DBHost     string
-	DBport     string
-	DBName     string
+	DBUser                 string
+	DBPassword             string
+	DBHost                 string
+	DBport                 string
+	DBName                 string
+	JWTSecretKey           string
+	JWTExpirationInSeconds int32
 }
 
 // ENV variables
@@ -25,11 +28,13 @@ func initConfig() *Config {
 	}
 
 	return &Config{
-		DBUser:     GetEnv("DB_USER", "postgres"),
-		DBPassword: GetEnv("DB_PASSWORD", "postgres"),
-		DBHost:     GetEnv("DB_HOST", "localhost"),
-		DBport:     GetEnv("DB_PORT", "5432"),
-		DBName:     GetEnv("DB_NAME", "tui_chat_db"),
+		DBUser:                 GetEnv("DB_USER", "postgres"),
+		DBPassword:             GetEnv("DB_PASSWORD", "postgres"),
+		DBHost:                 GetEnv("DB_HOST", "localhost"),
+		DBport:                 GetEnv("DB_PORT", "5432"),
+		DBName:                 GetEnv("DB_NAME", "tui_chat_db"),
+		JWTSecretKey:           GetEnv("JWT_SECRET_KEY", ""),
+		JWTExpirationInSeconds: GetEnvAsInt("JWT_EXP", 259200),
 	}
 }
 
@@ -40,4 +45,17 @@ func GetEnv(key, fallback string) string {
 	}
 
 	return value
+}
+
+func GetEnvAsInt(key string, fallback int32) int32 {
+	if value, ok := os.LookupEnv(key); ok {
+		valueInt, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return fallback
+		}
+
+		return int32(valueInt)
+	}
+
+	return fallback
 }

@@ -15,6 +15,7 @@ type UserResponseType struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	Username  string `json:"username"`
+	Token     string `json:"token"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
