@@ -3,10 +3,9 @@ package auth
 
 import (
 	"context"
-	"net/http"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -15,12 +14,12 @@ type AuthServiceInt interface {
 	Register(
 		ctx context.Context,
 		user RegisterUserType,
-	) (*types.APIResponse[UserResponseType], *types.APIErrorResponse)
+	) (*UserResponseType, error)
 
 	Login(
 		ctx context.Context,
 		input LoginUserType,
-	) (*types.APIResponse[UserResponseType], *types.APIErrorResponse)
+	) (*UserResponseType, error)
 }
 
 type AuthService struct {
@@ -35,14 +34,10 @@ var _ AuthServiceInt = (*AuthService)(nil)
 
 func (s *AuthService) Register(ctx context.Context,
 	input RegisterUserType,
-) (*types.APIResponse[UserResponseType], *types.APIErrorResponse) {
+) (*UserResponseType, error) {
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Success: false,
-			Message: "password error, try again",
-		}
+		return nil, errors.NewInternalServerError("password error, try again", err)
 	}
 
 	createUser := users.CreateUserType{
@@ -51,80 +46,56 @@ func (s *AuthService) Register(ctx context.Context,
 		Password: string(hashPassword),
 	}
 
-	apiResponse, apiError := s.u.CreateUser(ctx, createUser)
+	userRegisterd, apiError := s.u.CreateUser(ctx, createUser)
 	if apiError != nil {
 		return nil, apiError
 	}
 
-	data := apiResponse.Data
-
-	token, err := helpers.CreateToken(helpers.UserToken{ID: data.ID, Username: data.Username})
+	token, err := helpers.CreateToken(
+		helpers.UserToken{ID: userRegisterd.ID, Username: userRegisterd.Username},
+	)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Success: false,
-			Message: "error creating token",
-		}
+		return nil, errors.NewInternalServerError("error creating token", err)
 	}
 
-	newData := UserResponseType{
-		ID:        data.ID,
-		Name:      data.Name,
-		Username:  data.Username,
+	newData := &UserResponseType{
+		ID:        userRegisterd.ID,
+		Name:      userRegisterd.Name,
+		Username:  userRegisterd.Username,
 		Token:     token,
-		CreatedAt: data.CreatedAt,
-		UpdatedAt: data.UpdatedAt,
+		CreatedAt: userRegisterd.CreatedAt,
+		UpdatedAt: userRegisterd.UpdatedAt,
 	}
-	return &types.APIResponse[UserResponseType]{
-		Status:  apiResponse.Status,
-		Success: true,
-		Data:    newData,
-	}, nil
+	return newData, nil
 }
 
 func (s *AuthService) Login(
 	ctx context.Context,
 	input LoginUserType,
-) (*types.APIResponse[UserResponseType], *types.APIErrorResponse) {
-	user, err := s.u.GetUserAuth(ctx, input.Username)
+) (*UserResponseType, error) {
+	user, err := s.u.GetUserByUsername(ctx, input.Username)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  404,
-			Success: false,
-			Message: "incorrect username or password",
-		}
+		return nil, errors.NewNotFoundError("incorrect username or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(input.Password),
 		[]byte(user.Password),
 	); err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  404,
-			Success: false,
-			Message: "incorrect username or password",
-		}
+		return nil, errors.NewNotFoundError("incorrect username or password")
 	}
 
 	token, err := helpers.CreateToken(helpers.UserToken{ID: user.ID, Username: user.Username})
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Success: false,
-			Message: "error creating token",
-		}
+		return nil, errors.NewInternalServerError("error creating token", err)
 	}
 
-	data := UserResponseType{
+	userLogin := &UserResponseType{
 		ID:       user.ID,
 		Name:     user.Name,
 		Username: user.Username,
 		Token:    token,
 	}
 
-	return &types.APIResponse[UserResponseType]{
-		Status:  http.StatusOK,
-		Success: true,
-		Data:    data,
-	}, nil
+	return userLogin, nil
 }

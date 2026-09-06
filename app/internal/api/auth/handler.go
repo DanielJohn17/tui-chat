@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
 	"github.com/gin-gonic/gin"
 )
@@ -25,18 +27,18 @@ func (h *AuthHandler) RegisterUser(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	if apiError := helpers.ParseJSON(c, &registerUser); apiError != nil {
-		helpers.WriteError(c, *apiError)
+	if err := helpers.ParseJSON(c, &registerUser); err != nil {
+		helpers.WriteError(c, err)
 		return
 	}
 
-	apiResp, apiError := h.s.Register(ctx, registerUser)
-	if apiError != nil {
-		helpers.WriteError(c, *apiError)
+	userRegisterd, err := h.s.Register(ctx, registerUser)
+	if err != nil {
+		helpers.WriteError(c, err)
 		return
 	}
 
-	helpers.WriteJSON(c, *apiResp)
+	helpers.WriteJSON(c, http.StatusCreated, userRegisterd)
 }
 
 func (h *AuthHandler) LoginUser(c *gin.Context) {
@@ -44,16 +46,16 @@ func (h *AuthHandler) LoginUser(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	if apiError := helpers.ParseJSON(c, &loginUser); apiError != nil {
-		helpers.WriteError(c, *apiError)
+	if err := helpers.ParseJSON(c, &loginUser); err != nil {
+		helpers.WriteError(c, err)
 		return
 	}
 
-	apiResp, apiError := h.s.Login(ctx, loginUser)
-	if apiError != nil {
-		helpers.WriteError(c, *apiError)
+	userLogin, err := h.s.Login(ctx, loginUser)
+	if err != nil {
+		helpers.WriteError(c, err)
 		return
 	}
 
-	helpers.WriteJSON(c, *apiResp)
+	helpers.WriteJSON(c, http.StatusOK, userLogin)
 }
