@@ -11,7 +11,7 @@ import (
 
 type UserRepositoryInt interface {
 	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
-	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseAuthType, error)
+	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
 	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
 	DeleteUser(ctx context.Context, id int64) (*DeleteUserResponseType, error)
 }
@@ -61,14 +61,14 @@ func (r *UserRepository) CreateUser(
 func (r *UserRepository) GetUserByUsername(
 	ctx context.Context,
 	username string,
-) (*GetUserResponseAuthType, error) {
+) (*GetUserResponseType, error) {
 	user, err := r.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		log.Printf("==>GetUserByUsername: %v\n", err)
 		return nil, fmt.Errorf("user not found")
 	}
 
-	return &GetUserResponseAuthType{
+	return &GetUserResponseType{
 		ID:       user.ID,
 		Name:     user.Name,
 		Password: user.Password,

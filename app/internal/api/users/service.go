@@ -2,36 +2,30 @@ package users
 
 import (
 	"context"
-	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 )
 
 type UserServiceInt interface {
 	CreateUser(
 		ctx context.Context,
 		input CreateUserType,
-	) (*types.APIResponse[CreateUserResponseType], *types.APIErrorResponse)
+	) (*CreateUserResponseType, error)
 
 	GetUserByUsername(
 		ctx context.Context,
 		input string,
-	) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse)
+	) (*GetUserResponseType, error)
 
 	GetUserByID(
 		ctx context.Context,
 		input int64,
-	) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse)
+	) (*GetUserResponseType, error)
 
 	DeleteUser(
 		ctx context.Context,
 		input int64,
-	) (*types.APIResponse[DeleteUserResponseType], *types.APIErrorResponse)
-
-	GetUserAuth(
-		ctx context.Context,
-		input string,
-	) (*GetUserResponseAuthType, error)
+	) (*DeleteUserResponseType, error)
 }
 
 type UserService struct {
@@ -47,117 +41,64 @@ var _ UserServiceInt = (*UserService)(nil)
 func (s *UserService) CreateUser(
 	ctx context.Context,
 	input CreateUserType,
-) (*types.APIResponse[CreateUserResponseType], *types.APIErrorResponse) {
+) (*CreateUserResponseType, error) {
 	_, err := s.r.GetUserByUsername(ctx, input.Username)
 	if err == nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusConflict,
-			Success: false,
-			Message: "user already created",
-		}
+		return nil, errors.NewConflictError("user already exists")
 	}
 
 	createdUser, err := s.r.CreateUser(ctx, input)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Success: false,
-			Message: err.Error(),
-		}
+		return nil, errors.NewInternalServerError(err.Error(), err)
 	}
 
-	return &types.APIResponse[CreateUserResponseType]{
-		Status:  http.StatusCreated,
-		Success: true,
-		Data:    *createdUser,
-	}, nil
+	return createdUser, nil
 }
 
 func (s *UserService) GetUserByUsername(
 	ctx context.Context,
 	input string,
-) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse) {
+) (*GetUserResponseType, error) {
 	user, err := s.r.GetUserByUsername(ctx, input)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusNotFound,
-			Success: false,
-			Message: err.Error(),
-		}
+		return nil, errors.NewNotFoundError(err.Error())
 	}
 
-	userResp := GetUserResponseType{
+	userResp := &GetUserResponseType{
 		ID:       user.ID,
 		Name:     user.Name,
+		Password: user.Password,
 		Username: user.Username,
 	}
 
-	return &types.APIResponse[GetUserResponseType]{
-		Status:  http.StatusOK,
-		Success: true,
-		Data:    userResp,
-	}, nil
+	return userResp, nil
 }
 
 func (s *UserService) GetUserByID(
 	ctx context.Context,
 	input int64,
-) (*types.APIResponse[GetUserResponseType], *types.APIErrorResponse) {
+) (*GetUserResponseType, error) {
 	user, err := s.r.GetUserByID(ctx, input)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusNotFound,
-			Success: false,
-			Message: err.Error(),
-		}
+		return nil, errors.NewNotFoundError(err.Error())
 	}
 
-	return &types.APIResponse[GetUserResponseType]{
-		Status:  http.StatusOK,
-		Success: true,
-		Data:    *user,
-	}, nil
+	return user, nil
 }
 
 func (s *UserService) DeleteUser(
 	ctx context.Context,
 	input int64,
-) (*types.APIResponse[DeleteUserResponseType], *types.APIErrorResponse) {
+) (*DeleteUserResponseType, error) {
 	user, err := s.r.GetUserByID(ctx, input)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusNotFound,
-			Success: false,
-			Message: err.Error(),
-		}
+		return nil, errors.NewNotFoundError(err.Error())
 	}
 
 	deletedUser, err := s.r.DeleteUser(ctx, user.ID)
 	if err != nil {
-		return nil, &types.APIErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Success: false,
-			Message: err.Error(),
-		}
-
+		return nil, errors.NewInternalServerError(err.Error(), err)
 	}
 
-	return &types.APIResponse[DeleteUserResponseType]{
-		Status:  http.StatusOK,
-		Success: true,
-		Data:    *deletedUser,
-	}, nil
-}
-
-func (s *UserService) GetUserAuth(
-	ctx context.Context,
-	input string,
-) (*GetUserResponseAuthType, error) {
-	user, err := s.r.GetUserByUsername(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-
+	return deletedUser, nil
 }

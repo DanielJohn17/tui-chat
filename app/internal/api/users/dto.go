@@ -15,19 +15,11 @@ type CreateUserResponseType struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-type GetUserResponseAuthType struct {
-	ID        int64
-	Name      string
-	Username  string
-	Password  string
-	CreatedAt string
-	UpdatedAt string
-}
-
 type GetUserResponseType struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	Username  string `json:"username"`
+	Password  string `json:"-"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }

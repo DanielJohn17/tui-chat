@@ -9,28 +9,10 @@ type URLParamInt struct {
 	ID int `uri:"id" binding:"required,gt=0"`
 }
 
-type BaseResponse[T comparable] struct {
-	Status  int
-	Success bool `json:"success"`
-	Data    T    `json:"data"`
-
-	// Error   *ErrorInfo `json:"error,omitempty"`
-}
-
-type APIResponse[T comparable] struct {
-	BaseResponse[T]
-}
-
-type APIListResponse[T comparable] struct {
-	BaseResponse[T]
-	Data []T   `json:"data"`
-	Meta *Meta `json:"meta"`
-}
-
-type APIErrorResponse struct {
-	Status  int
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+type APIResponse[T any] struct {
+	Success bool  `json:"success"`
+	Data    T     `json:"data,omitempty"`
+	Meta    *Meta `json:"meta,omitempty"`
 }
 
 type Meta struct {

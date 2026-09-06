@@ -3,63 +3,56 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	apierrors "github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
 // ParseJSON transforms json byte slice into go struct
-func ParseJSON[K comparable](c *gin.Context, payload *K) *types.APIErrorResponse {
+func ParseJSON[K comparable](c *gin.Context, payload *K) error {
 	validate := validator.New()
 
 	if c.Request.Body == nil {
-		return &types.APIErrorResponse{
-			Status:  http.StatusBadRequest,
-			Success: false,
-			Message: "missing request body",
-		}
+		return apierrors.NewBadRequestError("missing request body")
 	}
 
 	if err := json.NewDecoder(c.Request.Body).Decode(payload); err != nil {
-		return &types.APIErrorResponse{
-			Status:  http.StatusBadRequest,
-			Success: false,
-			Message: fmt.Errorf("error decoding payload: %w", err).Error(),
-		}
+		return apierrors.NewBadRequestError(fmt.Sprintf("error decoding payload: %v", err))
 	}
 
 	if err := validate.Struct(payload); err != nil {
-		return &types.APIErrorResponse{
-			Status:  http.StatusBadRequest,
-			Success: false,
-			Message: fmt.Errorf("validation error: %w", err).Error(),
-		}
+		return apierrors.NewBadRequestError(
+			fmt.Sprintf("validation error: %v", err),
+		)
 	}
 
 	return nil
 }
 
-func WriteJSON[T comparable](c *gin.Context, response types.APIResponse[T]) {
-	c.IndentedJSON(response.Status, gin.H{
-		"success": response.Success,
-		"data":    response.Data,
+func WriteJSON[T any](c *gin.Context, code int, data T) {
+	c.IndentedJSON(code, gin.H{
+		"success": true,
+		"data":    data,
 	})
 }
 
-func WriteListJSON[T comparable](c *gin.Context, response types.APIListResponse[T]) {
-	c.IndentedJSON(response.Status, gin.H{
-		"success": response.Success,
-		"data":    response.Data,
-		"meta":    response.Meta,
-	})
-}
+func WriteError(c *gin.Context, err error) {
 
-func WriteError(c *gin.Context, apiErr types.APIErrorResponse) {
-	c.AbortWithStatusJSON(apiErr.Status, gin.H{
-		"success": apiErr.Success,
-		"error":   apiErr.Message,
+	if apiErr, ok := errors.AsType[*apierrors.APIError](err); ok {
+		c.AbortWithStatusJSON(apiErr.Code, gin.H{
+			"success": false,
+			"error":   apiErr.Message,
+		})
+		return
+	}
+
+	// Fallback for unhandled raw errors
+	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+		"success": false,
+		"error":   "internal server error",
 	})
 }

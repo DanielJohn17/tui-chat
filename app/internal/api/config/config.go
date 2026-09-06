@@ -10,13 +10,14 @@ import (
 )
 
 type Config struct {
+	JWTExpirationInSeconds int32
 	DBUser                 string
 	DBPassword             string
 	DBHost                 string
 	DBport                 string
 	DBName                 string
 	JWTSecretKey           string
-	JWTExpirationInSeconds int32
+	GoEnv                  string
 }
 
 // ENV variables
@@ -35,6 +36,7 @@ func initConfig() *Config {
 		DBName:                 GetEnv("DB_NAME", "tui_chat_db"),
 		JWTSecretKey:           GetEnv("JWT_SECRET_KEY", ""),
 		JWTExpirationInSeconds: GetEnvAsInt("JWT_EXP", 259200),
+		GoEnv:                  GetEnv("GO_ENV", "production"),
 	}
 }
 
