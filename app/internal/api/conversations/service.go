@@ -13,6 +13,8 @@ type ConvServiceInt interface {
 		ctx context.Context,
 		input GetOrCreateDirectConvType,
 	) ([]GetConvParticipantType, error)
+
+	GetConvsByUserID(ctx context.Context, input int64) ([]GetConvParticipantType, error)
 }
 
 type ConvService struct {
@@ -59,6 +61,20 @@ func (s *ConvService) GetOrCreateDirectConversation(
 	if err != nil {
 		return nil, errors.NewInternalServerError(err.Error(), err)
 	}
+
+	return participants, nil
+}
+
+func (s *ConvService) GetConvsByUserID(
+	ctx context.Context,
+	input int64,
+) ([]GetConvParticipantType, error) {
+	_, err := s.u.GetUserByID(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	participants := s.r.GetConvsByUserID(ctx, input)
 
 	return participants, nil
 }

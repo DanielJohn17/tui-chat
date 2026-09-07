@@ -9,6 +9,59 @@ import (
 	"context"
 )
 
+const getConversationsByUserId = `-- name: GetConversationsByUserId :many
+WITH
+  target_conv AS (
+    SELECT
+      conv_id
+    FROM
+      participants
+    WHERE
+      user_id = $1
+  )
+SELECT
+  tc.conv_id,
+  u.id AS user_id,
+  u.name,
+  u.username
+FROM
+  target_conv tc
+  JOIN participants p ON p.conv_id = tc.conv_id and p.user_id <> $1
+  JOIN users u ON u.id = p.user_id
+`
+
+type GetConversationsByUserIdRow struct {
+	ConvID   int64
+	UserID   int64
+	Name     string
+	Username string
+}
+
+func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([]GetConversationsByUserIdRow, error) {
+	rows, err := q.db.Query(ctx, getConversationsByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetConversationsByUserIdRow
+	for rows.Next() {
+		var i GetConversationsByUserIdRow
+		if err := rows.Scan(
+			&i.ConvID,
+			&i.UserID,
+			&i.Name,
+			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getOrCreateDirectConversation = `-- name: GetOrCreateDirectConversation :many
 WITH
   existing AS (

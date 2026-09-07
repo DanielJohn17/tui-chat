@@ -14,6 +14,8 @@ type ConvRepositoryInt interface {
 		ctx context.Context,
 		input GetOrCreateDirectConvType,
 	) ([]GetConvParticipantType, error)
+
+	GetConvsByUserID(ctx context.Context, input int64) []GetConvParticipantType
 }
 
 type ConvQuerier interface {
@@ -21,6 +23,11 @@ type ConvQuerier interface {
 		ctx context.Context,
 		arg database.GetOrCreateDirectConversationParams,
 	) ([]database.GetOrCreateDirectConversationRow, error)
+
+	GetConversationsByUserId(
+		ctx context.Context,
+		userID int64,
+	) ([]database.GetConversationsByUserIdRow, error)
 }
 
 type ConvRepository struct {
@@ -55,4 +62,22 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 	}
 
 	return participants, nil
+}
+
+func (r *ConvRepository) GetConvsByUserID(
+	ctx context.Context,
+	input int64,
+) []GetConvParticipantType {
+	conversations, err := r.q.GetConversationsByUserId(ctx, input)
+	if err != nil {
+		log.Printf("===> GetConvsByUserId: %v\n", err)
+		return []GetConvParticipantType{}
+	}
+
+	convParticipants := make([]GetConvParticipantType, len(conversations))
+	for i, v := range conversations {
+		convParticipants[i] = GetConvParticipantType(v)
+	}
+
+	return convParticipants
 }

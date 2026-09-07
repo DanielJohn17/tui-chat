@@ -46,6 +46,10 @@ func NewUnauthorizedError(msg string) *APIError {
 	return &APIError{Code: http.StatusUnauthorized, Message: msg}
 }
 
+func NewForbiddenError(msg string) *APIError {
+	return &APIError{Code: http.StatusForbidden, Message: msg}
+}
+
 func NewBadRequestError(msg string) *APIError {
 	return &APIError{Code: http.StatusBadRequest, Message: msg}
 }

@@ -65,3 +65,23 @@ FROM
   target_conv tc
   JOIN participants p ON p.conv_id = tc.id
   JOIN users u ON u.id = p.user_id;
+
+-- name: GetConversationsByUserId :many
+WITH
+  target_conv AS (
+    SELECT
+      conv_id
+    FROM
+      participants
+    WHERE
+      user_id = $1
+  )
+SELECT
+  tc.conv_id,
+  u.id AS user_id,
+  u.name,
+  u.username
+FROM
+  target_conv tc
+  JOIN participants p ON p.conv_id = tc.conv_id and p.user_id <> $1
+  JOIN users u ON u.id = p.user_id;

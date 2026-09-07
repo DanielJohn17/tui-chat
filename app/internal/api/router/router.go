@@ -34,6 +34,7 @@ func NewRouter(h Handlers) *gin.Engine {
 		)
 
 		// conversations
+		subRouter.GET("/conversations", h.Conv.GetConvsByUserID)
 		subRouter.POST("/conversations", h.Conv.GetOrCreateDirectConversation)
 	}
 	return router
