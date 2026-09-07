@@ -20,9 +20,11 @@ type ConvService struct {
 	u users.UserServiceInt
 }
 
-func NewConvService(r ConvRepositoryInt) *ConvService {
-	return &ConvService{r: r}
+func NewConvService(r ConvRepositoryInt, u users.UserServiceInt) *ConvService {
+	return &ConvService{r: r, u: u}
 }
+
+var _ ConvServiceInt = (*ConvService)(nil)
 
 func (s *ConvService) GetOrCreateDirectConversation(
 	ctx context.Context,

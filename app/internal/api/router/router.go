@@ -3,6 +3,7 @@ package router
 
 import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/middleware"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
@@ -12,6 +13,7 @@ import (
 type Handlers struct {
 	User users.UserHandlerInt
 	Auth auth.AuthHandlerInt
+	Conv conversations.ConvHandlerInt
 }
 
 func NewRouter(h Handlers) *gin.Engine {
@@ -30,6 +32,9 @@ func NewRouter(h Handlers) *gin.Engine {
 			middleware.ValidateAndBind[types.URLParamInt](),
 			h.User.GetUserByID,
 		)
+
+		// conversations
+		subRouter.POST("/conversations", h.Conv.GetOrCreateDirectConversation)
 	}
 	return router
 }

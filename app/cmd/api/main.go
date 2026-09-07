@@ -7,6 +7,7 @@ import (
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/router"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
@@ -42,10 +43,16 @@ func main() {
 	authService := auth.NewAuthService(userService)
 	authHandler := auth.NewAuthHander(authService)
 
+	// conversations
+	convRepo := conversations.NewConvRepository(q)
+	convService := conversations.NewConvService(convRepo, userService)
+	convHandler := conversations.NewConvHandler(convService)
+
 	// router
 	handlers := router.Handlers{
 		User: userHandler,
 		Auth: authHandler,
+		Conv: convHandler,
 	}
 
 	router := router.NewRouter(handlers)
