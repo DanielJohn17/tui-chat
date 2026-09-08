@@ -3,6 +3,7 @@ package users
 import (
 	"net/http"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,11 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 	ctx := c.Request.Context()
 	req := c.MustGet("params").(types.URLParamString)
 
+	if req.Str == "" {
+		helpers.WriteError(c, errors.NewBadRequestError("username is not present"))
+		return
+	}
+
 	user, err := h.s.GetUserByUsername(ctx, req.Str)
 	if err != nil {
 		helpers.WriteError(c, err)
@@ -40,6 +46,11 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	req := c.MustGet("params").(types.URLParamInt)
+
+	if req.ID == 0 {
+		helpers.WriteError(c, errors.NewBadRequestError("id is not present"))
+		return
+	}
 
 	user, apiError := h.s.GetUserByID(ctx, int64(req.ID))
 	if apiError != nil {
