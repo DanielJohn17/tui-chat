@@ -12,8 +12,9 @@ type URLParamInt struct {
 }
 
 type URLQueryParams struct {
-	CursorTime time.Time `form:"cursor_time" binding:"omitempty,datetime=2006-01-02T15:04:05Z07:00"`
-	CursorID   int64     `form:"cursor_id"   binding:"omitempty,gte=1"`
+	Cursor     string    `form:"cursor"           binding:"omitempty"`
+	CursorTime time.Time `form:"-"`
+	CursorID   int64     `form:"-"`
 	Limit      int64     `form:"limit,default=30" binding:"omitempty,gte=1,lte=100"`
 }
 
@@ -24,8 +25,9 @@ type APIResponse[T any] struct {
 }
 
 type Meta struct {
-	Page       uint `json:"page,omitempty"`
-	Limit      uint `json:"limit,omitempty"`
-	Total      uint `json:"total,omitempty"`
-	TotalPages uint `json:"total_pages,omitempty"`
+	Page       int64  `json:"page,omitempty"`
+	Cursor     string `json:"cursor,omitempty"`
+	Limit      int64  `json:"limit,omitempty"`
+	Total      int64  `json:"total,omitempty"`
+	TotalPages int64  `json:"total_pages,omitempty"`
 }

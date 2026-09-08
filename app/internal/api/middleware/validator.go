@@ -1,9 +1,10 @@
-// Package middleware
 package middleware
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/gin-gonic/gin"
 )
@@ -37,6 +38,16 @@ func ValidateQueryParams() gin.HandlerFunc {
 			return
 		}
 
+		if queryParams.Cursor != "" {
+			cursorTime, cursorID, err := ParseCursor(queryParams.Cursor)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			queryParams.CursorTime = cursorTime
+			queryParams.CursorID = cursorID
+		}
+
 		if queryParams.Limit <= 0 {
 			queryParams.Limit = 30
 		}
@@ -44,4 +55,9 @@ func ValidateQueryParams() gin.HandlerFunc {
 		c.Set("queries", queryParams)
 		c.Next()
 	}
+}
+
+// ParseCursor parses a cursor string (Base64 URL-safe or raw) into time.Time and int64.
+func ParseCursor(cursor string) (time.Time, int64, error) {
+	return helpers.DecodeCursor(cursor)
 }

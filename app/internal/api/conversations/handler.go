@@ -56,7 +56,11 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 		return
 	}
 
-	helpers.WriteJSON(c, http.StatusOK, conversations)
+	meta := &types.Meta{
+		Total: int64(len(conversations)),
+	}
+
+	helpers.WriteJSONWithMeta(c, http.StatusOK, conversations, meta)
 }
 
 func (h *ConvHandler) GetConvChats(c *gin.Context) {
@@ -73,5 +77,18 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 
 	chats := h.s.GetConvChats(ctx, int64(convID), queries)
 
-	helpers.WriteJSON(c, http.StatusOK, chats)
+	var meta *types.Meta
+	if len(chats) > 0 {
+		lastChat := chats[len(chats)-1]
+		meta = &types.Meta{
+			Cursor: helpers.EncodeCursor(lastChat.CreatedAt, lastChat.ID),
+			Limit:  queries.Limit,
+		}
+	} else {
+		meta = &types.Meta{
+			Limit: queries.Limit,
+		}
+	}
+
+	helpers.WriteJSONWithMeta(c, http.StatusOK, chats, meta)
 }

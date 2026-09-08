@@ -2,7 +2,6 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 
@@ -24,9 +23,7 @@ type Config struct {
 var ENV = initConfig()
 
 func initConfig() *Config {
-	if err := godotenv.Load(".env"); err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	_ = godotenv.Load(".env", "../../.env", "../../../.env")
 
 	return &Config{
 		DBUser:                 GetEnv("DB_USER", "postgres"),
