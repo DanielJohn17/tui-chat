@@ -7,7 +7,137 @@ package database
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const getConvChats = `-- name: GetConvChats :many
+SELECT
+  id,
+  sender_id,
+  content,
+  created_at,
+  updated_at
+FROM
+  messages
+WHERE
+  conv_id = $1
+ORDER BY
+  created_at DESC,
+  id DESC
+LIMIT
+  $2
+`
+
+type GetConvChatsParams struct {
+	ConvID int64
+	Limit  int64
+}
+
+type GetConvChatsRow struct {
+	ID        int64
+	SenderID  int64
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetConvChats(ctx context.Context, arg GetConvChatsParams) ([]GetConvChatsRow, error) {
+	rows, err := q.db.Query(ctx, getConvChats, arg.ConvID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetConvChatsRow
+	for rows.Next() {
+		var i GetConvChatsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SenderID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getConvChatsPaginated = `-- name: GetConvChatsPaginated :many
+SELECT
+  id,
+  sender_id,
+  content,
+  created_at,
+  updated_at
+FROM
+  messages
+WHERE
+  conv_id = $1
+  AND (
+    created_at < $2
+    OR (
+      created_at = $2
+      AND id < $3
+    )
+  )
+ORDER BY
+  created_at DESC,
+  id DESC
+LIMIT
+  $4
+`
+
+type GetConvChatsPaginatedParams struct {
+	ConvID    int64
+	CreatedAt pgtype.Timestamptz
+	ID        int64
+	Limit     int64
+}
+
+type GetConvChatsPaginatedRow struct {
+	ID        int64
+	SenderID  int64
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetConvChatsPaginated(ctx context.Context, arg GetConvChatsPaginatedParams) ([]GetConvChatsPaginatedRow, error) {
+	rows, err := q.db.Query(ctx, getConvChatsPaginated,
+		arg.ConvID,
+		arg.CreatedAt,
+		arg.ID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetConvChatsPaginatedRow
+	for rows.Next() {
+		var i GetConvChatsPaginatedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SenderID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const getConversationsByUserId = `-- name: GetConversationsByUserId :many
 WITH

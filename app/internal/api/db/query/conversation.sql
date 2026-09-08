@@ -85,3 +85,44 @@ FROM
   target_conv tc
   JOIN participants p ON p.conv_id = tc.conv_id and p.user_id <> $1
   JOIN users u ON u.id = p.user_id;
+
+-- name: GetConvChats :many
+SELECT
+  id,
+  sender_id,
+  content,
+  created_at,
+  updated_at
+FROM
+  messages
+WHERE
+  conv_id = $1
+ORDER BY
+  created_at DESC,
+  id DESC
+LIMIT
+  $2;
+
+-- name: GetConvChatsPaginated :many
+SELECT
+  id,
+  sender_id,
+  content,
+  created_at,
+  updated_at
+FROM
+  messages
+WHERE
+  conv_id = $1
+  AND (
+    created_at < $2
+    OR (
+      created_at = $2
+      AND id < $3
+    )
+  )
+ORDER BY
+  created_at DESC,
+  id DESC
+LIMIT
+  $4;

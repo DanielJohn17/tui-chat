@@ -29,13 +29,22 @@ func NewRouter(h Handlers) *gin.Engine {
 		// users routes
 		subRouter.GET(
 			"/users/:id",
-			middleware.ValidateAndBind[types.URLParamInt](),
+			middleware.ValidateURIParams[types.URLParamInt](),
 			h.User.GetUserByID,
 		)
 
 		// conversations
+		// implement cursor pagination later
+		// implement chat history order by latest message update later
 		subRouter.GET("/conversations", h.Conv.GetConvsByUserID)
+		subRouter.GET(
+			"/conversations/:id/chats",
+			middleware.ValidateURIParams[types.URLParamInt](),
+			middleware.ValidateQueryParams(),
+			h.Conv.GetConvChats,
+		)
 		subRouter.POST("/conversations", h.Conv.GetOrCreateDirectConversation)
+		// subRouter.DELETE("/conversations/:id", handlers ...gin.HandlerFunc)
 	}
 	return router
 }

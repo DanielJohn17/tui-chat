@@ -5,12 +5,14 @@ import (
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/gin-gonic/gin"
 )
 
 type ConvHandlerInt interface {
 	GetOrCreateDirectConversation(c *gin.Context)
 	GetConvsByUserID(c *gin.Context)
+	GetConvChats(c *gin.Context)
 }
 
 type ConvHandler struct {
@@ -55,4 +57,21 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 	}
 
 	helpers.WriteJSON(c, http.StatusOK, conversations)
+}
+
+func (h *ConvHandler) GetConvChats(c *gin.Context) {
+	params := c.MustGet("params").(types.URLParamInt)
+	var queries types.URLQueryParams
+	if q, exists := c.Get("queries"); exists {
+		if qParams, ok := q.(types.URLQueryParams); ok {
+			queries = qParams
+		}
+	}
+	ctx := c.Request.Context()
+
+	convID := params.ID
+
+	chats := h.s.GetConvChats(ctx, int64(convID), queries)
+
+	helpers.WriteJSON(c, http.StatusOK, chats)
 }

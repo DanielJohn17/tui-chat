@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
 )
 
@@ -15,6 +16,12 @@ type ConvServiceInt interface {
 	) ([]GetConvParticipantType, error)
 
 	GetConvsByUserID(ctx context.Context, input int64) ([]GetConvParticipantType, error)
+
+	GetConvChats(
+		ctx context.Context,
+		convID int64,
+		query types.URLQueryParams,
+	) []GetConvChatResponseType
 }
 
 type ConvService struct {
@@ -77,4 +84,19 @@ func (s *ConvService) GetConvsByUserID(
 	participants := s.r.GetConvsByUserID(ctx, input)
 
 	return participants, nil
+}
+
+func (s *ConvService) GetConvChats(
+	ctx context.Context,
+	convID int64,
+	query types.URLQueryParams,
+) []GetConvChatResponseType {
+	if query.CursorTime.IsZero() || query.CursorID == 0 {
+		chats := s.r.GetConvChats(ctx, convID, query)
+		return chats
+	}
+
+	chats := s.r.GetConvChatsPaginated(ctx, convID, query)
+
+	return chats
 }

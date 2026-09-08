@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ConvRepositoryInt interface {
@@ -16,6 +19,18 @@ type ConvRepositoryInt interface {
 	) ([]GetConvParticipantType, error)
 
 	GetConvsByUserID(ctx context.Context, input int64) []GetConvParticipantType
+
+	GetConvChats(
+		ctx context.Context,
+		convID int64,
+		input types.URLQueryParams,
+	) []GetConvChatResponseType
+
+	GetConvChatsPaginated(
+		ctx context.Context,
+		convID int64,
+		input types.URLQueryParams,
+	) []GetConvChatResponseType
 }
 
 type ConvQuerier interface {
@@ -28,6 +43,16 @@ type ConvQuerier interface {
 		ctx context.Context,
 		userID int64,
 	) ([]database.GetConversationsByUserIdRow, error)
+
+	GetConvChats(
+		ctx context.Context,
+		arg database.GetConvChatsParams,
+	) ([]database.GetConvChatsRow, error)
+
+	GetConvChatsPaginated(
+		ctx context.Context,
+		arg database.GetConvChatsPaginatedParams,
+	) ([]database.GetConvChatsPaginatedRow, error)
 }
 
 type ConvRepository struct {
@@ -80,4 +105,81 @@ func (r *ConvRepository) GetConvsByUserID(
 	}
 
 	return convParticipants
+}
+
+func (r *ConvRepository) GetConvChats(
+	ctx context.Context,
+	convID int64,
+	query types.URLQueryParams,
+) []GetConvChatResponseType {
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+
+	convParams := database.GetConvChatsParams{
+		ConvID: convID,
+		Limit:  limit,
+	}
+
+	chats, err := r.q.GetConvChats(ctx, convParams)
+	if err != nil {
+		log.Printf("===? GetConvChatsPaginated: %v\n", err)
+		return []GetConvChatResponseType{}
+	}
+
+	convChats := make([]GetConvChatResponseType, len(chats))
+	for i, v := range chats {
+		convChats[i] = GetConvChatResponseType{
+			ID:        v.ID,
+			SenderID:  v.SenderID,
+			Content:   v.Content,
+			CreatedAt: v.CreatedAt.Time.Format(time.RFC3339),
+			UpdatedAt: v.UpdatedAt.Time.Format(time.RFC3339),
+		}
+	}
+
+	return convChats
+}
+
+func (r *ConvRepository) GetConvChatsPaginated(
+	ctx context.Context,
+	convID int64,
+	query types.URLQueryParams,
+) []GetConvChatResponseType {
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+
+	timestamptzVal := pgtype.Timestamptz{
+		Time:  query.CursorTime,
+		Valid: true,
+	}
+
+	convParams := database.GetConvChatsPaginatedParams{
+		ConvID:    convID,
+		CreatedAt: timestamptzVal,
+		ID:        query.CursorID,
+		Limit:     limit,
+	}
+
+	chats, err := r.q.GetConvChatsPaginated(ctx, convParams)
+	if err != nil {
+		log.Printf("===? GetConvChatsPaginated: %v\n", err)
+		return []GetConvChatResponseType{}
+	}
+
+	convChats := make([]GetConvChatResponseType, len(chats))
+	for i, v := range chats {
+		convChats[i] = GetConvChatResponseType{
+			ID:        v.ID,
+			SenderID:  v.SenderID,
+			Content:   v.Content,
+			CreatedAt: v.CreatedAt.Time.Format(time.RFC3339),
+			UpdatedAt: v.UpdatedAt.Time.Format(time.RFC3339),
+		}
+	}
+
+	return convChats
 }
