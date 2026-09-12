@@ -79,8 +79,8 @@ func (s *AuthService) Login(
 	}
 
 	if err := bcrypt.CompareHashAndPassword(
-		[]byte(input.Password),
 		[]byte(user.Password),
+		[]byte(input.Password),
 	); err != nil {
 		return nil, errors.NewNotFoundError("incorrect username or password")
 	}

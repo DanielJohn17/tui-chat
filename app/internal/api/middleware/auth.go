@@ -1,3 +1,4 @@
+// Package middleware
 package middleware
 
 import (
@@ -38,7 +39,7 @@ func Auth() gin.HandlerFunc {
 		}
 
 		c.Set("userId", userToken.ID)
-		c.Set("userEmail", userToken.Username)
+		c.Set("username", userToken.Username)
 
 		c.Next()
 	}
