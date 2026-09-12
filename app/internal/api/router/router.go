@@ -7,6 +7,7 @@ import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/middleware"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/ws"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +15,7 @@ type Handlers struct {
 	User users.UserHandlerInt
 	Auth auth.AuthHandlerInt
 	Conv conversations.ConvHandlerInt
+	WS   ws.WSHandlerInt
 }
 
 func NewRouter(h Handlers) *gin.Engine {
@@ -46,6 +48,13 @@ func NewRouter(h Handlers) *gin.Engine {
 		)
 		subRouter.POST("/conversations", h.Conv.GetOrCreateDirectConversation)
 		// subRouter.DELETE("/conversations/:id", handlers ...gin.HandlerFunc)
+
+		// websocket routes
+		subRouter.GET(
+			"/conversations/:id/ws",
+			middleware.ValidateURIParams[types.URLParamInt](),
+			h.WS.HandleWS,
+		)
 	}
 	return router
 }

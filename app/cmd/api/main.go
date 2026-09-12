@@ -11,6 +11,7 @@ import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/router"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/ws"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,11 +49,17 @@ func main() {
 	convService := conversations.NewConvService(convRepo, userService)
 	convHandler := conversations.NewConvHandler(convService)
 
+	// websocket conn for conversations
+	hub := ws.NewHub()
+	go hub.Run()
+	wsHander := ws.NewWSHanler(hub)
+
 	// router
 	handlers := router.Handlers{
 		User: userHandler,
 		Auth: authHandler,
 		Conv: convHandler,
+		WS:   wsHander,
 	}
 
 	router := router.NewRouter(handlers)

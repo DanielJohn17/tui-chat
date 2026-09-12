@@ -42,10 +42,10 @@ func (h *Hub) Run() {
 
 			// Register client to convs map if convID is set
 			if client.ConvID > 0 {
-				if _, ok := h.users[client.ConvID]; !ok {
-					h.users[client.ConvID] = make(map[*Client]bool)
+				if _, ok := h.convs[client.ConvID]; !ok {
+					h.convs[client.ConvID] = make(map[*Client]bool)
 				}
-				h.users[client.ConvID][client] = true
+				h.convs[client.ConvID][client] = true
 			}
 
 		case client := <-h.UnRegister:
