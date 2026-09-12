@@ -21,6 +21,7 @@ func NewRouter(h Handlers) *gin.Engine {
 
 	subRouter := router.Group("/api/v1")
 
+	// Public auth routes
 	subRouter.POST("/auth/register", h.Auth.RegisterUser)
 	subRouter.POST("/auth/login", h.Auth.LoginUser)
 
