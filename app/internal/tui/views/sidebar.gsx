@@ -6,8 +6,18 @@ import (
 	tui "github.com/grindlemire/go-tui"
 )
 
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "…"
+}
+
 templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
-	<div class="flex-col border-rounded shrink-0 px-1 py-0 gap-0" width={28}>
+	<div class="flex-col border-rounded shrink-0 px-1 py-0 gap-0" width={30}>
 		<div class="flex justify-between items-center shrink-0 pt-0">
 			<span class="text-magenta font-bold">{"◈ CONVERSATIONS"}</span>
 			<span class="text-green font-bold">[+n]</span>
@@ -20,7 +30,7 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 						<div class="flex justify-between items-center">
 							<div class="flex items-center gap-1">
 								<span class="text-magenta font-bold">{"▶"}</span>
-								<span class="text-cyan font-bold">{ch.Name}</span>
+								<span class="text-cyan font-bold">{truncate(ch.Name, 15)}</span>
 							</div>
 							if ch.Online {
 								<span class="text-green font-bold">{"●"}</span>
@@ -29,11 +39,11 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 							}
 						</div>
 						<div class="flex justify-between items-center">
-							<span class="text-magenta font-dim">{"@" + ch.Username}</span>
+							<span class="text-magenta font-dim">{"@" + truncate(ch.Username, 12)}</span>
 							<span class="font-dim">{ch.Time}</span>
 						</div>
 						if ch.LastMessage != "" {
-							<span class="font-dim">{ch.LastMessage}</span>
+							<span class="font-dim">{truncate(ch.LastMessage, 22)}</span>
 						}
 					</div>
 				} else {
@@ -45,7 +55,7 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 								} else {
 									<span class="font-dim">{"○"}</span>
 								}
-								<span class="text-white">{ch.Name}</span>
+								<span class="text-white">{truncate(ch.Name, 14)}</span>
 							</div>
 							if ch.Unread > 0 {
 								<span class="text-magenta font-bold">{fmt.Sprintf("(%d)", ch.Unread)}</span>
@@ -53,7 +63,7 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 								<span class="font-dim">{ch.Time}</span>
 							}
 						</div>
-						<span class="font-dim">{"@" + ch.Username}</span>
+						<span class="font-dim">{"@" + truncate(ch.Username, 14)}</span>
 					</div>
 				}
 			}
@@ -62,9 +72,9 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 		<div class="flex items-center justify-between shrink-0 px-1 pb-0">
 			<div class="flex items-center gap-1">
 				<span class="text-green font-bold">{"●"}</span>
-				<span class="font-bold text-white">{c.Profile().Name}</span>
+				<span class="font-bold text-white">{truncate(c.Profile().Name, 12)}</span>
 			</div>
-			<span class="text-magenta font-dim">{"@" + c.Profile().Username}</span>
+			<span class="text-magenta font-dim">{"@" + truncate(c.Profile().Username, 10)}</span>
 		</div>
 	</div>
 }

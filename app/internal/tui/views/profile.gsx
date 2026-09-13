@@ -41,18 +41,6 @@ func Profile(
 	}
 }
 
-func (p *profile) KeyMap() tui.KeyMap {
-	if p.editMode.Get() {
-		return tui.KeyMap{
-			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { p.onCancel() }),
-			tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { p.onSave() }),
-		}
-	}
-	return tui.KeyMap{
-		tui.On(tui.Rune('e'), func(ke tui.KeyEvent) { p.editMode.Set(true) }),
-	}
-}
-
 templ (p *profile) Render() {
 	<div class="flex-col grow border-rounded px-2 py-0 gap-1">
 		<div class="flex justify-between items-center shrink-0 pt-0">

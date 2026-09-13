@@ -25,17 +25,6 @@ func NewDMModal(open *tui.State[bool], username *tui.State[string], onStart func
 	}
 }
 
-func (n *newDMModal) KeyMap() tui.KeyMap {
-	if !n.open.Get() {
-		return nil
-	}
-	return tui.KeyMap{
-		tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
-		tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { n.onCancel() }),
-		tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { n.submit() }),
-	}
-}
-
 func (n *newDMModal) submit() {
 	u := strings.TrimSpace(n.username.Get())
 	u = strings.TrimPrefix(u, "@")
@@ -162,8 +151,3 @@ func (n *newDMModal) BindApp(app *tui.App) {
 }
 
 var _ tui.AppBinder = (*newDMModal)(nil)
-
-// Compile-time interface satisfaction checks.
-var (
-	_ tui.KeyListener = (*newDMModal)(nil)
-)

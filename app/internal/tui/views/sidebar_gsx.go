@@ -10,6 +10,16 @@ import (
 	tui "github.com/grindlemire/go-tui"
 )
 
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "…"
+}
+
 type SidebarView struct {
 	Root      *tui.Element
 	watchers  []tui.Watcher
@@ -62,7 +72,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 		tui.WithFlexShrink(0),
 		tui.WithGap(0),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
-		tui.WithWidth(28),
+		tui.WithWidth(30),
 	)
 	__tui_1 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
@@ -121,7 +131,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 				)
 				__tui_8.AddChild(__tui_9)
 				__tui_10 := tui.New(
-					tui.WithText(ch.Name),
+					tui.WithText(truncate(ch.Name, 15)),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 				)
 				__tui_8.AddChild(__tui_10)
@@ -146,7 +156,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 					tui.WithAlign(tui.AlignCenter),
 				)
 				__tui_14 := tui.New(
-					tui.WithText("@"+ch.Username),
+					tui.WithText("@"+truncate(ch.Username, 12)),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Dim()),
 				)
 				__tui_13.AddChild(__tui_14)
@@ -158,7 +168,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 				__tui_6.AddChild(__tui_13)
 				if ch.LastMessage != "" {
 					__tui_16 := tui.New(
-						tui.WithText(ch.LastMessage),
+						tui.WithText(truncate(ch.LastMessage, 22)),
 						tui.WithTextStyle(tui.NewStyle().Dim()),
 					)
 					__tui_6.AddChild(__tui_16)
@@ -193,7 +203,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 					__tui_19.AddChild(__tui_21)
 				}
 				__tui_22 := tui.New(
-					tui.WithText(ch.Name),
+					tui.WithText(truncate(ch.Name, 14)),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
 				)
 				__tui_19.AddChild(__tui_22)
@@ -213,7 +223,7 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 				}
 				__tui_17.AddChild(__tui_18)
 				__tui_25 := tui.New(
-					tui.WithText("@"+ch.Username),
+					tui.WithText("@"+truncate(ch.Username, 14)),
 					tui.WithTextStyle(tui.NewStyle().Dim()),
 				)
 				__tui_17.AddChild(__tui_25)
@@ -246,13 +256,13 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 	)
 	__tui_28.AddChild(__tui_29)
 	__tui_30 := tui.New(
-		tui.WithText(c.Profile().Name),
+		tui.WithText(truncate(c.Profile().Name, 12)),
 		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
 	)
 	__tui_28.AddChild(__tui_30)
 	__tui_27.AddChild(__tui_28)
 	__tui_31 := tui.New(
-		tui.WithText("@"+c.Profile().Username),
+		tui.WithText("@"+truncate(c.Profile().Username, 10)),
 		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Dim()),
 	)
 	__tui_27.AddChild(__tui_31)

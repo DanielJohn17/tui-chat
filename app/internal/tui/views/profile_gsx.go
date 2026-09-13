@@ -45,18 +45,6 @@ func Profile(
 	}
 }
 
-func (p *profile) KeyMap() tui.KeyMap {
-	if p.editMode.Get() {
-		return tui.KeyMap{
-			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { p.onCancel() }),
-			tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { p.onSave() }),
-		}
-	}
-	return tui.KeyMap{
-		tui.On(tui.Rune('e'), func(ke tui.KeyEvent) { p.editMode.Set(true) }),
-	}
-}
-
 func (p *profile) Render(app *tui.App) *tui.Element {
 	__tui_0 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
@@ -346,8 +334,3 @@ func (p *profile) BindApp(app *tui.App) {
 }
 
 var _ tui.AppBinder = (*profile)(nil)
-
-// Compile-time interface satisfaction checks.
-var (
-	_ tui.KeyListener = (*profile)(nil)
-)

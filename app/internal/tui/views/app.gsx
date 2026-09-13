@@ -50,61 +50,77 @@ func App(c client.Client) *app {
 }
 
 func (a *app) KeyMap() tui.KeyMap {
-	km := tui.KeyMap{
+	// 1. Help Modal Active
+	if a.showHelp.Get() {
+		return tui.KeyMap{
+			tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
+			tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+		}
+	}
+
+	// 2. New DM Modal Active
+	if a.showNewDM.Get() {
+		return tui.KeyMap{
+			tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.cancelNewDM() }),
+		}
+	}
+
+	// 3. Profile View Active
+	if a.view.Get() == viewProfile {
+		if a.profileEdit.Get() {
+			return tui.KeyMap{
+				tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
+				tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.cancelProfile() }),
+			}
+		}
+		return tui.KeyMap{
+			tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
+			tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
+			tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.view.Set(viewChats) }),
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.view.Set(viewChats) }),
+			tui.OnStop(tui.Rune('e'), func(ke tui.KeyEvent) { a.profileEdit.Set(true) }),
+			tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(true) }),
+			tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(true) }),
+		}
+	}
+
+	// 4. Default Chat View
+	chats := a.client.Chats()
+	moveUp := func(ke tui.KeyEvent) {
+		a.selectedChat.Update(func(v int) int {
+			if v <= 0 {
+				return len(chats) - 1
+			}
+			return v - 1
+		})
+	}
+	moveDown := func(ke tui.KeyEvent) {
+		a.selectedChat.Update(func(v int) int {
+			if v >= len(chats)-1 {
+				return 0
+			}
+			return v + 1
+		})
+	}
+
+	return tui.KeyMap{
 		tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.KeyTab, func(ke tui.KeyEvent) { ke.App().FocusNext() }),
 		tui.OnStop(tui.KeyTab.Shift(), func(ke tui.KeyEvent) { ke.App().FocusPrev() }),
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
 		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.showNewDM.Set(true) }),
-		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
-		tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
-		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
+		tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(true) }),
+		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(true) }),
+		tui.On(tui.KeyUp, moveUp),
+		tui.On(tui.Rune('k'), moveUp),
+		tui.On(tui.KeyDown, moveDown),
+		tui.On(tui.Rune('j'), moveDown),
 	}
-	if a.showHelp.Get() {
-		km = append(km,
-			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
-			tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
-			tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
-		)
-		return km
-	}
-	if a.showNewDM.Get() {
-		km = append(km,
-			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showNewDM.Set(false) }),
-		)
-		return km
-	}
-	if a.view.Get() == viewChats {
-		chats := a.client.Chats()
-		moveUp := func(ke tui.KeyEvent) {
-			a.selectedChat.Update(func(v int) int {
-				if v <= 0 {
-					return len(chats) - 1
-				}
-				return v - 1
-			})
-		}
-		moveDown := func(ke tui.KeyEvent) {
-			a.selectedChat.Update(func(v int) int {
-				if v >= len(chats)-1 {
-					return 0
-				}
-				return v + 1
-			})
-		}
-		km = append(km,
-			tui.On(tui.KeyUp, moveUp),
-			tui.On(tui.Rune('k'), moveUp),
-			tui.On(tui.KeyDown, moveDown),
-			tui.On(tui.Rune('j'), moveDown),
-		)
-	}
-	if a.view.Get() == viewProfile && a.profileEdit.Get() {
-	} else {
-		km = append(km, tui.On(tui.KeyEscape, func(ke tui.KeyEvent) { a.view.Set(viewChats) }))
-	}
-	return km
 }
 
 func (a *app) Watchers() []tui.Watcher {
