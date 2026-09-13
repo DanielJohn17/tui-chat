@@ -134,7 +134,7 @@ templ (c *chatPane) Render() {
 			}
 		</div>
 		<div class="shrink-0 pb-1">
-			<input value={c.draft} onSubmit={c.onSubmit} placeholder={"Message @" + c.currentChat().Username + "... (Enter to send)"} border={tui.BorderRounded} width={100} focusColor={tui.Magenta} autoFocus={true} />
+			<input value={c.draft} onSubmit={c.onSubmit} placeholder={"Message @" + c.currentChat().Username + "... (Press Tab to type, Enter to send)"} border={tui.BorderRounded} width={100} focusColor={tui.Magenta} />
 		</div>
 	</div>
 }

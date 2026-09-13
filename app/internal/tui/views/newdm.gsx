@@ -1,48 +1,66 @@
 package views
 
-import tui "github.com/grindlemire/go-tui"
+import (
+	"strings"
+	tui "github.com/grindlemire/go-tui"
+)
 
-type newDM struct {
-	name     *tui.State[string]
+type newDMModal struct {
+	open     *tui.State[bool]
 	username *tui.State[string]
-	onStart  func()
+	onStart  func(username string)
 	onCancel func()
 }
 
-func NewDM(name *tui.State[string], username *tui.State[string], onStart func(), onCancel func()) *newDM {
-	return &newDM{
-		name:     name,
+func NewDMModal(open *tui.State[bool], username *tui.State[string], onStart func(username string), onCancel func()) *newDMModal {
+	return &newDMModal{
+		open:     open,
 		username: username,
 		onStart:  onStart,
 		onCancel: onCancel,
 	}
 }
 
-func (n *newDM) KeyMap() tui.KeyMap {
+func (n *newDMModal) KeyMap() tui.KeyMap {
+	if !n.open.Get() {
+		return nil
+	}
 	return tui.KeyMap{
+		tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { n.onCancel() }),
-		tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { n.onStart() }),
+		tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { n.submit() }),
 	}
 }
 
-templ (n *newDM) Render() {
-	<div class="flex-col grow border-rounded px-2 py-0 gap-1">
-		<div class="flex justify-between items-center shrink-0 pt-0">
-			<span class="font-bold text-magenta">{"◈ START NEW CONVERSATION"}</span>
-			<span class="text-green font-bold">[ POST /api/v1/conversations ]</span>
-		</div>
-		<hr />
-		<div class="flex-col gap-1 px-1 py-1" width={60}>
-			<span class="font-bold text-magenta">Recipient Display Name</span>
-			<input value={n.name} placeholder="e.g. David Kim" border={tui.BorderRounded} width={50} focusColor={tui.Magenta} autoFocus={true} />
-			<span class="font-bold text-magenta">Recipient Username</span>
-			<input value={n.username} placeholder="e.g. david" border={tui.BorderRounded} width={50} focusColor={tui.Magenta} />
-			<div class="flex gap-2 pt-1">
-				<span class="text-green font-bold">[Enter] Start Chat</span>
-				<span class="font-dim">•</span>
-				<span class="text-magenta font-bold">[Esc] Cancel</span>
+func (n *newDMModal) submit() {
+	u := strings.TrimSpace(n.username.Get())
+	u = strings.TrimPrefix(u, "@")
+	if u == "" {
+		return
+	}
+	n.onStart(u)
+}
+
+templ (n *newDMModal) Render() {
+	<modal open={n.open} class="justify-center items-center" backdrop="dim">
+		<div class="flex-col border-rounded p-2 gap-1 bg-black" width={52}>
+			<div class="flex justify-between items-center">
+				<span class="font-bold text-magenta">Start New Conversation</span>
+				<span class="font-dim text-yellow">esc</span>
 			</div>
-			<span class="font-dim pt-1">Creates or fetches direct message thread for peer user ID</span>
+			<hr />
+			<span class="font-bold text-cyan">Recipient Username</span>
+			<input value={n.username} onSubmit={func(string) { n.submit() }} placeholder="e.g. sarah or @sarah..." border={tui.BorderRounded} width={45} focusColor={tui.Magenta} autoFocus={true} />
+			<div class="flex justify-between items-center pt-1">
+				<div class="flex gap-1">
+					<span class="text-green font-bold">[Enter]</span>
+					<span class="text-white">Start</span>
+					<span class="font-dim">•</span>
+					<span class="text-yellow font-bold">[Esc]</span>
+					<span class="text-white">Cancel</span>
+				</div>
+				<span class="font-dim text-magenta">[q] Quit</span>
+			</div>
 		</div>
-	</div>
+	</modal>
 }

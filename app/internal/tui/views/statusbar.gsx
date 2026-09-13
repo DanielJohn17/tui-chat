@@ -23,23 +23,8 @@ templ StatusBar(v viewMode, editing bool) {
 			<span class="text-yellow font-bold">j/k</span>
 			<span class="text-white">Navigate</span>
 			<span class="font-dim">•</span>
-			<span class="text-magenta font-bold">?</span>
+			<span class="text-magenta font-bold">h/?</span>
 			<span class="text-white">Help</span>
-			<span class="grow"></span>
-			<span class="text-magenta font-bold">tui-chat</span>
-		</div>
-	} else if v == viewNewDM {
-		<div class="flex shrink-0 bg-black text-white w-full px-1 py-0 items-center gap-1">
-			<span class="text-magenta font-bold">[NEW CONVERSATION]</span>
-			<span class="font-dim">•</span>
-			<span class="text-cyan font-bold">Tab</span>
-			<span class="text-white">Next Field</span>
-			<span class="font-dim">•</span>
-			<span class="text-green font-bold">Enter</span>
-			<span class="text-white">Start</span>
-			<span class="font-dim">•</span>
-			<span class="text-yellow font-bold">Esc</span>
-			<span class="text-white">Cancel</span>
 			<span class="grow"></span>
 			<span class="text-magenta font-bold">tui-chat</span>
 		</div>

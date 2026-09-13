@@ -4,130 +4,143 @@
 package views
 
 import (
+	"strings"
+
 	tui "github.com/grindlemire/go-tui"
 )
 
-type newDM struct {
-	name     *tui.State[string]
+type newDMModal struct {
+	open     *tui.State[bool]
 	username *tui.State[string]
-	onStart  func()
+	onStart  func(username string)
 	onCancel func()
 }
 
-func NewDM(name *tui.State[string], username *tui.State[string], onStart func(), onCancel func()) *newDM {
-	return &newDM{
-		name:     name,
+func NewDMModal(open *tui.State[bool], username *tui.State[string], onStart func(username string), onCancel func()) *newDMModal {
+	return &newDMModal{
+		open:     open,
 		username: username,
 		onStart:  onStart,
 		onCancel: onCancel,
 	}
 }
 
-func (n *newDM) KeyMap() tui.KeyMap {
+func (n *newDMModal) KeyMap() tui.KeyMap {
+	if !n.open.Get() {
+		return nil
+	}
 	return tui.KeyMap{
+		tui.OnStop(tui.KeyCtrlC, func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { n.onCancel() }),
-		tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { n.onStart() }),
+		tui.OnStop(tui.KeyEnter, func(ke tui.KeyEvent) { n.submit() }),
 	}
 }
 
-func (n *newDM) Render(app *tui.App) *tui.Element {
-	__tui_0 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
-		tui.WithFlexGrow(1),
-		tui.WithBorder(tui.BorderRounded),
-		tui.WithGap(1),
-		tui.WithPaddingTRBL(0, 2, 0, 2),
-	)
+func (n *newDMModal) submit() {
+	u := strings.TrimSpace(n.username.Get())
+	u = strings.TrimPrefix(u, "@")
+	if u == "" {
+		return
+	}
+	n.onStart(u)
+}
+
+func (n *newDMModal) Render(app *tui.App) *tui.Element {
+	__tui_0 := app.MountPersistent(n, 0, func() tui.Component {
+		return tui.NewModal(
+			tui.WithModalOpen(n.open),
+			tui.WithModalBackdrop("dim"),
+			tui.WithModalElementOptions(tui.WithJustify(tui.JustifyCenter), tui.WithAlign(tui.AlignCenter)),
+		)
+	})
 	__tui_1 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+		tui.WithBorder(tui.BorderRounded),
+		tui.WithPadding(2),
+		tui.WithGap(1),
+		tui.WithBackground(tui.NewStyle().Background(tui.Black)),
+		tui.WithWidth(52),
+	)
+	__tui_2 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithJustify(tui.JustifySpaceBetween),
 		tui.WithAlign(tui.AlignCenter),
-		tui.WithFlexShrink(0),
-		tui.WithPaddingTRBL(0, 0, 0, 0),
 	)
-	__tui_2 := tui.New(
-		tui.WithText("◈ START NEW CONVERSATION"),
+	__tui_3 := tui.New(
+		tui.WithText("Start New Conversation"),
 		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 	)
-	__tui_1.AddChild(__tui_2)
-	__tui_3 := tui.New(
-		tui.WithText("[ POST /api/v1/conversations ]"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
-	)
-	__tui_1.AddChild(__tui_3)
-	__tui_0.AddChild(__tui_1)
+	__tui_2.AddChild(__tui_3)
 	__tui_4 := tui.New(
+		tui.WithText("esc"),
+		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Yellow)),
+	)
+	__tui_2.AddChild(__tui_4)
+	__tui_1.AddChild(__tui_2)
+	__tui_5 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_4)
-	__tui_5 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
-		tui.WithGap(1),
-		tui.WithPaddingTRBL(1, 1, 1, 1),
-		tui.WithWidth(60),
-	)
+	__tui_1.AddChild(__tui_5)
 	__tui_6 := tui.New(
-		tui.WithText("Recipient Display Name"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
+		tui.WithText("Recipient Username"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
 	)
-	__tui_5.AddChild(__tui_6)
-	__tui_7 := app.MountPersistent(n, 0, func() tui.Component {
+	__tui_1.AddChild(__tui_6)
+	__tui_7 := app.MountPersistent(n, 1, func() tui.Component {
 		return tui.NewInput(
-			tui.WithInputValue(n.name),
-			tui.WithInputPlaceholder("e.g. David Kim"),
+			tui.WithInputValue(n.username),
+			tui.WithInputOnSubmit(func(string) { n.submit() }),
+			tui.WithInputPlaceholder("e.g. sarah or @sarah..."),
 			tui.WithInputBorder(tui.BorderRounded),
-			tui.WithInputWidth(50),
+			tui.WithInputWidth(45),
 			tui.WithInputFocusColor(tui.Magenta),
 			tui.WithInputAutoFocus(true),
 		)
 	})
-	__tui_5.AddChild(__tui_7)
+	__tui_1.AddChild(__tui_7)
 	__tui_8 := tui.New(
-		tui.WithText("Recipient Username"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
-	)
-	__tui_5.AddChild(__tui_8)
-	__tui_9 := app.MountPersistent(n, 1, func() tui.Component {
-		return tui.NewInput(
-			tui.WithInputValue(n.username),
-			tui.WithInputPlaceholder("e.g. david"),
-			tui.WithInputBorder(tui.BorderRounded),
-			tui.WithInputWidth(50),
-			tui.WithInputFocusColor(tui.Magenta),
-		)
-	})
-	__tui_5.AddChild(__tui_9)
-	__tui_10 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithGap(2),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
 		tui.WithPaddingTRBL(1, 0, 0, 0),
 	)
-	__tui_11 := tui.New(
-		tui.WithText("[Enter] Start Chat"),
+	__tui_9 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithGap(1),
+	)
+	__tui_10 := tui.New(
+		tui.WithText("[Enter]"),
 		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 	)
-	__tui_10.AddChild(__tui_11)
+	__tui_9.AddChild(__tui_10)
+	__tui_11 := tui.New(
+		tui.WithText("Start"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_9.AddChild(__tui_11)
 	__tui_12 := tui.New(
 		tui.WithText("•"),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
-	__tui_10.AddChild(__tui_12)
+	__tui_9.AddChild(__tui_12)
 	__tui_13 := tui.New(
-		tui.WithText("[Esc] Cancel"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+		tui.WithText("[Esc]"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
 	)
-	__tui_10.AddChild(__tui_13)
-	__tui_5.AddChild(__tui_10)
+	__tui_9.AddChild(__tui_13)
 	__tui_14 := tui.New(
-		tui.WithPaddingTRBL(1, 0, 0, 0),
-		tui.WithTextStyle(tui.NewStyle().Dim()),
+		tui.WithText("Cancel"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
 	)
-	__tui_15 := tui.New(tui.WithText("Creates or fetches direct message thread"))
-	__tui_14.AddChild(__tui_15)
-	__tui_16 := tui.New(tui.WithText("peer user ID"))
-	__tui_14.AddChild(__tui_16)
-	__tui_5.AddChild(__tui_14)
-	__tui_0.AddChild(__tui_5)
+	__tui_9.AddChild(__tui_14)
+	__tui_8.AddChild(__tui_9)
+	__tui_15 := tui.New(
+		tui.WithText("[q] Quit"),
+		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Magenta)),
+	)
+	__tui_8.AddChild(__tui_15)
+	__tui_1.AddChild(__tui_8)
+	__tui_0.AddChild(__tui_1)
 
 	return __tui_0
 }
@@ -135,22 +148,22 @@ func (n *newDM) Render(app *tui.App) *tui.Element {
 // bindAppFields is generated. It wires the component's *tui.App,
 // State, Events, and TextArea fields to app. When you override BindApp,
 // call this helper instead of hand-maintaining the delegation list.
-func (n *newDM) bindAppFields(app *tui.App) {
-	if n.name != nil {
-		n.name.BindApp(app)
+func (n *newDMModal) bindAppFields(app *tui.App) {
+	if n.open != nil {
+		n.open.BindApp(app)
 	}
 	if n.username != nil {
 		n.username.BindApp(app)
 	}
 }
 
-func (n *newDM) BindApp(app *tui.App) {
+func (n *newDMModal) BindApp(app *tui.App) {
 	n.bindAppFields(app)
 }
 
-var _ tui.AppBinder = (*newDM)(nil)
+var _ tui.AppBinder = (*newDMModal)(nil)
 
 // Compile-time interface satisfaction checks.
 var (
-	_ tui.KeyListener = (*newDM)(nil)
+	_ tui.KeyListener = (*newDMModal)(nil)
 )

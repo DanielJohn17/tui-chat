@@ -301,11 +301,10 @@ func (c *chatPane) Render(app *tui.App) *tui.Element {
 		return tui.NewInput(
 			tui.WithInputValue(c.draft),
 			tui.WithInputOnSubmit(c.onSubmit),
-			tui.WithInputPlaceholder("Message @"+c.currentChat().Username+"... (Enter to send)"),
+			tui.WithInputPlaceholder("Message @"+c.currentChat().Username+"... (Press Tab to type, Enter to send)"),
 			tui.WithInputBorder(tui.BorderRounded),
 			tui.WithInputWidth(100),
 			tui.WithInputFocusColor(tui.Magenta),
-			tui.WithInputAutoFocus(true),
 		)
 	})
 	__tui_38.AddChild(__tui_39)

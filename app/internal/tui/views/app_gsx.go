@@ -4,7 +4,9 @@
 package views
 
 import (
+	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
@@ -16,7 +18,6 @@ type viewMode int
 const (
 	viewChats viewMode = iota
 	viewProfile
-	viewNewDM
 )
 
 type app struct {
@@ -27,10 +28,10 @@ type app struct {
 	name          *tui.State[string]
 	username      *tui.State[string]
 	password      *tui.State[string]
-	newDMName     *tui.State[string]
 	newDMUsername *tui.State[string]
-	profileEdit   *tui.State[bool]
+	showNewDM     *tui.State[bool]
 	showHelp      *tui.State[bool]
+	profileEdit   *tui.State[bool]
 	replyPending  *tui.State[int]
 }
 
@@ -55,10 +56,10 @@ func App(c client.Client) *app {
 		name:          tui.NewState(p.Name),
 		username:      tui.NewState(p.Username),
 		password:      tui.NewState(p.Password),
-		newDMName:     tui.NewState(""),
 		newDMUsername: tui.NewState(""),
-		profileEdit:   tui.NewState(false),
+		showNewDM:     tui.NewState(false),
 		showHelp:      tui.NewState(false),
+		profileEdit:   tui.NewState(false),
 		replyPending:  tui.NewState(-1),
 	}
 }
@@ -70,12 +71,23 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.KeyTab.Shift(), func(ke tui.KeyEvent) { ke.App().FocusPrev() }),
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
-		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
+		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.showNewDM.Set(true) }),
 		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
+		tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
 	}
 	if a.showHelp.Get() {
-		km = append(km, tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }))
+		km = append(km,
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+		)
+		return km
+	}
+	if a.showNewDM.Get() {
+		km = append(km,
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showNewDM.Set(false) }),
+		)
 		return km
 	}
 	if a.view.Get() == viewChats {
@@ -152,26 +164,38 @@ func (a *app) cancelProfile() {
 	a.profileEdit.Set(false)
 }
 
-func (a *app) startNewDM() {
-	name := a.newDMName.Get()
-	username := a.newDMUsername.Get()
-	if name == "" {
-		name = "Anonymous User"
-	}
+func (a *app) startNewDM(username string) {
+	username = strings.TrimSpace(strings.TrimPrefix(username, "@"))
 	if username == "" {
-		username = "anon"
+		return
 	}
-	a.client.AddChat(name, username)
-	a.newDMName.Set("")
+	// Derive clean display name from username e.g. "alex" -> "Alex"
+	displayName := strings.ToUpper(username[:1]) + username[1:]
+	for _, ch := range a.client.Chats() {
+		if strings.EqualFold(ch.Username, username) {
+			// Select existing chat
+			for i, c := range a.client.Chats() {
+				if c.ID == ch.ID {
+					a.selectedChat.Set(i)
+					break
+				}
+			}
+			a.newDMUsername.Set("")
+			a.showNewDM.Set(false)
+			a.view.Set(viewChats)
+			return
+		}
+	}
+	a.client.AddChat(fmt.Sprintf("%s", displayName), username)
 	a.newDMUsername.Set("")
+	a.showNewDM.Set(false)
 	a.selectedChat.Set(len(a.client.Chats()) - 1)
 	a.view.Set(viewChats)
 }
 
 func (a *app) cancelNewDM() {
-	a.newDMName.Set("")
 	a.newDMUsername.Set("")
-	a.view.Set(viewChats)
+	a.showNewDM.Set(false)
 }
 
 func (a *app) Render(app *tui.App) *tui.Element {
@@ -224,256 +248,58 @@ func (a *app) Render(app *tui.App) *tui.Element {
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
 		__tui_7.AddChild(__tui_8)
-	} else if a.view.Get() == viewNewDM {
-		__tui_9 := tui.New(
-			tui.WithText("[ New Conversation ]"),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Green)),
-		)
-		__tui_7.AddChild(__tui_9)
 	} else {
-		__tui_10 := tui.New(
+		__tui_9 := tui.New(
 			tui.WithText("[ Profile & Auth ]"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Yellow)),
 		)
-		__tui_7.AddChild(__tui_10)
+		__tui_7.AddChild(__tui_9)
 	}
 	__tui_1.AddChild(__tui_7)
 	__tui_0.AddChild(__tui_1)
-	__tui_11 := tui.New(
+	__tui_10 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_11)
-	__tui_12 := tui.New(
+	__tui_0.AddChild(__tui_10)
+	__tui_11 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithFlexGrow(1),
 		tui.WithMinHeight(0),
 		tui.WithGap(1),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
 	)
-	__tui_13 := app.Mount(a, 0, func() tui.Component {
+	__tui_12 := app.Mount(a, 0, func() tui.Component {
 		return Sidebar(a.client, a.selectedChat)
 	})
-	__tui_12.AddChild(__tui_13)
+	__tui_11.AddChild(__tui_12)
 	if a.view.Get() == viewChats {
-		__tui_14 := app.Mount(a, 1, func() tui.Component {
+		__tui_13 := app.Mount(a, 1, func() tui.Component {
 			return ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
 		})
-		__tui_12.AddChild(__tui_14)
-	} else if a.view.Get() == viewNewDM {
-		__tui_15 := app.Mount(a, 2, func() tui.Component {
-			return NewDM(a.newDMName, a.newDMUsername, a.startNewDM, a.cancelNewDM)
-		})
-		__tui_12.AddChild(__tui_15)
+		__tui_11.AddChild(__tui_13)
 	} else {
-		__tui_16 := app.Mount(a, 3, func() tui.Component {
+		__tui_14 := app.Mount(a, 2, func() tui.Component {
 			return Profile(a.name, a.username, a.password, a.profile().ID, a.profile().Token, a.profile().CreatedAt, a.profileEdit, a.saveProfile, a.cancelProfile)
 		})
-		__tui_12.AddChild(__tui_16)
+		__tui_11.AddChild(__tui_14)
 	}
-	__tui_0.AddChild(__tui_12)
-	__tui_17 := tui.New(
+	__tui_0.AddChild(__tui_11)
+	__tui_15 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_17)
-	__tui_18 := app.Mount(a, 4, func() tui.Component {
+	__tui_0.AddChild(__tui_15)
+	__tui_16 := app.Mount(a, 3, func() tui.Component {
 		return StatusBar(a.view.Get(), a.profileEdit.Get())
 	})
-	__tui_0.AddChild(__tui_18)
-	__tui_19 := app.MountPersistent(a, 5, func() tui.Component {
-		return tui.NewModal(
-			tui.WithModalOpen(a.showHelp),
-			tui.WithModalBackdrop("dim"),
-			tui.WithModalElementOptions(tui.WithJustify(tui.JustifyCenter), tui.WithAlign(tui.AlignCenter)),
-		)
+	__tui_0.AddChild(__tui_16)
+	__tui_17 := app.Mount(a, 4, func() tui.Component {
+		return HelpModal(a.showHelp)
 	})
-	__tui_20 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
-		tui.WithBorder(tui.BorderRounded),
-		tui.WithPadding(2),
-		tui.WithGap(1),
-		tui.WithBackground(tui.NewStyle().Background(tui.Black)),
-		tui.WithWidth(52),
-	)
-	__tui_21 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_22 := tui.New(
-		tui.WithText("Commands & Shortcuts"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
-	)
-	__tui_21.AddChild(__tui_22)
-	__tui_23 := tui.New(
-		tui.WithText("esc"),
-		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Yellow)),
-	)
-	__tui_21.AddChild(__tui_23)
-	__tui_20.AddChild(__tui_21)
-	__tui_24 := tui.New(
-		tui.WithHR(),
-	)
-	__tui_20.AddChild(__tui_24)
-	__tui_25 := tui.New(
-		tui.WithText("Suggested"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
-	)
-	__tui_20.AddChild(__tui_25)
-	__tui_26 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_27 := tui.New(
-		tui.WithText("Switch conversation"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_26.AddChild(__tui_27)
-	__tui_28 := tui.New(
-		tui.WithText("j / k or ↑ / ↓"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_26.AddChild(__tui_28)
-	__tui_20.AddChild(__tui_26)
-	__tui_29 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_30 := tui.New(
-		tui.WithText("New conversation"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_29.AddChild(__tui_30)
-	__tui_31 := tui.New(
-		tui.WithText("n"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_29.AddChild(__tui_31)
-	__tui_20.AddChild(__tui_29)
-	__tui_32 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_33 := tui.New(
-		tui.WithText("User profile & identity"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_32.AddChild(__tui_33)
-	__tui_34 := tui.New(
-		tui.WithText("p"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_32.AddChild(__tui_34)
-	__tui_20.AddChild(__tui_32)
-	__tui_35 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_36 := tui.New(
-		tui.WithText("Focus message input"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_35.AddChild(__tui_36)
-	__tui_37 := tui.New(
-		tui.WithText("Tab"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
-	)
-	__tui_35.AddChild(__tui_37)
-	__tui_20.AddChild(__tui_35)
-	__tui_38 := tui.New(
-		tui.WithHR(),
-	)
-	__tui_20.AddChild(__tui_38)
-	__tui_39 := tui.New(
-		tui.WithText("Actions & Navigation"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
-	)
-	__tui_20.AddChild(__tui_39)
-	__tui_40 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_41 := tui.New(
-		tui.WithText("Send message"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_40.AddChild(__tui_41)
-	__tui_42 := tui.New(
-		tui.WithText("Enter"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
-	)
-	__tui_40.AddChild(__tui_42)
-	__tui_20.AddChild(__tui_40)
-	__tui_43 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_44 := tui.New(
-		tui.WithText("Return to chats"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_43.AddChild(__tui_44)
-	__tui_45 := tui.New(
-		tui.WithText("c / Esc"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_43.AddChild(__tui_45)
-	__tui_20.AddChild(__tui_43)
-	__tui_46 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_47 := tui.New(
-		tui.WithText("Edit user profile"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_46.AddChild(__tui_47)
-	__tui_48 := tui.New(
-		tui.WithText("e"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_46.AddChild(__tui_48)
-	__tui_20.AddChild(__tui_46)
-	__tui_49 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_50 := tui.New(
-		tui.WithText("Toggle shortcuts help"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_49.AddChild(__tui_50)
-	__tui_51 := tui.New(
-		tui.WithText("?"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
-	)
-	__tui_49.AddChild(__tui_51)
-	__tui_20.AddChild(__tui_49)
-	__tui_52 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-	)
-	__tui_53 := tui.New(
-		tui.WithText("Quit messenger"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
-	)
-	__tui_52.AddChild(__tui_53)
-	__tui_54 := tui.New(
-		tui.WithText("q"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
-	)
-	__tui_52.AddChild(__tui_54)
-	__tui_20.AddChild(__tui_52)
-	__tui_19.AddChild(__tui_20)
-	__tui_0.AddChild(__tui_19)
+	__tui_0.AddChild(__tui_17)
+	__tui_18 := app.Mount(a, 5, func() tui.Component {
+		return NewDMModal(a.showNewDM, a.newDMUsername, a.startNewDM, a.cancelNewDM)
+	})
+	__tui_0.AddChild(__tui_18)
 
 	return __tui_0
 }
@@ -517,17 +343,17 @@ func (a *app) bindAppFields(app *tui.App) {
 	if a.password != nil {
 		a.password.BindApp(app)
 	}
-	if a.newDMName != nil {
-		a.newDMName.BindApp(app)
-	}
 	if a.newDMUsername != nil {
 		a.newDMUsername.BindApp(app)
 	}
-	if a.profileEdit != nil {
-		a.profileEdit.BindApp(app)
+	if a.showNewDM != nil {
+		a.showNewDM.BindApp(app)
 	}
 	if a.showHelp != nil {
 		a.showHelp.BindApp(app)
+	}
+	if a.profileEdit != nil {
+		a.profileEdit.BindApp(app)
 	}
 	if a.replyPending != nil {
 		a.replyPending.BindApp(app)

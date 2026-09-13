@@ -1,7 +1,9 @@
 package views
 
 import (
+	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	tui "github.com/grindlemire/go-tui"
@@ -12,7 +14,6 @@ type viewMode int
 const (
 	viewChats viewMode = iota
 	viewProfile
-	viewNewDM
 )
 
 type app struct {
@@ -23,10 +24,10 @@ type app struct {
 	name          *tui.State[string]
 	username      *tui.State[string]
 	password      *tui.State[string]
-	newDMName     *tui.State[string]
 	newDMUsername *tui.State[string]
-	profileEdit   *tui.State[bool]
+	showNewDM     *tui.State[bool]
 	showHelp      *tui.State[bool]
+	profileEdit   *tui.State[bool]
 	replyPending  *tui.State[int]
 }
 
@@ -40,10 +41,10 @@ func App(c client.Client) *app {
 		name:          tui.NewState(p.Name),
 		username:      tui.NewState(p.Username),
 		password:      tui.NewState(p.Password),
-		newDMName:     tui.NewState(""),
 		newDMUsername: tui.NewState(""),
-		profileEdit:   tui.NewState(false),
+		showNewDM:     tui.NewState(false),
 		showHelp:      tui.NewState(false),
+		profileEdit:   tui.NewState(false),
 		replyPending:  tui.NewState(-1),
 	}
 }
@@ -55,12 +56,23 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.KeyTab.Shift(), func(ke tui.KeyEvent) { ke.App().FocusPrev() }),
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
-		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
+		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.showNewDM.Set(true) }),
 		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
+		tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
 	}
 	if a.showHelp.Get() {
-		km = append(km, tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }))
+		km = append(km,
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('h'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+			tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(false) }),
+		)
+		return km
+	}
+	if a.showNewDM.Get() {
+		km = append(km,
+			tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showNewDM.Set(false) }),
+		)
 		return km
 	}
 	if a.view.Get() == viewChats {
@@ -128,8 +140,6 @@ templ (a *app) Render() {
 			<div class="flex items-center gap-2">
 				if a.view.Get() == viewChats {
 					<span class="font-bold text-magenta">[ Direct Messages ]</span>
-				} else if a.view.Get() == viewNewDM {
-					<span class="font-bold text-green">[ New Conversation ]</span>
 				} else {
 					<span class="font-bold text-yellow">[ Profile & Auth ]</span>
 				}
@@ -140,63 +150,14 @@ templ (a *app) Render() {
 			@Sidebar(a.client, a.selectedChat)
 			if a.view.Get() == viewChats {
 				@ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
-			} else if a.view.Get() == viewNewDM {
-				@NewDM(a.newDMName, a.newDMUsername, a.startNewDM, a.cancelNewDM)
 			} else {
 				@Profile(a.name, a.username, a.password, a.profile().ID, a.profile().Token, a.profile().CreatedAt, a.profileEdit, a.saveProfile, a.cancelProfile)
 			}
 		</div>
 		<hr />
 		@StatusBar(a.view.Get(), a.profileEdit.Get())
-
-		<modal open={a.showHelp} class="justify-center items-center" backdrop="dim">
-			<div class="flex-col border-rounded p-2 gap-1 bg-black" width={52}>
-				<div class="flex justify-between items-center">
-					<span class="font-bold text-magenta">Commands & Shortcuts</span>
-					<span class="font-dim text-yellow">esc</span>
-				</div>
-				<hr />
-				<span class="font-bold text-cyan">Suggested</span>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Switch conversation</span>
-					<span class="text-magenta font-bold">j / k or ↑ / ↓</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">New conversation</span>
-					<span class="text-magenta font-bold">n</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">User profile & identity</span>
-					<span class="text-magenta font-bold">p</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Focus message input</span>
-					<span class="text-cyan font-bold">Tab</span>
-				</div>
-				<hr />
-				<span class="font-bold text-cyan">Actions & Navigation</span>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Send message</span>
-					<span class="text-cyan font-bold">Enter</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Return to chats</span>
-					<span class="text-magenta font-bold">c / Esc</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Edit user profile</span>
-					<span class="text-magenta font-bold">e</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Toggle shortcuts help</span>
-					<span class="text-yellow font-bold">?</span>
-				</div>
-				<div class="flex justify-between items-center">
-					<span class="text-white">Quit messenger</span>
-					<span class="text-magenta font-bold">q</span>
-				</div>
-			</div>
-		</modal>
+		@HelpModal(a.showHelp)
+		@NewDMModal(a.showNewDM, a.newDMUsername, a.startNewDM, a.cancelNewDM)
 	</div>
 }
 
@@ -221,26 +182,38 @@ func (a *app) cancelProfile() {
 	a.profileEdit.Set(false)
 }
 
-func (a *app) startNewDM() {
-	name := a.newDMName.Get()
-	username := a.newDMUsername.Get()
-	if name == "" {
-		name = "Anonymous User"
-	}
+func (a *app) startNewDM(username string) {
+	username = strings.TrimSpace(strings.TrimPrefix(username, "@"))
 	if username == "" {
-		username = "anon"
+		return
 	}
-	a.client.AddChat(name, username)
-	a.newDMName.Set("")
+	// Derive clean display name from username e.g. "alex" -> "Alex"
+	displayName := strings.ToUpper(username[:1]) + username[1:]
+	for _, ch := range a.client.Chats() {
+		if strings.EqualFold(ch.Username, username) {
+			// Select existing chat
+			for i, c := range a.client.Chats() {
+				if c.ID == ch.ID {
+					a.selectedChat.Set(i)
+					break
+				}
+			}
+			a.newDMUsername.Set("")
+			a.showNewDM.Set(false)
+			a.view.Set(viewChats)
+			return
+		}
+	}
+	a.client.AddChat(fmt.Sprintf("%s", displayName), username)
 	a.newDMUsername.Set("")
+	a.showNewDM.Set(false)
 	a.selectedChat.Set(len(a.client.Chats()) - 1)
 	a.view.Set(viewChats)
 }
 
 func (a *app) cancelNewDM() {
-	a.newDMName.Set("")
 	a.newDMUsername.Set("")
-	a.view.Set(viewChats)
+	a.showNewDM.Set(false)
 }
 
 var mockReplies = []string{
@@ -253,4 +226,5 @@ var mockReplies = []string{
 	"👍 Got it!",
 	"Looks fantastic!",
 }
+
 
