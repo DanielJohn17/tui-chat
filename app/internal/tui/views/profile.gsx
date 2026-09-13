@@ -1,24 +1,43 @@
 package views
 
-import tui "github.com/grindlemire/go-tui"
+import (
+	"fmt"
+	tui "github.com/grindlemire/go-tui"
+)
 
 type profile struct {
+	name        *tui.State[string]
 	username    *tui.State[string]
-	accountCode *tui.State[string]
 	password    *tui.State[string]
+	userID      int64
+	token       string
+	createdAt   string
 	editMode    *tui.State[bool]
 	onSave      func()
 	onCancel    func()
 }
 
-func Profile(username *tui.State[string], accountCode *tui.State[string], password *tui.State[string], editMode *tui.State[bool], onSave func(), onCancel func()) *profile {
+func Profile(
+	name *tui.State[string],
+	username *tui.State[string],
+	password *tui.State[string],
+	userID int64,
+	token string,
+	createdAt string,
+	editMode *tui.State[bool],
+	onSave func(),
+	onCancel func(),
+) *profile {
 	return &profile{
-		username:    username,
-		accountCode: accountCode,
-		password:    password,
-		editMode:    editMode,
-		onSave:      onSave,
-		onCancel:    onCancel,
+		name:      name,
+		username:  username,
+		password:  password,
+		userID:    userID,
+		token:     token,
+		createdAt: createdAt,
+		editMode:  editMode,
+		onSave:    onSave,
+		onCancel:  onCancel,
 	}
 }
 
@@ -35,53 +54,64 @@ func (p *profile) KeyMap() tui.KeyMap {
 }
 
 templ (p *profile) Render() {
-	<div class="flex-col grow px-2 gap-1">
-		<div class="flex justify-between items-center shrink-0">
-			<span class="font-bold text-cyan">User Profile</span>
+	<div class="flex-col grow border-rounded px-2 py-0 gap-1">
+		<div class="flex justify-between items-center shrink-0 pt-0">
+			<span class="font-bold text-magenta">{"◈ USER IDENTITY & API AUTH"}</span>
 			if p.editMode.Get() {
-				<span class="text-yellow font-bold">[Editing Mode]</span>
+				<span class="text-yellow font-bold">[ Editing Mode ]</span>
 			} else {
-				<span class="font-dim">Press [e] to edit</span>
+				<span class="text-green font-bold">[ Press 'e' to Edit ]</span>
 			}
 		</div>
 		<hr />
 		if p.editMode.Get() {
-			<div class="flex-col gap-1">
-				<span class="font-bold text-white">Username</span>
-				<input value={p.username} placeholder="Enter username..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} autoFocus={true} />
-				<span class="font-bold text-white">Account Code</span>
-				<input value={p.accountCode} placeholder="Enter account code..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} />
-				<span class="font-bold text-white">Password</span>
-				<input value={p.password} placeholder="Enter password..." border={tui.BorderRounded} width={45} focusColor={tui.Cyan} />
+			<div class="flex-col gap-1 px-1">
+				<span class="font-bold text-magenta">Display Name</span>
+				<input value={p.name} placeholder="Enter full name..." border={tui.BorderRounded} width={50} focusColor={tui.Magenta} autoFocus={true} />
+				<span class="font-bold text-magenta">Username</span>
+				<input value={p.username} placeholder="Enter username..." border={tui.BorderRounded} width={50} focusColor={tui.Magenta} />
+				<span class="font-bold text-magenta">Password</span>
+				<input value={p.password} placeholder="Enter password..." border={tui.BorderRounded} width={50} focusColor={tui.Magenta} />
 				<div class="flex gap-2 pt-1">
 					<span class="text-green font-bold">[Enter] Save Changes</span>
-					<span class="font-dim">|</span>
-					<span class="text-red font-bold">[Esc] Cancel</span>
+					<span class="font-dim">•</span>
+					<span class="text-magenta font-bold">[Esc] Cancel</span>
 				</div>
 			</div>
 		} else {
-			<div class="flex-col gap-1">
-				<div class="flex-col border-single px-2" width={48}>
-					<div class="flex justify-between">
-						<span class="font-bold text-white">Account Information</span>
-						<span class="text-green font-bold">{"\u25cf Active"}</span>
-					</div>
-					<hr />
-					<div class="flex justify-between">
-						<span class="font-dim">Username:</span>
-						<span class="font-bold text-cyan">{p.username.Get()}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="font-dim">Account Code:</span>
-						<span class="font-bold text-white">{p.accountCode.Get()}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="font-dim">Password:</span>
-						<span class="font-dim">{"\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}</span>
-					</div>
+			<div class="flex-col gap-1 px-1 py-1" width={60}>
+				<div class="flex justify-between items-center">
+					<span class="font-bold text-white">Active Session Details</span>
+					<span class="text-green font-bold">● Authenticated</span>
 				</div>
-				<span class="font-dim pt-1">Press [e] to edit profile details</span>
+				<hr />
+				<div class="flex justify-between">
+					<span class="font-dim">User ID:</span>
+					<span class="font-bold text-yellow">{fmt.Sprintf("#%d", p.userID)}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="font-dim">Display Name:</span>
+					<span class="font-bold text-cyan">{p.name.Get()}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="font-dim">Username:</span>
+					<span class="font-bold text-magenta">{"@" + p.username.Get()}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="font-dim">Password:</span>
+					<span class="font-dim">••••••••••••</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="font-dim">API Auth Token:</span>
+					<span class="text-cyan">JWT Signed (Bearer)</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="font-dim">Registered:</span>
+					<span class="font-dim">{p.createdAt}</span>
+				</div>
+				<span class="font-dim pt-1">Press [e] to modify user details or [c / Esc] to return to chats</span>
 			</div>
 		}
 	</div>
 }
+

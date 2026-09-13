@@ -1,7 +1,6 @@
 package views
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"time"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
@@ -13,32 +12,37 @@ type viewMode int
 const (
 	viewChats viewMode = iota
 	viewProfile
+	viewNewDM
 )
 
 type app struct {
-	client       client.Client
-	view         *tui.State[viewMode]
-	selectedChat *tui.State[int]
-	draft        *tui.State[string]
-	username     *tui.State[string]
-	accountCode  *tui.State[string]
-	password     *tui.State[string]
-	profileEdit  *tui.State[bool]
-	replyPending *tui.State[int]
+	client        client.Client
+	view          *tui.State[viewMode]
+	selectedChat  *tui.State[int]
+	draft         *tui.State[string]
+	name          *tui.State[string]
+	username      *tui.State[string]
+	password      *tui.State[string]
+	newDMName     *tui.State[string]
+	newDMUsername *tui.State[string]
+	profileEdit   *tui.State[bool]
+	replyPending  *tui.State[int]
 }
 
 func App(c client.Client) *app {
 	p := c.Profile()
 	return &app{
-		client:       c,
-		view:         tui.NewState(viewChats),
-		selectedChat: tui.NewState(0),
-		draft:        tui.NewState(""),
-		username:     tui.NewState(p.Username),
-		accountCode:  tui.NewState(p.AccountCode),
-		password:     tui.NewState(p.Password),
-		profileEdit:  tui.NewState(false),
-		replyPending: tui.NewState(-1),
+		client:        c,
+		view:          tui.NewState(viewChats),
+		selectedChat:  tui.NewState(0),
+		draft:         tui.NewState(""),
+		name:          tui.NewState(p.Name),
+		username:      tui.NewState(p.Username),
+		password:      tui.NewState(p.Password),
+		newDMName:     tui.NewState(""),
+		newDMUsername: tui.NewState(""),
+		profileEdit:   tui.NewState(false),
+		replyPending:  tui.NewState(-1),
 	}
 }
 
@@ -49,6 +53,7 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.KeyTab.Shift(), func(ke tui.KeyEvent) { ke.App().FocusPrev() }),
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
+		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
 	}
 	if a.view.Get() == viewChats {
@@ -85,41 +90,58 @@ func (a *app) KeyMap() tui.KeyMap {
 
 func (a *app) Watchers() []tui.Watcher {
 	return []tui.Watcher{
-		tui.OnTimer(3*time.Second, func() {
+		tui.OnTimer(2*time.Second, func() {
 			if a.replyPending.Get() >= 0 {
-				chatID := a.replyPending.Get()
-				a.client.Send(chatID, mockAutoReply())
+				chatIdx := a.replyPending.Get()
+				chats := a.client.Chats()
+				if chatIdx >= 0 && chatIdx < len(chats) {
+					chat := chats[chatIdx]
+					reply := mockReplies[rand.IntN(len(mockReplies))]
+					a.client.Send(chat.ID, reply)
+				}
 				a.replyPending.Set(-1)
 			}
 		}),
 	}
 }
 
+func (a *app) profile() client.Profile {
+	return a.client.Profile()
+}
+
 templ (a *app) Render() {
 	<div class="flex-col h-full bg-black">
-		<div class="flex justify-between items-center px-1 shrink-0">
+		<div class="flex justify-between items-center px-1 py-0 shrink-0">
 			<div class="flex items-center gap-1">
-				<span class="font-bold text-gradient-cyan-magenta">{"\u26a1 TUI CHAT"}</span>
-				<span class="font-dim text-cyan">|</span>
-				<span class="font-dim">terminal messenger</span>
+				<span class="font-bold text-magenta">{"⚡ TUI CHAT"}</span>
+				<span class="font-dim text-cyan">v1.2.0</span>
+				<span class="font-dim">•</span>
+				<span class="font-dim">terminal direct messenger</span>
 			</div>
-			<div class="flex items-center gap-1">
-				<span class="text-green font-bold">{"\u25cf Online"}</span>
-				<span class="font-dim">|</span>
+			<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1">
+					<span class="text-green font-bold">●</span>
+					<span class="text-green font-bold">Online</span>
+				</div>
+				<span class="font-dim">•</span>
 				if a.view.Get() == viewChats {
-					<span class="font-bold text-cyan">[ Chat ]</span>
+					<span class="font-bold text-magenta">[ Direct Messages ]</span>
+				} else if a.view.Get() == viewNewDM {
+					<span class="font-bold text-green">[ New Conversation ]</span>
 				} else {
-					<span class="font-bold text-magenta">[ Profile ]</span>
+					<span class="font-bold text-yellow">[ Profile & Auth ]</span>
 				}
 			</div>
 		</div>
 		<hr />
-		<div class="flex grow min-h-0">
+		<div class="flex grow min-h-0 gap-1 px-1">
 			@Sidebar(a.client, a.selectedChat)
 			if a.view.Get() == viewChats {
 				@ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
+			} else if a.view.Get() == viewNewDM {
+				@NewDM(a.newDMName, a.newDMUsername, a.startNewDM, a.cancelNewDM)
 			} else {
-				@Profile(a.username, a.accountCode, a.password, a.profileEdit, a.saveProfile, a.cancelProfile)
+				@Profile(a.name, a.username, a.password, a.profile().ID, a.profile().Token, a.profile().CreatedAt, a.profileEdit, a.saveProfile, a.cancelProfile)
 			}
 		</div>
 		<hr />
@@ -132,46 +154,52 @@ func (a *app) onSend() {
 }
 
 func (a *app) saveProfile() {
-	a.client.UpdateProfile(client.Profile{
-		Username:    a.username.Get(),
-		AccountCode: a.accountCode.Get(),
-		Password:    a.password.Get(),
-	})
+	p := a.client.Profile()
+	p.Name = a.name.Get()
+	p.Username = a.username.Get()
+	p.Password = a.password.Get()
+	a.client.UpdateProfile(p)
 	a.profileEdit.Set(false)
 }
 
 func (a *app) cancelProfile() {
 	p := a.client.Profile()
+	a.name.Set(p.Name)
 	a.username.Set(p.Username)
-	a.accountCode.Set(p.AccountCode)
 	a.password.Set(p.Password)
 	a.profileEdit.Set(false)
 }
 
-var mockReplies = []string{
-	"That's a good point!",
-	"Let me think about that...",
-	"I'll look into it.",
-	"Sure, sounds good!",
-	"Haha, nice one!",
-	"Thanks for sharing!",
-	"Interesting, I hadn't considered that.",
-	"\U0001F44D",
-	"lol",
-	"Agreed!",
-}
-
-var mockResponders = []string{"bob", "charlie", "system"}
-
-func mockAutoReply() string {
-	reply := mockReplies[rand.IntN(len(mockReplies))]
-	sender := mockResponders[rand.IntN(len(mockResponders))]
-	return fmt.Sprintf("%s: %s", sender, reply)
-}
-
-func viewName(v viewMode) string {
-	if v == viewProfile {
-		return "profile"
+func (a *app) startNewDM() {
+	name := a.newDMName.Get()
+	username := a.newDMUsername.Get()
+	if name == "" {
+		name = "Anonymous User"
 	}
-	return "chat"
+	if username == "" {
+		username = "anon"
+	}
+	a.client.AddChat(name, username)
+	a.newDMName.Set("")
+	a.newDMUsername.Set("")
+	a.selectedChat.Set(len(a.client.Chats()) - 1)
+	a.view.Set(viewChats)
 }
+
+func (a *app) cancelNewDM() {
+	a.newDMName.Set("")
+	a.newDMUsername.Set("")
+	a.view.Set(viewChats)
+}
+
+var mockReplies = []string{
+	"Sounds great! Looking into it right now.",
+	"Checked the pull request, everything looks solid.",
+	"Let me test the websocket endpoint locally.",
+	"Agreed, nice improvement on the UI.",
+	"Deploying the latest build to staging 🚀",
+	"Thanks for the update!",
+	"👍 Got it!",
+	"Looks fantastic!",
+}
+

@@ -4,7 +4,6 @@
 package views
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"time"
 
@@ -17,47 +16,48 @@ type viewMode int
 const (
 	viewChats viewMode = iota
 	viewProfile
+	viewNewDM
 )
 
 type app struct {
-	client       client.Client
-	view         *tui.State[viewMode]
-	selectedChat *tui.State[int]
-	draft        *tui.State[string]
-	username     *tui.State[string]
-	accountCode  *tui.State[string]
-	password     *tui.State[string]
-	profileEdit  *tui.State[bool]
-	replyPending *tui.State[int]
+	client        client.Client
+	view          *tui.State[viewMode]
+	selectedChat  *tui.State[int]
+	draft         *tui.State[string]
+	name          *tui.State[string]
+	username      *tui.State[string]
+	password      *tui.State[string]
+	newDMName     *tui.State[string]
+	newDMUsername *tui.State[string]
+	profileEdit   *tui.State[bool]
+	replyPending  *tui.State[int]
 }
 
 var mockReplies = []string{
-	"That's a good point!",
-	"Let me think about that...",
-	"I'll look into it.",
-	"Sure, sounds good!",
-	"Haha, nice one!",
-	"Thanks for sharing!",
-	"Interesting, I hadn't considered that.",
-	"\U0001F44D",
-	"lol",
-	"Agreed!",
+	"Sounds great! Looking into it right now.",
+	"Checked the pull request, everything looks solid.",
+	"Let me test the websocket endpoint locally.",
+	"Agreed, nice improvement on the UI.",
+	"Deploying the latest build to staging 🚀",
+	"Thanks for the update!",
+	"👍 Got it!",
+	"Looks fantastic!",
 }
-
-var mockResponders = []string{"bob", "charlie", "system"}
 
 func App(c client.Client) *app {
 	p := c.Profile()
 	return &app{
-		client:       c,
-		view:         tui.NewState(viewChats),
-		selectedChat: tui.NewState(0),
-		draft:        tui.NewState(""),
-		username:     tui.NewState(p.Username),
-		accountCode:  tui.NewState(p.AccountCode),
-		password:     tui.NewState(p.Password),
-		profileEdit:  tui.NewState(false),
-		replyPending: tui.NewState(-1),
+		client:        c,
+		view:          tui.NewState(viewChats),
+		selectedChat:  tui.NewState(0),
+		draft:         tui.NewState(""),
+		name:          tui.NewState(p.Name),
+		username:      tui.NewState(p.Username),
+		password:      tui.NewState(p.Password),
+		newDMName:     tui.NewState(""),
+		newDMUsername: tui.NewState(""),
+		profileEdit:   tui.NewState(false),
+		replyPending:  tui.NewState(-1),
 	}
 }
 
@@ -68,6 +68,7 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.KeyTab.Shift(), func(ke tui.KeyEvent) { ke.App().FocusPrev() }),
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
+		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
 	}
 	if a.view.Get() == viewChats {
@@ -104,14 +105,23 @@ func (a *app) KeyMap() tui.KeyMap {
 
 func (a *app) Watchers() []tui.Watcher {
 	return []tui.Watcher{
-		tui.OnTimer(3*time.Second, func() {
+		tui.OnTimer(2*time.Second, func() {
 			if a.replyPending.Get() >= 0 {
-				chatID := a.replyPending.Get()
-				a.client.Send(chatID, mockAutoReply())
+				chatIdx := a.replyPending.Get()
+				chats := a.client.Chats()
+				if chatIdx >= 0 && chatIdx < len(chats) {
+					chat := chats[chatIdx]
+					reply := mockReplies[rand.IntN(len(mockReplies))]
+					a.client.Send(chat.ID, reply)
+				}
 				a.replyPending.Set(-1)
 			}
 		}),
 	}
+}
+
+func (a *app) profile() client.Profile {
+	return a.client.Profile()
 }
 
 func (a *app) onSend() {
@@ -119,33 +129,42 @@ func (a *app) onSend() {
 }
 
 func (a *app) saveProfile() {
-	a.client.UpdateProfile(client.Profile{
-		Username:    a.username.Get(),
-		AccountCode: a.accountCode.Get(),
-		Password:    a.password.Get(),
-	})
+	p := a.client.Profile()
+	p.Name = a.name.Get()
+	p.Username = a.username.Get()
+	p.Password = a.password.Get()
+	a.client.UpdateProfile(p)
 	a.profileEdit.Set(false)
 }
 
 func (a *app) cancelProfile() {
 	p := a.client.Profile()
+	a.name.Set(p.Name)
 	a.username.Set(p.Username)
-	a.accountCode.Set(p.AccountCode)
 	a.password.Set(p.Password)
 	a.profileEdit.Set(false)
 }
 
-func mockAutoReply() string {
-	reply := mockReplies[rand.IntN(len(mockReplies))]
-	sender := mockResponders[rand.IntN(len(mockResponders))]
-	return fmt.Sprintf("%s: %s", sender, reply)
+func (a *app) startNewDM() {
+	name := a.newDMName.Get()
+	username := a.newDMUsername.Get()
+	if name == "" {
+		name = "Anonymous User"
+	}
+	if username == "" {
+		username = "anon"
+	}
+	a.client.AddChat(name, username)
+	a.newDMName.Set("")
+	a.newDMUsername.Set("")
+	a.selectedChat.Set(len(a.client.Chats()) - 1)
+	a.view.Set(viewChats)
 }
 
-func viewName(v viewMode) string {
-	if v == viewProfile {
-		return "profile"
-	}
-	return "chat"
+func (a *app) cancelNewDM() {
+	a.newDMName.Set("")
+	a.newDMUsername.Set("")
+	a.view.Set(viewChats)
 }
 
 func (a *app) Render(app *tui.App) *tui.Element {
@@ -167,85 +186,113 @@ func (a *app) Render(app *tui.App) *tui.Element {
 		tui.WithGap(1),
 	)
 	__tui_3 := tui.New(
-		tui.WithText("\u26a1 TUI CHAT"),
-		tui.WithTextGradient(tui.NewGradient(tui.Cyan, tui.Magenta).WithDirection(tui.GradientHorizontal)),
-		tui.WithTextStyle(tui.NewStyle().Bold()),
+		tui.WithText("⚡ TUI CHAT"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 	)
 	__tui_2.AddChild(__tui_3)
 	__tui_4 := tui.New(
-		tui.WithText("|"),
+		tui.WithText("v1.2.0"),
 		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Cyan)),
 	)
 	__tui_2.AddChild(__tui_4)
 	__tui_5 := tui.New(
-		tui.WithText("terminal messenger"),
+		tui.WithText("•"),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
 	__tui_2.AddChild(__tui_5)
-	__tui_1.AddChild(__tui_2)
 	__tui_6 := tui.New(
+		tui.WithText("terminal direct messenger"),
+		tui.WithTextStyle(tui.NewStyle().Dim()),
+	)
+	__tui_2.AddChild(__tui_6)
+	__tui_1.AddChild(__tui_2)
+	__tui_7 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithGap(2),
+	)
+	__tui_8 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithGap(1),
 	)
-	__tui_7 := tui.New(
-		tui.WithText("\u25cf Online"),
+	__tui_9 := tui.New(
+		tui.WithText("●"),
 		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 	)
-	__tui_6.AddChild(__tui_7)
-	__tui_8 := tui.New(
-		tui.WithText("|"),
+	__tui_8.AddChild(__tui_9)
+	__tui_10 := tui.New(
+		tui.WithText("Online"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
+	)
+	__tui_8.AddChild(__tui_10)
+	__tui_7.AddChild(__tui_8)
+	__tui_11 := tui.New(
+		tui.WithText("•"),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
-	__tui_6.AddChild(__tui_8)
+	__tui_7.AddChild(__tui_11)
 	if a.view.Get() == viewChats {
-		__tui_9 := tui.New(
-			tui.WithText("[ Chat ]"),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
-		)
-		__tui_6.AddChild(__tui_9)
-	} else {
-		__tui_10 := tui.New(
-			tui.WithText("[ Profile ]"),
+		__tui_12 := tui.New(
+			tui.WithText("[ Direct Messages ]"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
-		__tui_6.AddChild(__tui_10)
+		__tui_7.AddChild(__tui_12)
+	} else if a.view.Get() == viewNewDM {
+		__tui_13 := tui.New(
+			tui.WithText("[ New Conversation ]"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Green)),
+		)
+		__tui_7.AddChild(__tui_13)
+	} else {
+		__tui_14 := tui.New(
+			tui.WithText("[ Profile & Auth ]"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Yellow)),
+		)
+		__tui_7.AddChild(__tui_14)
 	}
-	__tui_1.AddChild(__tui_6)
+	__tui_1.AddChild(__tui_7)
 	__tui_0.AddChild(__tui_1)
-	__tui_11 := tui.New(
+	__tui_15 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_11)
-	__tui_12 := tui.New(
+	__tui_0.AddChild(__tui_15)
+	__tui_16 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithFlexGrow(1),
 		tui.WithMinHeight(0),
+		tui.WithGap(1),
+		tui.WithPaddingTRBL(0, 1, 0, 1),
 	)
-	__tui_13 := app.Mount(a, 0, func() tui.Component {
+	__tui_17 := app.Mount(a, 0, func() tui.Component {
 		return Sidebar(a.client, a.selectedChat)
 	})
-	__tui_12.AddChild(__tui_13)
+	__tui_16.AddChild(__tui_17)
 	if a.view.Get() == viewChats {
-		__tui_14 := app.Mount(a, 1, func() tui.Component {
+		__tui_18 := app.Mount(a, 1, func() tui.Component {
 			return ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
 		})
-		__tui_12.AddChild(__tui_14)
-	} else {
-		__tui_15 := app.Mount(a, 2, func() tui.Component {
-			return Profile(a.username, a.accountCode, a.password, a.profileEdit, a.saveProfile, a.cancelProfile)
+		__tui_16.AddChild(__tui_18)
+	} else if a.view.Get() == viewNewDM {
+		__tui_19 := app.Mount(a, 2, func() tui.Component {
+			return NewDM(a.newDMName, a.newDMUsername, a.startNewDM, a.cancelNewDM)
 		})
-		__tui_12.AddChild(__tui_15)
+		__tui_16.AddChild(__tui_19)
+	} else {
+		__tui_20 := app.Mount(a, 3, func() tui.Component {
+			return Profile(a.name, a.username, a.password, a.profile().ID, a.profile().Token, a.profile().CreatedAt, a.profileEdit, a.saveProfile, a.cancelProfile)
+		})
+		__tui_16.AddChild(__tui_20)
 	}
-	__tui_0.AddChild(__tui_12)
-	__tui_16 := tui.New(
+	__tui_0.AddChild(__tui_16)
+	__tui_21 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_16)
-	__tui_17 := app.Mount(a, 3, func() tui.Component {
+	__tui_0.AddChild(__tui_21)
+	__tui_22 := app.Mount(a, 4, func() tui.Component {
 		return StatusBar(a.view.Get(), a.profileEdit.Get())
 	})
-	__tui_0.AddChild(__tui_17)
+	__tui_0.AddChild(__tui_22)
 
 	return __tui_0
 }
@@ -280,14 +327,20 @@ func (a *app) bindAppFields(app *tui.App) {
 	if a.draft != nil {
 		a.draft.BindApp(app)
 	}
+	if a.name != nil {
+		a.name.BindApp(app)
+	}
 	if a.username != nil {
 		a.username.BindApp(app)
 	}
-	if a.accountCode != nil {
-		a.accountCode.BindApp(app)
-	}
 	if a.password != nil {
 		a.password.BindApp(app)
+	}
+	if a.newDMName != nil {
+		a.newDMName.BindApp(app)
+	}
+	if a.newDMUsername != nil {
+		a.newDMUsername.BindApp(app)
 	}
 	if a.profileEdit != nil {
 		a.profileEdit.BindApp(app)

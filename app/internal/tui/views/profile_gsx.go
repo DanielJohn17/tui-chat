@@ -4,26 +4,44 @@
 package views
 
 import (
+	"fmt"
+
 	tui "github.com/grindlemire/go-tui"
 )
 
 type profile struct {
-	username    *tui.State[string]
-	accountCode *tui.State[string]
-	password    *tui.State[string]
-	editMode    *tui.State[bool]
-	onSave      func()
-	onCancel    func()
+	name      *tui.State[string]
+	username  *tui.State[string]
+	password  *tui.State[string]
+	userID    int64
+	token     string
+	createdAt string
+	editMode  *tui.State[bool]
+	onSave    func()
+	onCancel  func()
 }
 
-func Profile(username *tui.State[string], accountCode *tui.State[string], password *tui.State[string], editMode *tui.State[bool], onSave func(), onCancel func()) *profile {
+func Profile(
+	name *tui.State[string],
+	username *tui.State[string],
+	password *tui.State[string],
+	userID int64,
+	token string,
+	createdAt string,
+	editMode *tui.State[bool],
+	onSave func(),
+	onCancel func(),
+) *profile {
 	return &profile{
-		username:    username,
-		accountCode: accountCode,
-		password:    password,
-		editMode:    editMode,
-		onSave:      onSave,
-		onCancel:    onCancel,
+		name:      name,
+		username:  username,
+		password:  password,
+		userID:    userID,
+		token:     token,
+		createdAt: createdAt,
+		editMode:  editMode,
+		onSave:    onSave,
+		onCancel:  onCancel,
 	}
 }
 
@@ -43,6 +61,7 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 	__tui_0 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 		tui.WithFlexGrow(1),
+		tui.WithBorder(tui.BorderRounded),
 		tui.WithGap(1),
 		tui.WithPaddingTRBL(0, 2, 0, 2),
 	)
@@ -51,200 +70,268 @@ func (p *profile) Render(app *tui.App) *tui.Element {
 		tui.WithJustify(tui.JustifySpaceBetween),
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithFlexShrink(0),
+		tui.WithPaddingTRBL(0, 0, 0, 0),
 	)
 	__tui_2 := tui.New(
-		tui.WithText("User Profile"),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+		tui.WithText("◈ USER IDENTITY & API AUTH"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 	)
 	__tui_1.AddChild(__tui_2)
 	if p.editMode.Get() {
 		__tui_3 := tui.New(
-			tui.WithText("[Editing Mode]"),
+			tui.WithText("[ Editing Mode ]"),
 			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
 		)
 		__tui_1.AddChild(__tui_3)
 	} else {
 		__tui_4 := tui.New(
-			tui.WithText("Press [e] to edit"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
+		__tui_5 := tui.New(tui.WithText("[ Press"))
+		__tui_4.AddChild(__tui_5)
+		__tui_6 := tui.New(tui.WithText("to Edit ]"))
+		__tui_4.AddChild(__tui_6)
 		__tui_1.AddChild(__tui_4)
 	}
 	__tui_0.AddChild(__tui_1)
-	__tui_5 := tui.New(
+	__tui_7 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_5)
+	__tui_0.AddChild(__tui_7)
 	if p.editMode.Get() {
-		__tui_6 := tui.New(
+		__tui_8 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 			tui.WithGap(1),
+			tui.WithPaddingTRBL(0, 1, 0, 1),
 		)
-		__tui_7 := tui.New(
+		__tui_9 := tui.New(
+			tui.WithText("Display Name"),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
+		)
+		__tui_8.AddChild(__tui_9)
+		__tui_10 := app.MountPersistent(p, 0, func() tui.Component {
+			return tui.NewInput(
+				tui.WithInputValue(p.name),
+				tui.WithInputPlaceholder("Enter full name..."),
+				tui.WithInputBorder(tui.BorderRounded),
+				tui.WithInputWidth(50),
+				tui.WithInputFocusColor(tui.Magenta),
+				tui.WithInputAutoFocus(true),
+			)
+		})
+		__tui_8.AddChild(__tui_10)
+		__tui_11 := tui.New(
 			tui.WithText("Username"),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
-		__tui_6.AddChild(__tui_7)
-		__tui_8 := app.MountPersistent(p, 0, func() tui.Component {
+		__tui_8.AddChild(__tui_11)
+		__tui_12 := app.MountPersistent(p, 1, func() tui.Component {
 			return tui.NewInput(
 				tui.WithInputValue(p.username),
 				tui.WithInputPlaceholder("Enter username..."),
 				tui.WithInputBorder(tui.BorderRounded),
-				tui.WithInputWidth(45),
-				tui.WithInputFocusColor(tui.Cyan),
-				tui.WithInputAutoFocus(true),
+				tui.WithInputWidth(50),
+				tui.WithInputFocusColor(tui.Magenta),
 			)
 		})
-		__tui_6.AddChild(__tui_8)
-		__tui_9 := tui.New(
-			tui.WithText("Account Code"),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
-		)
-		__tui_6.AddChild(__tui_9)
-		__tui_10 := app.MountPersistent(p, 1, func() tui.Component {
-			return tui.NewInput(
-				tui.WithInputValue(p.accountCode),
-				tui.WithInputPlaceholder("Enter account code..."),
-				tui.WithInputBorder(tui.BorderRounded),
-				tui.WithInputWidth(45),
-				tui.WithInputFocusColor(tui.Cyan),
-			)
-		})
-		__tui_6.AddChild(__tui_10)
-		__tui_11 := tui.New(
+		__tui_8.AddChild(__tui_12)
+		__tui_13 := tui.New(
 			tui.WithText("Password"),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
-		__tui_6.AddChild(__tui_11)
-		__tui_12 := app.MountPersistent(p, 2, func() tui.Component {
+		__tui_8.AddChild(__tui_13)
+		__tui_14 := app.MountPersistent(p, 2, func() tui.Component {
 			return tui.NewInput(
 				tui.WithInputValue(p.password),
 				tui.WithInputPlaceholder("Enter password..."),
 				tui.WithInputBorder(tui.BorderRounded),
-				tui.WithInputWidth(45),
-				tui.WithInputFocusColor(tui.Cyan),
+				tui.WithInputWidth(50),
+				tui.WithInputFocusColor(tui.Magenta),
 			)
 		})
-		__tui_6.AddChild(__tui_12)
-		__tui_13 := tui.New(
+		__tui_8.AddChild(__tui_14)
+		__tui_15 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 			tui.WithGap(2),
 			tui.WithPaddingTRBL(1, 0, 0, 0),
 		)
-		__tui_14 := tui.New(
+		__tui_16 := tui.New(
 			tui.WithText("[Enter] Save Changes"),
 			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
-		__tui_13.AddChild(__tui_14)
-		__tui_15 := tui.New(
-			tui.WithText("|"),
+		__tui_15.AddChild(__tui_16)
+		__tui_17 := tui.New(
+			tui.WithText("•"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_13.AddChild(__tui_15)
-		__tui_16 := tui.New(
+		__tui_15.AddChild(__tui_17)
+		__tui_18 := tui.New(
 			tui.WithText("[Esc] Cancel"),
-			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Red).Bold()),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
 		)
-		__tui_13.AddChild(__tui_16)
-		__tui_6.AddChild(__tui_13)
-		__tui_0.AddChild(__tui_6)
+		__tui_15.AddChild(__tui_18)
+		__tui_8.AddChild(__tui_15)
+		__tui_0.AddChild(__tui_8)
 	} else {
-		__tui_17 := tui.New(
+		__tui_19 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 			tui.WithGap(1),
-		)
-		__tui_18 := tui.New(
-			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
-			tui.WithBorder(tui.BorderSingle),
-			tui.WithPaddingTRBL(0, 2, 0, 2),
-			tui.WithWidth(48),
-		)
-		__tui_19 := tui.New(
-			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-			tui.WithJustify(tui.JustifySpaceBetween),
+			tui.WithPaddingTRBL(1, 1, 1, 1),
+			tui.WithWidth(60),
 		)
 		__tui_20 := tui.New(
-			tui.WithText("Account Information"),
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+			tui.WithAlign(tui.AlignCenter),
+		)
+		__tui_21 := tui.New(
+			tui.WithText("Active Session Details"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
 		)
-		__tui_19.AddChild(__tui_20)
-		__tui_21 := tui.New(
-			tui.WithText("\u25cf Active"),
+		__tui_20.AddChild(__tui_21)
+		__tui_22 := tui.New(
+			tui.WithText("● Authenticated"),
 			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
-		__tui_19.AddChild(__tui_21)
-		__tui_18.AddChild(__tui_19)
-		__tui_22 := tui.New(
+		__tui_20.AddChild(__tui_22)
+		__tui_19.AddChild(__tui_20)
+		__tui_23 := tui.New(
 			tui.WithHR(),
 		)
-		__tui_18.AddChild(__tui_22)
-		__tui_23 := tui.New(
+		__tui_19.AddChild(__tui_23)
+		__tui_24 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 			tui.WithJustify(tui.JustifySpaceBetween),
 		)
-		__tui_24 := tui.New(
+		__tui_25 := tui.New(
+			tui.WithText("User ID:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_24.AddChild(__tui_25)
+		__tui_26 := tui.New(
+			tui.WithText(fmt.Sprintf("#%d", p.userID)),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Yellow)),
+		)
+		__tui_24.AddChild(__tui_26)
+		__tui_19.AddChild(__tui_24)
+		__tui_27 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_28 := tui.New(
+			tui.WithText("Display Name:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_27.AddChild(__tui_28)
+		__tui_29 := tui.New(
+			tui.WithText(p.name.Get()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+		)
+		__tui_27.AddChild(__tui_29)
+		__tui_19.AddChild(__tui_27)
+		__tui_30 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_31 := tui.New(
 			tui.WithText("Username:"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_23.AddChild(__tui_24)
-		__tui_25 := tui.New(
-			tui.WithText(p.username.Get()),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+		__tui_30.AddChild(__tui_31)
+		__tui_32 := tui.New(
+			tui.WithText("@"+p.username.Get()),
+			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
-		__tui_23.AddChild(__tui_25)
-		__tui_18.AddChild(__tui_23)
-		__tui_26 := tui.New(
+		__tui_30.AddChild(__tui_32)
+		__tui_19.AddChild(__tui_30)
+		__tui_33 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 			tui.WithJustify(tui.JustifySpaceBetween),
 		)
-		__tui_27 := tui.New(
-			tui.WithText("Account Code:"),
-			tui.WithTextStyle(tui.NewStyle().Dim()),
-		)
-		__tui_26.AddChild(__tui_27)
-		__tui_28 := tui.New(
-			tui.WithText(p.accountCode.Get()),
-			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
-		)
-		__tui_26.AddChild(__tui_28)
-		__tui_18.AddChild(__tui_26)
-		__tui_29 := tui.New(
-			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-			tui.WithJustify(tui.JustifySpaceBetween),
-		)
-		__tui_30 := tui.New(
+		__tui_34 := tui.New(
 			tui.WithText("Password:"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_29.AddChild(__tui_30)
-		__tui_31 := tui.New(
-			tui.WithText("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"),
+		__tui_33.AddChild(__tui_34)
+		__tui_35 := tui.New(
+			tui.WithText("••••••••••••"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_29.AddChild(__tui_31)
-		__tui_18.AddChild(__tui_29)
-		__tui_17.AddChild(__tui_18)
-		__tui_32 := tui.New(
-			tui.WithText("Press [e] to edit profile details"),
+		__tui_33.AddChild(__tui_35)
+		__tui_19.AddChild(__tui_33)
+		__tui_36 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_37 := tui.New(
+			tui.WithText("API Auth Token:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_36.AddChild(__tui_37)
+		__tui_38 := tui.New(
+			tui.WithText("JWT Signed (Bearer)"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan)),
+		)
+		__tui_36.AddChild(__tui_38)
+		__tui_19.AddChild(__tui_36)
+		__tui_39 := tui.New(
+			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+			tui.WithJustify(tui.JustifySpaceBetween),
+		)
+		__tui_40 := tui.New(
+			tui.WithText("Registered:"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_39.AddChild(__tui_40)
+		__tui_41 := tui.New(
+			tui.WithText(p.createdAt),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_39.AddChild(__tui_41)
+		__tui_19.AddChild(__tui_39)
+		__tui_42 := tui.New(
 			tui.WithPaddingTRBL(1, 0, 0, 0),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_17.AddChild(__tui_32)
-		__tui_0.AddChild(__tui_17)
+		__tui_43 := tui.New(tui.WithText("Press [e] to modify user details or [c / Esc] to"))
+		__tui_42.AddChild(__tui_43)
+		__tui_44 := tui.New(tui.WithText("to chats"))
+		__tui_42.AddChild(__tui_44)
+		__tui_19.AddChild(__tui_42)
+		__tui_0.AddChild(__tui_19)
 	}
 
 	return __tui_0
 }
 
+// updatePropsFields is generated. It copies prop fields from fresh onto
+// the receiver. When you override UpdateProps, call this helper instead
+// of hand-maintaining the copy list.
+func (p *profile) updatePropsFields(fresh tui.Component) {
+	f, ok := fresh.(*profile)
+	if !ok {
+		return
+	}
+	p.userID = f.userID
+	p.token = f.token
+	p.createdAt = f.createdAt
+}
+
+func (p *profile) UpdateProps(fresh tui.Component) {
+	p.updatePropsFields(fresh)
+}
+
+var _ tui.PropsUpdater = (*profile)(nil)
+
 // bindAppFields is generated. It wires the component's *tui.App,
 // State, Events, and TextArea fields to app. When you override BindApp,
 // call this helper instead of hand-maintaining the delegation list.
 func (p *profile) bindAppFields(app *tui.App) {
+	if p.name != nil {
+		p.name.BindApp(app)
+	}
 	if p.username != nil {
 		p.username.BindApp(app)
-	}
-	if p.accountCode != nil {
-		p.accountCode.BindApp(app)
 	}
 	if p.password != nil {
 		p.password.BindApp(app)

@@ -4,6 +4,8 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	tui "github.com/grindlemire/go-tui"
 )
@@ -50,87 +52,228 @@ var _ tui.AppUnbinder = (*SidebarView)(nil)
 
 var _ tui.PropsUpdater = (*SidebarView)(nil)
 
-func Sidebar(c client.Client, selectedChat *tui.State[int]) *SidebarView {
+func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 	var view SidebarView
 	var watchers []tui.Watcher
 
 	__tui_0 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
-		tui.WithBorder(tui.BorderSingle),
+		tui.WithBorder(tui.BorderRounded),
 		tui.WithFlexShrink(0),
+		tui.WithGap(0),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
-		tui.WithWidth(24),
+		tui.WithWidth(28),
 	)
 	__tui_1 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithJustify(tui.JustifySpaceBetween),
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithFlexShrink(0),
+		tui.WithPaddingTRBL(0, 0, 0, 0),
 	)
 	__tui_2 := tui.New(
-		tui.WithText("CHANNELS"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
+		tui.WithText("◈ CONVERSATIONS"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
 	)
 	__tui_1.AddChild(__tui_2)
-	__tui_0.AddChild(__tui_1)
 	__tui_3 := tui.New(
+		tui.WithText("[+n]"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
+	)
+	__tui_1.AddChild(__tui_3)
+	__tui_0.AddChild(__tui_1)
+	__tui_4 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_3)
-	__tui_4 := tui.New(
+	__tui_0.AddChild(__tui_4)
+	__tui_5 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 		tui.WithGap(1),
+		tui.WithFlexGrow(1),
+		tui.WithScrollable(tui.ScrollVertical),
+		tui.WithScrollbarStyle(tui.NewStyle().Foreground(tui.Magenta)),
 	)
-	__loop_0_style := __tui_4.LayoutStyle()
+	__loop_0_style := __tui_5.LayoutStyle()
 	__loop_0 := tui.New(tui.WithDirection(__loop_0_style.Direction), tui.WithGap(__loop_0_style.Gap))
-	__tui_4.AddChild(__loop_0)
+	__tui_5.AddChild(__loop_0)
 	__update___loop_0 := func() {
 		__loop_0.RemoveAllChildren()
 		for i, ch := range c.Chats() {
 			_ = i
-			if i == selectedChat.Get() {
-				__tui_5 := tui.New(
-					tui.WithText("\u276f #"+ch.Name),
+			if i == selectedIndex.Get() {
+				__tui_6 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+					tui.WithPaddingTRBL(0, 1, 0, 1),
+				)
+				__tui_7 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+					tui.WithJustify(tui.JustifySpaceBetween),
+					tui.WithAlign(tui.AlignCenter),
+				)
+				__tui_8 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+					tui.WithAlign(tui.AlignCenter),
+					tui.WithGap(1),
+				)
+				__tui_9 := tui.New(
+					tui.WithText("▶"),
+					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+				)
+				__tui_8.AddChild(__tui_9)
+				__tui_10 := tui.New(
+					tui.WithText(ch.Name),
 					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 				)
-				__loop_0.AddChild(__tui_5)
-			} else {
-				__tui_6 := tui.New(
-					tui.WithText("  #"+ch.Name),
+				__tui_8.AddChild(__tui_10)
+				__tui_7.AddChild(__tui_8)
+				if ch.Online {
+					__tui_11 := tui.New(
+						tui.WithText("●"),
+						tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
+					)
+					__tui_7.AddChild(__tui_11)
+				} else {
+					__tui_12 := tui.New(
+						tui.WithText("○"),
+						tui.WithTextStyle(tui.NewStyle().Dim()),
+					)
+					__tui_7.AddChild(__tui_12)
+				}
+				__tui_6.AddChild(__tui_7)
+				__tui_13 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+					tui.WithJustify(tui.JustifySpaceBetween),
+					tui.WithAlign(tui.AlignCenter),
+				)
+				__tui_14 := tui.New(
+					tui.WithText("@"+ch.Username),
+					tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Dim()),
+				)
+				__tui_13.AddChild(__tui_14)
+				__tui_15 := tui.New(
+					tui.WithText(ch.Time),
 					tui.WithTextStyle(tui.NewStyle().Dim()),
 				)
+				__tui_13.AddChild(__tui_15)
+				__tui_6.AddChild(__tui_13)
+				if ch.LastMessage != "" {
+					__tui_16 := tui.New(
+						tui.WithText(ch.LastMessage),
+						tui.WithTextStyle(tui.NewStyle().Dim()),
+					)
+					__tui_6.AddChild(__tui_16)
+				}
 				__loop_0.AddChild(__tui_6)
+			} else {
+				__tui_17 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+					tui.WithPaddingTRBL(0, 1, 0, 1),
+				)
+				__tui_18 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+					tui.WithJustify(tui.JustifySpaceBetween),
+					tui.WithAlign(tui.AlignCenter),
+				)
+				__tui_19 := tui.New(
+					tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+					tui.WithAlign(tui.AlignCenter),
+					tui.WithGap(1),
+				)
+				if ch.Online {
+					__tui_20 := tui.New(
+						tui.WithText("●"),
+						tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Dim()),
+					)
+					__tui_19.AddChild(__tui_20)
+				} else {
+					__tui_21 := tui.New(
+						tui.WithText("○"),
+						tui.WithTextStyle(tui.NewStyle().Dim()),
+					)
+					__tui_19.AddChild(__tui_21)
+				}
+				__tui_22 := tui.New(
+					tui.WithText(ch.Name),
+					tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+				)
+				__tui_19.AddChild(__tui_22)
+				__tui_18.AddChild(__tui_19)
+				if ch.Unread > 0 {
+					__tui_23 := tui.New(
+						tui.WithText(fmt.Sprintf("(%d)", ch.Unread)),
+						tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+					)
+					__tui_18.AddChild(__tui_23)
+				} else {
+					__tui_24 := tui.New(
+						tui.WithText(ch.Time),
+						tui.WithTextStyle(tui.NewStyle().Dim()),
+					)
+					__tui_18.AddChild(__tui_24)
+				}
+				__tui_17.AddChild(__tui_18)
+				__tui_25 := tui.New(
+					tui.WithText("@"+ch.Username),
+					tui.WithTextStyle(tui.NewStyle().Dim()),
+				)
+				__tui_17.AddChild(__tui_25)
+				__loop_0.AddChild(__tui_17)
 			}
 		}
 	}
 	__update___loop_0()
-	selectedChat.Bind(func(_ int) { __update___loop_0() })
-	__tui_0.AddChild(__tui_4)
-	__tui_7 := tui.New(
-		tui.WithFlexGrow(1),
-	)
-	__tui_0.AddChild(__tui_7)
-	__tui_8 := tui.New(
+	selectedIndex.Bind(func(_ int) { __update___loop_0() })
+	__tui_0.AddChild(__tui_5)
+	__tui_26 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_8)
-	__tui_9 := tui.New(
+	__tui_0.AddChild(__tui_26)
+	__tui_27 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithFlexShrink(0),
+		tui.WithPaddingTRBL(0, 1, 0, 1),
+	)
+	__tui_28 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithGap(1),
-		tui.WithFlexShrink(0),
 	)
-	__tui_10 := tui.New(
-		tui.WithText("\u25cf"),
+	__tui_29 := tui.New(
+		tui.WithText("●"),
 		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 	)
-	__tui_9.AddChild(__tui_10)
-	__tui_11 := tui.New(
-		tui.WithText(c.Profile().Username),
+	__tui_28.AddChild(__tui_29)
+	__tui_30 := tui.New(
+		tui.WithText(c.Profile().Name),
 		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
 	)
-	__tui_9.AddChild(__tui_11)
-	__tui_0.AddChild(__tui_9)
+	__tui_28.AddChild(__tui_30)
+	__tui_27.AddChild(__tui_28)
+	__tui_31 := tui.New(
+		tui.WithText(fmt.Sprintf("#%d", c.Profile().ID)),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
+	)
+	__tui_27.AddChild(__tui_31)
+	__tui_0.AddChild(__tui_27)
+	__tui_32 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+		tui.WithPaddingTRBL(0, 1, 0, 1),
+	)
+	__tui_33 := tui.New(
+		tui.WithText("@"+c.Profile().Username),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta)),
+	)
+	__tui_32.AddChild(__tui_33)
+	__tui_34 := tui.New(
+		tui.WithText("● Active"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
+	)
+	__tui_32.AddChild(__tui_34)
+	__tui_0.AddChild(__tui_32)
 
 	__bindApp := func(app *tui.App) {
 	}
