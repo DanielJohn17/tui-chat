@@ -37,3 +37,5 @@ go.work.sum
 .stfolder/
 
 tmp/
+
+bin/
