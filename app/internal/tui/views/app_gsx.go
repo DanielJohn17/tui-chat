@@ -211,88 +211,67 @@ func (a *app) Render(app *tui.App) *tui.Element {
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithGap(2),
 	)
-	__tui_8 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithAlign(tui.AlignCenter),
-		tui.WithGap(1),
-	)
-	__tui_9 := tui.New(
-		tui.WithText("●"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
-	)
-	__tui_8.AddChild(__tui_9)
-	__tui_10 := tui.New(
-		tui.WithText("Online"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
-	)
-	__tui_8.AddChild(__tui_10)
-	__tui_7.AddChild(__tui_8)
-	__tui_11 := tui.New(
-		tui.WithText("•"),
-		tui.WithTextStyle(tui.NewStyle().Dim()),
-	)
-	__tui_7.AddChild(__tui_11)
 	if a.view.Get() == viewChats {
-		__tui_12 := tui.New(
+		__tui_8 := tui.New(
 			tui.WithText("[ Direct Messages ]"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
 		)
-		__tui_7.AddChild(__tui_12)
+		__tui_7.AddChild(__tui_8)
 	} else if a.view.Get() == viewNewDM {
-		__tui_13 := tui.New(
+		__tui_9 := tui.New(
 			tui.WithText("[ New Conversation ]"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Green)),
 		)
-		__tui_7.AddChild(__tui_13)
+		__tui_7.AddChild(__tui_9)
 	} else {
-		__tui_14 := tui.New(
+		__tui_10 := tui.New(
 			tui.WithText("[ Profile & Auth ]"),
 			tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Yellow)),
 		)
-		__tui_7.AddChild(__tui_14)
+		__tui_7.AddChild(__tui_10)
 	}
 	__tui_1.AddChild(__tui_7)
 	__tui_0.AddChild(__tui_1)
-	__tui_15 := tui.New(
+	__tui_11 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_15)
-	__tui_16 := tui.New(
+	__tui_0.AddChild(__tui_11)
+	__tui_12 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithFlexGrow(1),
 		tui.WithMinHeight(0),
 		tui.WithGap(1),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
 	)
-	__tui_17 := app.Mount(a, 0, func() tui.Component {
+	__tui_13 := app.Mount(a, 0, func() tui.Component {
 		return Sidebar(a.client, a.selectedChat)
 	})
-	__tui_16.AddChild(__tui_17)
+	__tui_12.AddChild(__tui_13)
 	if a.view.Get() == viewChats {
-		__tui_18 := app.Mount(a, 1, func() tui.Component {
+		__tui_14 := app.Mount(a, 1, func() tui.Component {
 			return ChatPane(a.client, a.selectedChat, a.draft, a.onSend)
 		})
-		__tui_16.AddChild(__tui_18)
+		__tui_12.AddChild(__tui_14)
 	} else if a.view.Get() == viewNewDM {
-		__tui_19 := app.Mount(a, 2, func() tui.Component {
+		__tui_15 := app.Mount(a, 2, func() tui.Component {
 			return NewDM(a.newDMName, a.newDMUsername, a.startNewDM, a.cancelNewDM)
 		})
-		__tui_16.AddChild(__tui_19)
+		__tui_12.AddChild(__tui_15)
 	} else {
-		__tui_20 := app.Mount(a, 3, func() tui.Component {
+		__tui_16 := app.Mount(a, 3, func() tui.Component {
 			return Profile(a.name, a.username, a.password, a.profile().ID, a.profile().Token, a.profile().CreatedAt, a.profileEdit, a.saveProfile, a.cancelProfile)
 		})
-		__tui_16.AddChild(__tui_20)
+		__tui_12.AddChild(__tui_16)
 	}
-	__tui_0.AddChild(__tui_16)
-	__tui_21 := tui.New(
+	__tui_0.AddChild(__tui_12)
+	__tui_17 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_21)
-	__tui_22 := app.Mount(a, 4, func() tui.Component {
+	__tui_0.AddChild(__tui_17)
+	__tui_18 := app.Mount(a, 4, func() tui.Component {
 		return StatusBar(a.view.Get(), a.profileEdit.Get())
 	})
-	__tui_0.AddChild(__tui_22)
+	__tui_0.AddChild(__tui_18)
 
 	return __tui_0
 }

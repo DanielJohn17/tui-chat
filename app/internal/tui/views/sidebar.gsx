@@ -59,16 +59,12 @@ templ Sidebar(c client.Client, selectedIndex *tui.State[int]) {
 			}
 		</div>
 		<hr />
-		<div class="flex items-center justify-between shrink-0 px-1">
+		<div class="flex items-center justify-between shrink-0 px-1 pb-0">
 			<div class="flex items-center gap-1">
 				<span class="text-green font-bold">{"●"}</span>
 				<span class="font-bold text-white">{c.Profile().Name}</span>
 			</div>
-			<span class="text-yellow font-bold">{fmt.Sprintf("#%d", c.Profile().ID)}</span>
-		</div>
-		<div class="flex justify-between items-center px-1 pb-0">
-			<span class="text-magenta">{"@" + c.Profile().Username}</span>
-			<span class="text-green font-bold">● Active</span>
+			<span class="text-magenta font-dim">{"@" + c.Profile().Username}</span>
 		</div>
 	</div>
 }

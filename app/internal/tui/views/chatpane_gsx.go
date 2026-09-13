@@ -97,66 +97,56 @@ func (c *chatPane) Render(app *tui.App) *tui.Element {
 			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
 		)
 		__tui_2.AddChild(__tui_3)
-	} else {
 		__tui_4 := tui.New(
+			tui.WithText("Online"),
+			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
+		)
+		__tui_2.AddChild(__tui_4)
+	} else {
+		__tui_5 := tui.New(
 			tui.WithText("○"),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_2.AddChild(__tui_4)
+		__tui_2.AddChild(__tui_5)
+		__tui_6 := tui.New(
+			tui.WithText("Offline"),
+			tui.WithTextStyle(tui.NewStyle().Dim()),
+		)
+		__tui_2.AddChild(__tui_6)
 	}
-	__tui_5 := tui.New(
-		tui.WithText("@"+c.currentChat().Username),
-		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
-	)
-	__tui_2.AddChild(__tui_5)
-	__tui_6 := tui.New(
-		tui.WithText("("+c.currentChat().Name+")"),
-		tui.WithTextStyle(tui.NewStyle().Dim()),
-	)
-	__tui_2.AddChild(__tui_6)
 	__tui_7 := tui.New(
-		tui.WithText(fmt.Sprintf("• ID #%d", c.currentChat().RecipientID)),
+		tui.WithText("•"),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
 	__tui_2.AddChild(__tui_7)
-	__tui_1.AddChild(__tui_2)
 	__tui_8 := tui.New(
+		tui.WithText(c.currentChat().Name),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.White)),
+	)
+	__tui_2.AddChild(__tui_8)
+	__tui_9 := tui.New(
+		tui.WithText("(@"+c.currentChat().Username+")"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
+	)
+	__tui_2.AddChild(__tui_9)
+	__tui_1.AddChild(__tui_2)
+	__tui_10 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 		tui.WithAlign(tui.AlignCenter),
 		tui.WithGap(1),
 	)
-	__tui_9 := tui.New(
-		tui.WithText("[200 OK]"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
-	)
-	__tui_8.AddChild(__tui_9)
-	__tui_10 := tui.New(
-		tui.WithText("|"),
-		tui.WithTextStyle(tui.NewStyle().Dim()),
-	)
-	__tui_8.AddChild(__tui_10)
 	__tui_11 := tui.New(
-		tui.WithText("⚡ WS"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
-	)
-	__tui_8.AddChild(__tui_11)
-	__tui_12 := tui.New(
-		tui.WithText("|"),
+		tui.WithText(fmt.Sprintf("%d messages", len(c.messages()))),
 		tui.WithTextStyle(tui.NewStyle().Dim()),
 	)
-	__tui_8.AddChild(__tui_12)
-	__tui_13 := tui.New(
-		tui.WithText(fmt.Sprintf("%d msgs", len(c.messages()))),
-		tui.WithTextStyle(tui.NewStyle().Dim()),
-	)
-	__tui_8.AddChild(__tui_13)
-	__tui_1.AddChild(__tui_8)
+	__tui_10.AddChild(__tui_11)
+	__tui_1.AddChild(__tui_10)
 	__tui_0.AddChild(__tui_1)
-	__tui_14 := tui.New(
+	__tui_12 := tui.New(
 		tui.WithHR(),
 	)
-	__tui_0.AddChild(__tui_14)
-	__tui_15 := tui.New(
+	__tui_0.AddChild(__tui_12)
+	__tui_13 := tui.New(
 		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 		tui.WithFlexGrow(1),
 		tui.WithScrollable(tui.ScrollVertical),
@@ -164,161 +154,162 @@ func (c *chatPane) Render(app *tui.App) *tui.Element {
 		tui.WithGap(1),
 		tui.WithPaddingTRBL(0, 1, 0, 1),
 	)
-	c.msgRef.Set(__tui_15)
+	c.msgRef.Set(__tui_13)
 	for __idx_0, msg := range c.messages() {
 		_ = __idx_0
 		if msg.Sender == "system" {
-			__tui_16 := tui.New(
+			__tui_14 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 				tui.WithPaddingTRBL(0, 0, 1, 0),
 			)
-			__tui_17 := tui.New(
+			__tui_15 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithAlign(tui.AlignCenter),
 				tui.WithGap(1),
 			)
-			__tui_18 := tui.New(
+			__tui_16 := tui.New(
 				tui.WithText("◆ SYSTEM"),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
 			)
-			__tui_17.AddChild(__tui_18)
-			__tui_19 := tui.New(
+			__tui_15.AddChild(__tui_16)
+			__tui_17 := tui.New(
 				tui.WithText(msg.Timestamp),
 				tui.WithTextStyle(tui.NewStyle().Dim()),
 			)
-			__tui_17.AddChild(__tui_19)
-			__tui_16.AddChild(__tui_17)
-			__tui_20 := tui.New(
+			__tui_15.AddChild(__tui_17)
+			__tui_14.AddChild(__tui_15)
+			__tui_18 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithPaddingTRBL(0, 1, 0, 1),
 			)
-			__tui_21 := tui.New(
+			__tui_19 := tui.New(
 				tui.WithText(msg.Text),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Dim()),
 			)
-			__tui_20.AddChild(__tui_21)
-			__tui_16.AddChild(__tui_20)
-			__tui_15.AddChild(__tui_16)
+			__tui_18.AddChild(__tui_19)
+			__tui_14.AddChild(__tui_18)
+			__tui_13.AddChild(__tui_14)
 		} else if msg.Self {
-			__tui_22 := tui.New(
+			__tui_20 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 				tui.WithPaddingTRBL(0, 0, 1, 0),
 			)
-			__tui_23 := tui.New(
+			__tui_21 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithJustify(tui.JustifySpaceBetween),
 				tui.WithAlign(tui.AlignCenter),
 			)
-			__tui_24 := tui.New(
+			__tui_22 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithAlign(tui.AlignCenter),
 				tui.WithGap(1),
 			)
-			__tui_25 := tui.New(
+			__tui_23 := tui.New(
 				tui.WithText("● @"+msg.Sender),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
 			)
-			__tui_24.AddChild(__tui_25)
-			__tui_26 := tui.New(
+			__tui_22.AddChild(__tui_23)
+			__tui_24 := tui.New(
 				tui.WithText("(You)"),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Dim()),
 			)
-			__tui_24.AddChild(__tui_26)
-			__tui_23.AddChild(__tui_24)
-			__tui_27 := tui.New(
+			__tui_22.AddChild(__tui_24)
+			__tui_21.AddChild(__tui_22)
+			__tui_25 := tui.New(
 				tui.WithText(msg.Timestamp),
 				tui.WithTextStyle(tui.NewStyle().Dim()),
 			)
-			__tui_23.AddChild(__tui_27)
-			__tui_22.AddChild(__tui_23)
-			__tui_28 := tui.New(
+			__tui_21.AddChild(__tui_25)
+			__tui_20.AddChild(__tui_21)
+			__tui_26 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithPaddingTRBL(0, 1, 0, 1),
 			)
-			__tui_29 := tui.New(
+			__tui_27 := tui.New(
 				tui.WithText(msg.Text),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.White).Bold()),
 			)
-			__tui_28.AddChild(__tui_29)
-			__tui_22.AddChild(__tui_28)
-			__tui_15.AddChild(__tui_22)
+			__tui_26.AddChild(__tui_27)
+			__tui_20.AddChild(__tui_26)
+			__tui_13.AddChild(__tui_20)
 		} else {
-			__tui_30 := tui.New(
+			__tui_28 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 				tui.WithPaddingTRBL(0, 0, 1, 0),
 			)
-			__tui_31 := tui.New(
+			__tui_29 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithJustify(tui.JustifySpaceBetween),
 				tui.WithAlign(tui.AlignCenter),
 			)
-			__tui_32 := tui.New(
+			__tui_30 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithAlign(tui.AlignCenter),
 				tui.WithGap(1),
 			)
-			__tui_33 := tui.New(
+			__tui_31 := tui.New(
 				tui.WithText("● @"+msg.Sender),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
 			)
-			__tui_32.AddChild(__tui_33)
-			__tui_31.AddChild(__tui_32)
-			__tui_34 := tui.New(
+			__tui_30.AddChild(__tui_31)
+			__tui_29.AddChild(__tui_30)
+			__tui_32 := tui.New(
 				tui.WithText(msg.Timestamp),
 				tui.WithTextStyle(tui.NewStyle().Dim()),
 			)
-			__tui_31.AddChild(__tui_34)
-			__tui_30.AddChild(__tui_31)
-			__tui_35 := tui.New(
+			__tui_29.AddChild(__tui_32)
+			__tui_28.AddChild(__tui_29)
+			__tui_33 := tui.New(
 				tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
 				tui.WithPaddingTRBL(0, 1, 0, 1),
 			)
-			__tui_36 := tui.New(
+			__tui_34 := tui.New(
 				tui.WithText(msg.Text),
 				tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
 			)
-			__tui_35.AddChild(__tui_36)
-			__tui_30.AddChild(__tui_35)
-			__tui_15.AddChild(__tui_30)
+			__tui_33.AddChild(__tui_34)
+			__tui_28.AddChild(__tui_33)
+			__tui_13.AddChild(__tui_28)
 		}
 	}
 	if len(c.messages()) == 0 {
-		__tui_37 := tui.New(
+		__tui_35 := tui.New(
 			tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
 			tui.WithAlign(tui.AlignCenter),
 			tui.WithJustify(tui.JustifyCenter),
 			tui.WithFlexGrow(1),
 			tui.WithGap(1),
 		)
-		__tui_38 := tui.New(
+		__tui_36 := tui.New(
 			tui.WithText("✨ Conversation Thread Opened"),
 			tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
 		)
-		__tui_37.AddChild(__tui_38)
-		__tui_39 := tui.New(
+		__tui_35.AddChild(__tui_36)
+		__tui_37 := tui.New(
 			tui.WithText(fmt.Sprintf("Type a message below to chat with %s (@%s)", c.currentChat().Name, c.currentChat().Username)),
 			tui.WithTextStyle(tui.NewStyle().Dim()),
 		)
-		__tui_37.AddChild(__tui_39)
-		__tui_15.AddChild(__tui_37)
+		__tui_35.AddChild(__tui_37)
+		__tui_13.AddChild(__tui_35)
 	}
-	__tui_0.AddChild(__tui_15)
-	__tui_40 := tui.New(
+	__tui_0.AddChild(__tui_13)
+	__tui_38 := tui.New(
 		tui.WithFlexShrink(0),
 		tui.WithPaddingTRBL(0, 0, 1, 0),
 	)
-	__tui_41 := app.MountPersistent(c, 0, func() tui.Component {
+	__tui_39 := app.MountPersistent(c, 0, func() tui.Component {
 		return tui.NewInput(
 			tui.WithInputValue(c.draft),
 			tui.WithInputOnSubmit(c.onSubmit),
 			tui.WithInputPlaceholder("Message @"+c.currentChat().Username+"... (Enter to send)"),
 			tui.WithInputBorder(tui.BorderRounded),
+			tui.WithInputWidth(100),
 			tui.WithInputFocusColor(tui.Magenta),
 			tui.WithInputAutoFocus(true),
 		)
 	})
-	__tui_40.AddChild(__tui_41)
-	__tui_0.AddChild(__tui_40)
+	__tui_38.AddChild(__tui_39)
+	__tui_0.AddChild(__tui_38)
 
 	return __tui_0
 }

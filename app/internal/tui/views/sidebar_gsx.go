@@ -252,28 +252,11 @@ func Sidebar(c client.Client, selectedIndex *tui.State[int]) *SidebarView {
 	__tui_28.AddChild(__tui_30)
 	__tui_27.AddChild(__tui_28)
 	__tui_31 := tui.New(
-		tui.WithText(fmt.Sprintf("#%d", c.Profile().ID)),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
+		tui.WithText("@"+c.Profile().Username),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Dim()),
 	)
 	__tui_27.AddChild(__tui_31)
 	__tui_0.AddChild(__tui_27)
-	__tui_32 := tui.New(
-		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
-		tui.WithJustify(tui.JustifySpaceBetween),
-		tui.WithAlign(tui.AlignCenter),
-		tui.WithPaddingTRBL(0, 1, 0, 1),
-	)
-	__tui_33 := tui.New(
-		tui.WithText("@"+c.Profile().Username),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta)),
-	)
-	__tui_32.AddChild(__tui_33)
-	__tui_34 := tui.New(
-		tui.WithText("● Active"),
-		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Green).Bold()),
-	)
-	__tui_32.AddChild(__tui_34)
-	__tui_0.AddChild(__tui_32)
 
 	__bindApp := func(app *tui.App) {
 	}

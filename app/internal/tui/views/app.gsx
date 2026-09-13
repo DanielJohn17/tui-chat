@@ -119,11 +119,6 @@ templ (a *app) Render() {
 				<span class="font-dim">terminal direct messenger</span>
 			</div>
 			<div class="flex items-center gap-2">
-				<div class="flex items-center gap-1">
-					<span class="text-green font-bold">●</span>
-					<span class="text-green font-bold">Online</span>
-				</div>
-				<span class="font-dim">•</span>
 				if a.view.Get() == viewChats {
 					<span class="font-bold text-magenta">[ Direct Messages ]</span>
 				} else if a.view.Get() == viewNewDM {

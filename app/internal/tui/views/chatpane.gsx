@@ -73,19 +73,17 @@ templ (c *chatPane) Render() {
 			<div class="flex items-center gap-1">
 				if c.currentChat().Online {
 					<span class="text-green font-bold">{"●"}</span>
+					<span class="text-green font-bold">Online</span>
 				} else {
 					<span class="font-dim">{"○"}</span>
+					<span class="font-dim">Offline</span>
 				}
-				<span class="font-bold text-magenta">{"@" + c.currentChat().Username}</span>
-				<span class="font-dim">{"(" + c.currentChat().Name + ")"}</span>
-				<span class="font-dim">{fmt.Sprintf("• ID #%d", c.currentChat().RecipientID)}</span>
+				<span class="font-dim">•</span>
+				<span class="font-bold text-white">{c.currentChat().Name}</span>
+				<span class="font-bold text-magenta">{"(@" + c.currentChat().Username + ")"}</span>
 			</div>
 			<div class="flex items-center gap-1">
-				<span class="text-green font-bold">[200 OK]</span>
-				<span class="font-dim">|</span>
-				<span class="text-cyan font-bold">⚡ WS</span>
-				<span class="font-dim">|</span>
-				<span class="font-dim">{fmt.Sprintf("%d msgs", len(c.messages()))}</span>
+				<span class="font-dim">{fmt.Sprintf("%d messages", len(c.messages()))}</span>
 			</div>
 		</div>
 		<hr />
@@ -136,7 +134,7 @@ templ (c *chatPane) Render() {
 			}
 		</div>
 		<div class="shrink-0 pb-1">
-			<input value={c.draft} onSubmit={c.onSubmit} placeholder={"Message @" + c.currentChat().Username + "... (Enter to send)"} border={tui.BorderRounded} focusColor={tui.Magenta} autoFocus={true} />
+			<input value={c.draft} onSubmit={c.onSubmit} placeholder={"Message @" + c.currentChat().Username + "... (Enter to send)"} border={tui.BorderRounded} width={100} focusColor={tui.Magenta} autoFocus={true} />
 		</div>
 	</div>
 }
