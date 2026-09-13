@@ -31,6 +31,12 @@ type ConvRepositoryInt interface {
 		convID int64,
 		input types.URLQueryParams,
 	) []GetConvChatResponseType
+
+	CreateMessage(
+		ctx context.Context,
+		convID, senderID int64,
+		content string,
+	) (*CreateMessageResponseType, error)
 }
 
 type ConvQuerier interface {
@@ -53,6 +59,11 @@ type ConvQuerier interface {
 		ctx context.Context,
 		arg database.GetConvChatsPaginatedParams,
 	) ([]database.GetConvChatsPaginatedRow, error)
+
+	CreateMessageAndGetRecipient(
+		ctx context.Context,
+		arg database.CreateMessageAndGetRecipientParams,
+	) (database.CreateMessageAndGetRecipientRow, error)
 }
 
 type ConvRepository struct {
@@ -166,7 +177,7 @@ func (r *ConvRepository) GetConvChatsPaginated(
 
 	chats, err := r.q.GetConvChatsPaginated(ctx, convParams)
 	if err != nil {
-		log.Printf("===? GetConvChatsPaginated: %v\n", err)
+		log.Printf("===> GetConvChatsPaginated: %v\n", err)
 		return []GetConvChatResponseType{}
 	}
 
@@ -182,4 +193,38 @@ func (r *ConvRepository) GetConvChatsPaginated(
 	}
 
 	return convChats
+}
+
+func (r *ConvRepository) CreateMessage(
+	ctx context.Context,
+	convID,
+	senderID int64,
+	content string,
+) (*CreateMessageResponseType, error) {
+	pgConvID := pgtype.Int8{Int64: convID, Valid: true}
+	pgSenderID := pgtype.Int8{Int64: senderID, Valid: true}
+	pgContent := pgtype.Text{String: content, Valid: true}
+
+	messageParam := database.CreateMessageAndGetRecipientParams{
+		SenderID: pgSenderID,
+		ConvID:   pgConvID,
+		Content:  pgContent,
+	}
+
+	chat, err := r.q.CreateMessageAndGetRecipient(ctx, messageParam)
+	if err != nil {
+		log.Printf("==> CreateMessage: %v", err)
+		return nil, fmt.Errorf("error saving message")
+	}
+
+	return &CreateMessageResponseType{
+		ID:          chat.ID,
+		SenderID:    chat.SenderID,
+		ConvID:      chat.ConvID,
+		RecipientID: chat.RecipientID,
+		Content:     chat.Content,
+		CreatedAt:   chat.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   chat.UpdatedAt.Time.Format(time.RFC3339),
+	}, nil
+
 }

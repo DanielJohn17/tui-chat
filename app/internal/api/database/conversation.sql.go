@@ -11,6 +11,89 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createMessageAndGetRecipient = `-- name: CreateMessageAndGetRecipient :one
+WITH
+  verified_sender AS (
+    SELECT
+      conv_id
+    FROM
+      participants
+    WHERE
+      user_id = $1
+      AND conv_id = $2
+  ),
+  recipient AS (
+    SELECT
+      user_id AS recipient_id
+    FROM
+      participants
+    WHERE
+      user_id <> $1
+      AND conv_id = $2
+    LIMIT
+      1
+  ),
+  inserted_msg AS (
+    INSERT INTO
+      messages (conv_id, sender_id, content)
+    SELECT
+      vs.conv_id AS conv_id,
+      $1 AS sender_id,
+      $3 AS content
+    FROM
+      verified_sender vs
+    RETURNING
+      id,
+      conv_id,
+      sender_id,
+      content,
+      created_at,
+      updated_at
+  )
+SELECT
+  im.id,
+  im.conv_id,
+  im.sender_id,
+  r.recipient_id,
+  im.content,
+  im.created_at,
+  im.updated_at
+FROM
+  inserted_msg im
+  CROSS JOIN recipient r
+`
+
+type CreateMessageAndGetRecipientParams struct {
+	SenderID pgtype.Int8
+	ConvID   pgtype.Int8
+	Content  pgtype.Text
+}
+
+type CreateMessageAndGetRecipientRow struct {
+	ID          int64
+	ConvID      int64
+	SenderID    int64
+	RecipientID int64
+	Content     string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+func (q *Queries) CreateMessageAndGetRecipient(ctx context.Context, arg CreateMessageAndGetRecipientParams) (CreateMessageAndGetRecipientRow, error) {
+	row := q.db.QueryRow(ctx, createMessageAndGetRecipient, arg.SenderID, arg.ConvID, arg.Content)
+	var i CreateMessageAndGetRecipientRow
+	err := row.Scan(
+		&i.ID,
+		&i.ConvID,
+		&i.SenderID,
+		&i.RecipientID,
+		&i.Content,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getConvChats = `-- name: GetConvChats :many
 SELECT
   id,

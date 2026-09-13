@@ -11,8 +11,15 @@ type WSMessage struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+type WSMessageError struct {
+	Type      string `json:"type"` // error
+	ConvID    int64  `json:"conv_id"`
+	Content   string `json:"content"` // text content to retry
+	Error     string `json:"error"`   // human readable error message
+	Retryable bool   `json:"retryable"`
+}
+
 type InboundMessage struct {
-	ConvID      int64  `json:"conv_id,omitempty"`
-	RecipientID int64  `json:"recipient_id,omitempty"`
-	Content     string `json:"content"`
+	ConvID  int64  `json:"conv_id,omitempty"`
+	Content string `json:"content"`
 }

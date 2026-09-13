@@ -126,3 +126,54 @@ ORDER BY
   id DESC
 LIMIT
   $4;
+
+-- name: CreateMessageAndGetRecipient :one
+WITH
+  verified_sender AS (
+    SELECT
+      conv_id
+    FROM
+      participants
+    WHERE
+      user_id = sqlc.arg(sender_id)
+      AND conv_id = sqlc.arg(conv_id)
+  ),
+  recipient AS (
+    SELECT
+      user_id AS recipient_id
+    FROM
+      participants
+    WHERE
+      user_id <> sqlc.arg(sender_id)
+      AND conv_id = sqlc.arg(conv_id)
+    LIMIT
+      1
+  ),
+  inserted_msg AS (
+    INSERT INTO
+      messages (conv_id, sender_id, content)
+    SELECT
+      vs.conv_id AS conv_id,
+      sqlc.arg(sender_id) AS sender_id,
+      sqlc.arg(content) AS content
+    FROM
+      verified_sender vs
+    RETURNING
+      id,
+      conv_id,
+      sender_id,
+      content,
+      created_at,
+      updated_at
+  )
+SELECT
+  im.id,
+  im.conv_id,
+  im.sender_id,
+  r.recipient_id,
+  im.content,
+  im.created_at,
+  im.updated_at
+FROM
+  inserted_msg im
+  CROSS JOIN recipient r;

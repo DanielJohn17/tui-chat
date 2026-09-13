@@ -52,7 +52,7 @@ func main() {
 	// websocket conn for conversations
 	hub := ws.NewHub()
 	go hub.Run()
-	wsHander := ws.NewWSHanler(hub)
+	wsHander := ws.NewWSHanler(hub, convService)
 
 	// router
 	handlers := router.Handlers{

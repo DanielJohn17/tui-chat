@@ -11,6 +11,11 @@ type GetConvParticipantType struct {
 	Name     string `json:"name"`
 	Username string `json:"username"`
 }
+type CreateMessageType struct {
+	SenderID int64
+	ConvID   int64
+	Content  string
+}
 
 type GetConvChatResponseType struct {
 	ID        int64  `json:"id"`
@@ -18,4 +23,14 @@ type GetConvChatResponseType struct {
 	Content   string `json:"content"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+}
+
+type CreateMessageResponseType struct {
+	ID          int64  `json:"id"`
+	ConvID      int64  `json:"conv_id"`
+	SenderID    int64  `json:"sender_id"`
+	RecipientID int64  `json:"recipient_id"`
+	Content     string `json:"content"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }

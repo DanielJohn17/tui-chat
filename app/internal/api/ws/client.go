@@ -1,11 +1,12 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log"
-	"sync/atomic"
 	"time"
 
+	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/gorilla/websocket"
 )
 
@@ -16,16 +17,22 @@ const (
 	maxMessageSize = 512 * 1024
 )
 
-// temporary counter
-var msgIDCounter int64 = 1000
+type MessagePersister interface {
+	CreateMessage(
+		ctx context.Context,
+		convID, senderID int64,
+		content string,
+	) (*conversations.CreateMessageResponseType, error)
+}
 
 type Client struct {
-	UserID   int64
-	Username string
-	ConvID   int64
-	Send     chan []byte
-	Conn     *websocket.Conn
-	Hub      *Hub
+	UserID      int64
+	Username    string
+	ConvID      int64
+	Send        chan []byte
+	Conn        *websocket.Conn
+	Hub         *Hub
+	convService MessagePersister
 }
 
 func (c *Client) readPump() {
@@ -69,17 +76,31 @@ func (c *Client) readPump() {
 			continue
 		}
 
-		now := time.Now().Format(time.RFC3339)
-		msgID := atomic.AddInt64(&msgIDCounter, 1)
+		saved, err := c.convService.CreateMessage(
+			context.Background(),
+			convID,
+			c.UserID,
+			inboundMessage.Content,
+		)
+		if err != nil {
+			log.Printf("failed to persist message from user %d: %v", c.UserID, err)
+			c.sendError(
+				convID,
+				inboundMessage.Content,
+				"Failed to save message. Please retry.",
+				true,
+			)
+			continue
+		}
 
 		outbound := WSMessage{
-			ID:          msgID,
-			SenderID:    c.UserID,
-			RecipientID: inboundMessage.RecipientID,
-			ConvID:      convID,
-			Content:     inboundMessage.Content,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:          saved.ID,
+			SenderID:    saved.SenderID,
+			RecipientID: saved.RecipientID,
+			ConvID:      saved.ConvID,
+			Content:     saved.Content,
+			CreatedAt:   saved.CreatedAt,
+			UpdatedAt:   saved.UpdatedAt,
 		}
 
 		encoding, err := json.Marshal(outbound)
@@ -89,9 +110,9 @@ func (c *Client) readPump() {
 		}
 
 		c.Hub.SendDirect <- &DirectMessage{
-			SenderID:    c.UserID,
-			RecipientID: inboundMessage.RecipientID,
-			ConvID:      convID,
+			SenderID:    saved.SenderID,
+			RecipientID: saved.RecipientID,
+			ConvID:      saved.ConvID,
 			Payload:     encoding,
 		}
 	}
@@ -151,5 +172,24 @@ func (c *Client) writePump() {
 				return
 			}
 		}
+	}
+}
+
+func (c *Client) sendError(convID int64, content, errMsg string, retryable bool) {
+	errPayload, err := json.Marshal(WSMessageError{
+		Type:      "error",
+		ConvID:    convID,
+		Content:   content,
+		Error:     errMsg,
+		Retryable: retryable,
+	})
+	if err != nil {
+		return
+	}
+
+	select {
+	case c.Send <- errPayload:
+	default:
+		log.Printf("ws send buffer full for user %d, dropped error frame", c.UserID)
 	}
 }

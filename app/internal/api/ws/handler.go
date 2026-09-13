@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
@@ -32,11 +33,12 @@ type WSHandlerInt interface {
 }
 
 type WSHandler struct {
-	hub *Hub
+	hub         *Hub
+	convService conversations.ConvServiceInt
 }
 
-func NewWSHanler(hub *Hub) *WSHandler {
-	return &WSHandler{hub: hub}
+func NewWSHanler(hub *Hub, convService conversations.ConvServiceInt) *WSHandler {
+	return &WSHandler{hub: hub, convService: convService}
 }
 
 var _ WSHandlerInt = (*WSHandler)(nil)
@@ -67,15 +69,16 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 
 	userID := userIDParam.(int64)
 	username := usernameParam.(string)
-	convId := int64(params.(types.URLParamInt).ID)
+	convID := int64(params.(types.URLParamInt).ID)
 
 	client := &Client{
-		UserID:   userID,
-		Username: username,
-		ConvID:   convId,
-		Conn:     conn,
-		Send:     make(chan []byte, 256),
-		Hub:      h.hub,
+		UserID:      userID,
+		Username:    username,
+		ConvID:      convID,
+		Conn:        conn,
+		Send:        make(chan []byte, 256),
+		Hub:         h.hub,
+		convService: h.convService,
 	}
 
 	h.hub.Register <- client

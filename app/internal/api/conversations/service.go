@@ -22,6 +22,11 @@ type ConvServiceInt interface {
 		convID int64,
 		query types.URLQueryParams,
 	) []GetConvChatResponseType
+
+	CreateMessage(
+		ctx context.Context,
+		convID, senderID int64, content string,
+	) (*CreateMessageResponseType, error)
 }
 
 type ConvService struct {
@@ -99,4 +104,16 @@ func (s *ConvService) GetConvChats(
 	chats := s.r.GetConvChatsPaginated(ctx, convID, query)
 
 	return chats
+}
+
+func (s *ConvService) CreateMessage(
+	ctx context.Context,
+	convID, senderID int64, content string,
+) (*CreateMessageResponseType, error) {
+	chat, err := s.r.CreateMessage(ctx, convID, senderID, content)
+	if err != nil {
+		return nil, errors.NewInternalServerError(err.Error(), err)
+	}
+
+	return chat, nil
 }
