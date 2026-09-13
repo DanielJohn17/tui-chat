@@ -17,7 +17,7 @@ $$ language plpgsql;
 
 -- Create tables
 CREATE TABLE users (
-  id bigint PRIMARY KEY,
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name varchar(150) NOT NULL,
   username varchar(100) NOT NULL UNIQUE,
   password varchar(150) NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE users_archive (
 
 
 CREATE TABLE conversations (
-  id bigint PRIMARY KEY,
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT NOW()
 );
 
@@ -53,7 +53,7 @@ CREATE TABLE participants (
 
 
 CREATE TABLE messages (
-  id bigint PRIMARY KEY,
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   sender_id bigint NOT NULL,
   conv_id bigint NOT NULL,
   content text NOT NULL,
