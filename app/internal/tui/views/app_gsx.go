@@ -30,6 +30,7 @@ type app struct {
 	newDMName     *tui.State[string]
 	newDMUsername *tui.State[string]
 	profileEdit   *tui.State[bool]
+	showHelp      *tui.State[bool]
 	replyPending  *tui.State[int]
 }
 
@@ -57,6 +58,7 @@ func App(c client.Client) *app {
 		newDMName:     tui.NewState(""),
 		newDMUsername: tui.NewState(""),
 		profileEdit:   tui.NewState(false),
+		showHelp:      tui.NewState(false),
 		replyPending:  tui.NewState(-1),
 	}
 }
@@ -69,7 +71,12 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
 		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
+		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
+	}
+	if a.showHelp.Get() {
+		km = append(km, tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }))
+		return km
 	}
 	if a.view.Get() == viewChats {
 		chats := a.client.Chats()
@@ -272,6 +279,201 @@ func (a *app) Render(app *tui.App) *tui.Element {
 		return StatusBar(a.view.Get(), a.profileEdit.Get())
 	})
 	__tui_0.AddChild(__tui_18)
+	__tui_19 := app.MountPersistent(a, 5, func() tui.Component {
+		return tui.NewModal(
+			tui.WithModalOpen(a.showHelp),
+			tui.WithModalBackdrop("dim"),
+			tui.WithModalElementOptions(tui.WithJustify(tui.JustifyCenter), tui.WithAlign(tui.AlignCenter)),
+		)
+	})
+	__tui_20 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Column),
+		tui.WithBorder(tui.BorderRounded),
+		tui.WithPadding(2),
+		tui.WithGap(1),
+		tui.WithBackground(tui.NewStyle().Background(tui.Black)),
+		tui.WithWidth(52),
+	)
+	__tui_21 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_22 := tui.New(
+		tui.WithText("Commands & Shortcuts"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Magenta)),
+	)
+	__tui_21.AddChild(__tui_22)
+	__tui_23 := tui.New(
+		tui.WithText("esc"),
+		tui.WithTextStyle(tui.NewStyle().Dim().Foreground(tui.Yellow)),
+	)
+	__tui_21.AddChild(__tui_23)
+	__tui_20.AddChild(__tui_21)
+	__tui_24 := tui.New(
+		tui.WithHR(),
+	)
+	__tui_20.AddChild(__tui_24)
+	__tui_25 := tui.New(
+		tui.WithText("Suggested"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+	)
+	__tui_20.AddChild(__tui_25)
+	__tui_26 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_27 := tui.New(
+		tui.WithText("Switch conversation"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_26.AddChild(__tui_27)
+	__tui_28 := tui.New(
+		tui.WithText("j / k or ↑ / ↓"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_26.AddChild(__tui_28)
+	__tui_20.AddChild(__tui_26)
+	__tui_29 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_30 := tui.New(
+		tui.WithText("New conversation"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_29.AddChild(__tui_30)
+	__tui_31 := tui.New(
+		tui.WithText("n"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_29.AddChild(__tui_31)
+	__tui_20.AddChild(__tui_29)
+	__tui_32 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_33 := tui.New(
+		tui.WithText("User profile & identity"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_32.AddChild(__tui_33)
+	__tui_34 := tui.New(
+		tui.WithText("p"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_32.AddChild(__tui_34)
+	__tui_20.AddChild(__tui_32)
+	__tui_35 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_36 := tui.New(
+		tui.WithText("Focus message input"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_35.AddChild(__tui_36)
+	__tui_37 := tui.New(
+		tui.WithText("Tab"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
+	)
+	__tui_35.AddChild(__tui_37)
+	__tui_20.AddChild(__tui_35)
+	__tui_38 := tui.New(
+		tui.WithHR(),
+	)
+	__tui_20.AddChild(__tui_38)
+	__tui_39 := tui.New(
+		tui.WithText("Actions & Navigation"),
+		tui.WithTextStyle(tui.NewStyle().Bold().Foreground(tui.Cyan)),
+	)
+	__tui_20.AddChild(__tui_39)
+	__tui_40 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_41 := tui.New(
+		tui.WithText("Send message"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_40.AddChild(__tui_41)
+	__tui_42 := tui.New(
+		tui.WithText("Enter"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Cyan).Bold()),
+	)
+	__tui_40.AddChild(__tui_42)
+	__tui_20.AddChild(__tui_40)
+	__tui_43 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_44 := tui.New(
+		tui.WithText("Return to chats"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_43.AddChild(__tui_44)
+	__tui_45 := tui.New(
+		tui.WithText("c / Esc"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_43.AddChild(__tui_45)
+	__tui_20.AddChild(__tui_43)
+	__tui_46 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_47 := tui.New(
+		tui.WithText("Edit user profile"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_46.AddChild(__tui_47)
+	__tui_48 := tui.New(
+		tui.WithText("e"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_46.AddChild(__tui_48)
+	__tui_20.AddChild(__tui_46)
+	__tui_49 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_50 := tui.New(
+		tui.WithText("Toggle shortcuts help"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_49.AddChild(__tui_50)
+	__tui_51 := tui.New(
+		tui.WithText("?"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Yellow).Bold()),
+	)
+	__tui_49.AddChild(__tui_51)
+	__tui_20.AddChild(__tui_49)
+	__tui_52 := tui.New(
+		tui.WithDisplay(tui.DisplayFlex), tui.WithDirection(tui.Row),
+		tui.WithJustify(tui.JustifySpaceBetween),
+		tui.WithAlign(tui.AlignCenter),
+	)
+	__tui_53 := tui.New(
+		tui.WithText("Quit messenger"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.White)),
+	)
+	__tui_52.AddChild(__tui_53)
+	__tui_54 := tui.New(
+		tui.WithText("q"),
+		tui.WithTextStyle(tui.NewStyle().Foreground(tui.Magenta).Bold()),
+	)
+	__tui_52.AddChild(__tui_54)
+	__tui_20.AddChild(__tui_52)
+	__tui_19.AddChild(__tui_20)
+	__tui_0.AddChild(__tui_19)
 
 	return __tui_0
 }
@@ -323,6 +525,9 @@ func (a *app) bindAppFields(app *tui.App) {
 	}
 	if a.profileEdit != nil {
 		a.profileEdit.BindApp(app)
+	}
+	if a.showHelp != nil {
+		a.showHelp.BindApp(app)
 	}
 	if a.replyPending != nil {
 		a.replyPending.BindApp(app)

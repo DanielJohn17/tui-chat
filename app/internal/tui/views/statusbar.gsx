@@ -22,6 +22,9 @@ templ StatusBar(v viewMode, editing bool) {
 			<span class="font-dim">•</span>
 			<span class="text-yellow font-bold">j/k</span>
 			<span class="text-white">Navigate</span>
+			<span class="font-dim">•</span>
+			<span class="text-magenta font-bold">?</span>
+			<span class="text-white">Help</span>
 			<span class="grow"></span>
 			<span class="text-magenta font-bold">tui-chat</span>
 		</div>

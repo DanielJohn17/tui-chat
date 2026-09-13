@@ -11,6 +11,7 @@ func New() *tui.App {
 	c := client.NewMock()
 	app, err := tui.NewApp(
 		tui.WithRootComponent(views.App(c)),
+		tui.WithMouse(),
 	)
 	if err != nil {
 		panic(err)

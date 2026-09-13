@@ -26,6 +26,7 @@ type app struct {
 	newDMName     *tui.State[string]
 	newDMUsername *tui.State[string]
 	profileEdit   *tui.State[bool]
+	showHelp      *tui.State[bool]
 	replyPending  *tui.State[int]
 }
 
@@ -42,6 +43,7 @@ func App(c client.Client) *app {
 		newDMName:     tui.NewState(""),
 		newDMUsername: tui.NewState(""),
 		profileEdit:   tui.NewState(false),
+		showHelp:      tui.NewState(false),
 		replyPending:  tui.NewState(-1),
 	}
 }
@@ -54,7 +56,12 @@ func (a *app) KeyMap() tui.KeyMap {
 		tui.OnStop(tui.Rune('q'), func(ke tui.KeyEvent) { ke.App().Stop() }),
 		tui.OnStop(tui.Rune('p'), func(ke tui.KeyEvent) { a.view.Set(viewProfile); a.profileEdit.Set(false) }),
 		tui.OnStop(tui.Rune('n'), func(ke tui.KeyEvent) { a.view.Set(viewNewDM) }),
+		tui.OnStop(tui.Rune('?'), func(ke tui.KeyEvent) { a.showHelp.Set(!a.showHelp.Get()) }),
 		tui.OnStop(tui.Rune('c'), func(ke tui.KeyEvent) { a.saveProfile(); a.view.Set(viewChats); a.profileEdit.Set(false) }),
+	}
+	if a.showHelp.Get() {
+		km = append(km, tui.OnStop(tui.KeyEscape, func(ke tui.KeyEvent) { a.showHelp.Set(false) }))
+		return km
 	}
 	if a.view.Get() == viewChats {
 		chats := a.client.Chats()
@@ -141,6 +148,55 @@ templ (a *app) Render() {
 		</div>
 		<hr />
 		@StatusBar(a.view.Get(), a.profileEdit.Get())
+
+		<modal open={a.showHelp} class="justify-center items-center" backdrop="dim">
+			<div class="flex-col border-rounded p-2 gap-1 bg-black" width={52}>
+				<div class="flex justify-between items-center">
+					<span class="font-bold text-magenta">Commands & Shortcuts</span>
+					<span class="font-dim text-yellow">esc</span>
+				</div>
+				<hr />
+				<span class="font-bold text-cyan">Suggested</span>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Switch conversation</span>
+					<span class="text-magenta font-bold">j / k or ↑ / ↓</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">New conversation</span>
+					<span class="text-magenta font-bold">n</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">User profile & identity</span>
+					<span class="text-magenta font-bold">p</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Focus message input</span>
+					<span class="text-cyan font-bold">Tab</span>
+				</div>
+				<hr />
+				<span class="font-bold text-cyan">Actions & Navigation</span>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Send message</span>
+					<span class="text-cyan font-bold">Enter</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Return to chats</span>
+					<span class="text-magenta font-bold">c / Esc</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Edit user profile</span>
+					<span class="text-magenta font-bold">e</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Toggle shortcuts help</span>
+					<span class="text-yellow font-bold">?</span>
+				</div>
+				<div class="flex justify-between items-center">
+					<span class="text-white">Quit messenger</span>
+					<span class="text-magenta font-bold">q</span>
+				</div>
+			</div>
+		</modal>
 	</div>
 }
 
