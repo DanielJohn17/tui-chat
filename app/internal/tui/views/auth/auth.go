@@ -54,42 +54,31 @@ func New(c client.Client) Model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(theme.ColorCyan)
 
-	// Login inputs
-	lu := textinput.New()
-	lu.Placeholder = "Enter your username"
-	lu.CharLimit = 20
-	lu.Focus()
-	lu.Prompt = "  "
-	lu.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+	createInput := func(placeholder string, isPassword bool, charLimit int) textinput.Model {
+		ti := textinput.New()
+		ti.Placeholder = placeholder
+		ti.Prompt = ""
+		ti.CharLimit = charLimit
+		ti.Width = 44
+		ti.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+		ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.ColorDimText)
+		ti.Cursor.Style = lipgloss.NewStyle().Foreground(theme.ColorCyan)
+		if isPassword {
+			ti.EchoMode = textinput.EchoPassword
+			ti.EchoCharacter = '•'
+		}
+		return ti
+	}
 
-	lp := textinput.New()
-	lp.Placeholder = "Enter your password"
-	lp.EchoMode = textinput.EchoPassword
-	lp.EchoCharacter = '•'
-	lp.CharLimit = 50
-	lp.Prompt = "  "
-	lp.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+	// Login inputs
+	lu := createInput("Enter your username", false, 20)
+	lu.Focus()
+	lp := createInput("Enter your password", true, 50)
 
 	// Register inputs
-	rn := textinput.New()
-	rn.Placeholder = "e.g. Alex Mercer"
-	rn.CharLimit = 50
-	rn.Prompt = "  "
-	rn.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
-
-	ru := textinput.New()
-	ru.Placeholder = "e.g. alexm (3-20 chars)"
-	ru.CharLimit = 20
-	ru.Prompt = "  "
-	ru.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
-
-	rp := textinput.New()
-	rp.Placeholder = "Must include A-Z and 0-9"
-	rp.EchoMode = textinput.EchoPassword
-	rp.EchoCharacter = '•'
-	rp.CharLimit = 50
-	rp.Prompt = "  "
-	rp.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+	rn := createInput("e.g. Alex Mercer", false, 50)
+	ru := createInput("e.g. alexm (3-20 chars)", false, 20)
+	rp := createInput("Must contain A-Z and 0-9", true, 50)
 
 	return Model{
 		client:        c,
@@ -131,23 +120,25 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.errorMessage = "" // Clear error on new keypress
 
 		switch msg.String() {
-		case "tab", "shift+tab", "up", "down":
-			isDown := msg.String() == "tab" || msg.String() == "down"
-			maxIndex := 1 // Login has 2 fields (0, 1)
+		case "tab", "down":
+			maxIndex := 1
 			if m.mode == ModeRegister {
-				maxIndex = 2 // Register has 3 fields (0, 1, 2)
+				maxIndex = 2
 			}
+			m.focusIndex = (m.focusIndex + 1) % (maxIndex + 1)
+			m.updateFocus()
+			return m, nil
 
-			if isDown {
-				m.focusIndex = (m.focusIndex + 1) % (maxIndex + 1)
-			} else {
-				m.focusIndex = (m.focusIndex - 1 + maxIndex + 1) % (maxIndex + 1)
+		case "shift+tab", "up":
+			maxIndex := 1
+			if m.mode == ModeRegister {
+				maxIndex = 2
 			}
+			m.focusIndex = (m.focusIndex - 1 + maxIndex + 1) % (maxIndex + 1)
 			m.updateFocus()
 			return m, nil
 
 		case "ctrl+t":
-			// Toggle between login and register
 			if m.mode == ModeLogin {
 				m.mode = ModeRegister
 			} else {
@@ -279,15 +270,30 @@ func (m *Model) submit() tea.Cmd {
 }
 
 func (m Model) View() string {
-	boxWidth := 54
-	if m.width > 0 && m.width < 58 {
-		boxWidth = m.width - 4
+	cardWidth := 56
+	if m.width > 0 && m.width < 60 {
+		cardWidth = m.width - 4
+	}
+	if cardWidth < 44 {
+		cardWidth = 44
 	}
 
+	innerWidth := cardWidth - 6  // inside padding(1, 2)
+	inputWidth := innerWidth - 4 // inside input box margin/border
+
+	// Update text input widths
+	m.loginUsername.Width = inputWidth - 2
+	m.loginPassword.Width = inputWidth - 2
+	m.regName.Width = inputWidth - 2
+	m.regUsername.Width = inputWidth - 2
+	m.regPassword.Width = inputWidth - 2
+
 	// Title / Brand
+	title := theme.StyleTitle.Render("◈ TUI CHAT SYSTEM ◈")
+	subtitle := theme.StyleDim.Render("Secure Terminal Communication")
 	header := lipgloss.JoinVertical(lipgloss.Center,
-		theme.StyleTitle.Render("◈ TUI CHAT SYSTEM ◈"),
-		theme.StyleDim.Render("Secure Terminal Communication"),
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(title),
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(subtitle),
 	)
 
 	// Mode selector tabs
@@ -316,19 +322,49 @@ func (m Model) View() string {
 			Render("2. REGISTER")
 	}
 
-	tabs := lipgloss.JoinHorizontal(lipgloss.Center, tabLogin, "  ", tabRegister)
+	tabs := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(
+		lipgloss.JoinHorizontal(lipgloss.Center, tabLogin, "  ", tabRegister),
+	)
+
+	// Render input helper
+	renderField := func(label string, inputView string, focused bool) string {
+		lblStyle := theme.StyleDim
+		borderCol := theme.ColorBorderDim
+		if focused {
+			lblStyle = theme.StyleSubtitle
+			borderCol = theme.ColorCyan
+		}
+
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(borderCol).
+			Width(inputWidth).
+			Padding(0, 1).
+			Render(inputView)
+
+		return lipgloss.JoinVertical(lipgloss.Left,
+			lblStyle.Render(label),
+			box,
+		)
+	}
 
 	// Form inputs
 	var formContent string
 	if m.mode == ModeLogin {
-		uBox := m.renderInputBox("Username", m.loginUsername.View(), m.focusIndex == 0, boxWidth-8)
-		pBox := m.renderInputBox("Password", m.loginPassword.View(), m.focusIndex == 1, boxWidth-8)
+		uBox := renderField("Username", m.loginUsername.View(), m.focusIndex == 0)
+		pBox := renderField("Password", m.loginPassword.View(), m.focusIndex == 1)
 		formContent = lipgloss.JoinVertical(lipgloss.Left, uBox, "", pBox)
 	} else {
-		nBox := m.renderInputBox("Display Name", m.regName.View(), m.focusIndex == 0, boxWidth-8)
-		uBox := m.renderInputBox("Username (3-20 chars)", m.regUsername.View(), m.focusIndex == 1, boxWidth-8)
-		pBox := m.renderInputBox("Password (A-Z, 0-9)", m.regPassword.View(), m.focusIndex == 2, boxWidth-8)
-		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox)
+		nBox := renderField("Display Name", m.regName.View(), m.focusIndex == 0)
+		uBox := renderField("Username (3-20 chars)", m.regUsername.View(), m.focusIndex == 1)
+		pBox := renderField("Password (A-Z, 0-9)", m.regPassword.View(), m.focusIndex == 2)
+
+		// Subtle password rules helper for register
+		pwHelper := lipgloss.NewStyle().
+			Foreground(theme.ColorDimText).
+			Render("  • Must include ≥1 uppercase letter and ≥1 digit")
+
+		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox, pwHelper)
 	}
 
 	// Error banner if any
@@ -341,7 +377,7 @@ func (m Model) View() string {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.ColorRed).
 			Padding(0, 1).
-			Width(boxWidth - 6).
+			Width(inputWidth).
 			Render("✖ " + m.errorMessage)
 	}
 
@@ -360,11 +396,17 @@ func (m Model) View() string {
 		}
 		submitAction = theme.StyleSuccess.Render(actionText)
 	}
+	submitActionCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(submitAction)
 
-	// Hotkeys helper footer
-	footer := theme.StyleDim.Render("Tab: next field • Ctrl+T: switch login/register • Esc: quit")
+	// Clean 2-line footer helper
+	hint1 := theme.StyleDim.Render("Tab: next field  •  Ctrl+T: switch mode")
+	hint2 := theme.StyleDim.Render("Enter: submit   •  Esc: quit")
+	footer := lipgloss.JoinVertical(lipgloss.Center,
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint1),
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint2),
+	)
 
-	// Assemble card body
+	// Assemble card body cleanly without erratic line wrapping
 	bodyItems := []string{
 		header,
 		"",
@@ -374,16 +416,22 @@ func (m Model) View() string {
 	if errorBanner != "" {
 		bodyItems = append(bodyItems, errorBanner, "")
 	}
-	bodyItems = append(bodyItems, formContent, "", lipgloss.NewStyle().Width(boxWidth-6).Align(lipgloss.Center).Render(submitAction), "", footer)
+	bodyItems = append(bodyItems,
+		formContent,
+		"",
+		submitActionCentered,
+		"",
+		footer,
+	)
 
-	cardContent := lipgloss.JoinVertical(lipgloss.Center, bodyItems...)
+	cardContent := lipgloss.JoinVertical(lipgloss.Left, bodyItems...)
 
 	card := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
 		Background(theme.ColorPanelBg).
 		Padding(1, 2).
-		Width(boxWidth).
+		Width(cardWidth).
 		Render(cardContent)
 
 	// Center on screen
@@ -391,25 +439,4 @@ func (m Model) View() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card)
 	}
 	return card
-}
-
-func (m Model) renderInputBox(label, inputView string, focused bool, width int) string {
-	lblStyle := theme.StyleDim
-	borderCol := theme.ColorBorderDim
-	if focused {
-		lblStyle = theme.StyleSubtitle
-		borderCol = theme.ColorCyan
-	}
-
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderCol).
-		Width(width).
-		Padding(0, 1).
-		Render(inputView)
-
-	return lipgloss.JoinVertical(lipgloss.Left,
-		lblStyle.Render(label),
-		box,
-	)
 }
