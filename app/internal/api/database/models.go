@@ -9,8 +9,9 @@ import (
 )
 
 type Conversation struct {
-	ID        int64
-	CreatedAt pgtype.Timestamptz
+	ID         int64
+	IsDeleting bool
+	CreatedAt  pgtype.Timestamptz
 }
 
 type Message struct {

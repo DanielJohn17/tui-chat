@@ -1,7 +1,7 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: "internal/api/db/schema.sql"
+    schema: "internal/api/db/migrations"
     queries: "internal/api/db/query/"
     database:
       uri: "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"

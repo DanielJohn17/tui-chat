@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/db"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/router"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/ws"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {
@@ -31,6 +34,16 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
+	}
+
+	sqlDB := stdlib.OpenDBFromPool(conn)
+	defer func() {
+		_ = sqlDB.Close()
+		conn.Close()
+	}()
+
+	if err := db.Migrate(sqlDB); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
 	}
 
 	q := database.New(conn)
