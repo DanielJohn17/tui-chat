@@ -1,0 +1,234 @@
+package chat
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+type Model struct {
+	client       client.Client
+	activeChatID int64
+	viewport     viewport.Model
+	input        textinput.Model
+	isFocused    bool
+	width        int
+	height       int
+}
+
+func New(c client.Client) Model {
+	vp := viewport.New(60, 18)
+	vp.SetContent("Select a conversation to begin chatting.")
+
+	ti := textinput.New()
+	ti.Placeholder = "Type a message... (Press Enter to send, Esc to unfocus)"
+	ti.Prompt = "❯ "
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(theme.ColorCyan).Bold(true)
+	ti.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+	ti.CharLimit = 500
+
+	return Model{
+		client:    c,
+		viewport:  vp,
+		input:     ti,
+		isFocused: false,
+		width:     60,
+		height:    24,
+	}
+}
+
+func (m *Model) SetSize(w, h int) {
+	m.width = w
+	m.height = h
+
+	vpWidth := w - 4
+	if vpWidth < 20 {
+		vpWidth = 20
+	}
+	// Reserve 3 lines for header, 4 lines for input box, 2 lines for borders
+	vpHeight := h - 9
+	if vpHeight < 4 {
+		vpHeight = 4
+	}
+
+	m.viewport.Width = vpWidth
+	m.viewport.Height = vpHeight
+	m.input.Width = vpWidth - 4
+	m.RefreshMessages()
+}
+
+func (m *Model) SetActiveChat(chatID int64) {
+	if m.activeChatID != chatID {
+		m.activeChatID = chatID
+		m.RefreshMessages()
+		m.viewport.GotoBottom()
+	}
+}
+
+func (m *Model) FocusInput() {
+	m.isFocused = true
+	m.input.Focus()
+}
+
+func (m *Model) BlurInput() {
+	m.isFocused = false
+	m.input.Blur()
+}
+
+func (m Model) IsInputFocused() bool {
+	return m.isFocused
+}
+
+func (m *Model) RefreshMessages() {
+	if m.activeChatID == 0 {
+		m.viewport.SetContent("No conversation selected.")
+		return
+	}
+
+	messages := m.client.Messages(m.activeChatID)
+	if len(messages) == 0 {
+		m.viewport.SetContent(theme.StyleDim.Render("\n  No messages yet. Send a message to break the ice!"))
+		return
+	}
+
+	var sb strings.Builder
+	contentWidth := m.viewport.Width - 2
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	for _, msg := range messages {
+		var senderTag, row string
+		timeTag := theme.StyleDim.Render(msg.Timestamp)
+
+		if msg.Self {
+			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("You")
+			header := fmt.Sprintf("%s  %s", senderTag, timeTag)
+			body := lipgloss.NewStyle().
+				Foreground(theme.ColorWhite).
+				Width(contentWidth).
+				Render(msg.Text)
+			row = fmt.Sprintf("  %s\n  %s\n", header, body)
+		} else {
+			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render(msg.Sender)
+			header := fmt.Sprintf("%s  %s", senderTag, timeTag)
+			body := lipgloss.NewStyle().
+				Foreground(theme.ColorWhite).
+				Width(contentWidth).
+				Render(msg.Text)
+			row = fmt.Sprintf("  %s\n  %s\n", header, body)
+		}
+		sb.WriteString(row + "\n")
+	}
+
+	m.viewport.SetContent(sb.String())
+}
+
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	if m.isFocused {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.BlurInput()
+				return m, nil
+			case "enter":
+				text := strings.TrimSpace(m.input.Value())
+				if text != "" && m.activeChatID != 0 {
+					m.client.Send(m.activeChatID, text)
+					m.input.Reset()
+					m.RefreshMessages()
+					m.viewport.GotoBottom()
+				}
+				return m, nil
+			}
+		}
+		m.input, cmd = m.input.Update(msg)
+		cmds = append(cmds, cmd)
+	} else {
+		m.viewport, cmd = m.viewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) View(activeChat *client.Chat) string {
+	contentWidth := m.width - 4
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	// 1. Chat Header
+	var header string
+	if activeChat != nil {
+		var dot string
+		if activeChat.Online {
+			dot = theme.StyleSuccess.Render("●")
+		} else {
+			dot = theme.StyleDim.Render("○")
+		}
+
+		leftTitle := lipgloss.JoinHorizontal(lipgloss.Center,
+			dot, " ",
+			theme.StyleSubtitle.Render(activeChat.Name), " ",
+			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+activeChat.Username),
+		)
+
+		var focusHint string
+		if m.isFocused {
+			focusHint = theme.StyleDim.Render("[Esc: unfocus input]")
+		} else {
+			focusHint = theme.StyleDim.Render("[i / Enter: focus input]")
+		}
+
+		hSpaces := contentWidth - lipgloss.Width(leftTitle) - lipgloss.Width(focusHint)
+		if hSpaces < 1 {
+			hSpaces = 1
+		}
+		header = lipgloss.JoinHorizontal(lipgloss.Center, leftTitle, lipgloss.NewStyle().Width(hSpaces).Render(""), focusHint)
+	} else {
+		header = theme.StyleDim.Render("No active conversation")
+	}
+
+	// 2. Viewport
+	vpBox := m.viewport.View()
+
+	// 3. Input Box
+	inputBorder := theme.ColorBorderDim
+	if m.isFocused {
+		inputBorder = theme.ColorCyan
+	}
+	inputRendered := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(inputBorder).
+		Width(contentWidth).
+		Padding(0, 1).
+		Render(m.input.View())
+
+	// Assemble Pane
+	pane := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.ColorBorderDim).
+		Width(m.width).
+		Height(m.height).
+		Padding(0, 1).
+		Render(lipgloss.JoinVertical(lipgloss.Left,
+			header,
+			"",
+			vpBox,
+			"",
+			inputRendered,
+		))
+
+	return pane
+}

@@ -21,7 +21,7 @@ API_BIN := $(BIN_DIR)/api
 TUI_BIN := $(BIN_DIR)/tui
 MIGRATIONS_DIR := internal/api/db/migrations
 GOOSE ?= goose
-GO_TUI_VERSION ?= v0.19.0
+# Bubble Tea does not require code generation
 
 # Colors for terminal output
 CYAN := \033[36m
@@ -96,7 +96,7 @@ sqlc: generate-api ## Alias for generate-api
 
 generate-tui: ## Generate TUI GSX templates
 	@printf "$(YELLOW)Generating go-tui GSX templates...$(RESET)\n"
-	@go run github.com/grindlemire/go-tui/cmd/tui@$(GO_TUI_VERSION) generate ./...
+	@printf "$(GREEN)✓ Bubble Tea does not require code generation.$(RESET)\n"
 	@printf "$(GREEN)✓ TUI GSX generation complete.$(RESET)\n"
 
 generate-gsx: generate-tui ## Alias for generate-tui

@@ -175,3 +175,32 @@ func (m *mockClient) AddChat(name, username string) Chat {
 	}
 	return chat
 }
+func (m *mockClient) Login(username, password string) (*Profile, error) {
+	m.profile = Profile{
+		ID:        1,
+		Name:      username,
+		Username:  username,
+		Token:     "mock-jwt-token-authenticated",
+		CreatedAt: time.Now().Format("2006-01-02"),
+	}
+	return &m.profile, nil
+}
+
+func (m *mockClient) Register(name, username, password string) (*Profile, error) {
+	m.profile = Profile{
+		ID:        1,
+		Name:      name,
+		Username:  username,
+		Token:     "mock-jwt-token-registered",
+		CreatedAt: time.Now().Format("2006-01-02"),
+	}
+	return &m.profile, nil
+}
+
+func (m *mockClient) IsAuthenticated() bool {
+	return m.profile.Token != ""
+}
+
+func (m *mockClient) SetProfile(p Profile) {
+	m.profile = p
+}
