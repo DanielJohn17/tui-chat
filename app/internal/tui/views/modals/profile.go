@@ -63,7 +63,6 @@ func RenderProfile(prof client.Profile, width, height int) string {
 	modal := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorMagenta).
-		Background(theme.ColorPanelBg).
 		Padding(1, 2).
 		Width(boxWidth).
 		Render(content)

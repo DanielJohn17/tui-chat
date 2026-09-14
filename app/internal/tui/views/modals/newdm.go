@@ -56,18 +56,25 @@ func (m NewDMModel) Update(msg tea.Msg) (NewDMModel, tea.Cmd) {
 }
 
 func (m NewDMModel) View(width, height int) string {
-	boxWidth := 46
-	if width > 0 && width < 50 {
+	boxWidth := 48
+	if width > 0 && width < 52 {
 		boxWidth = width - 4
 	}
+	if boxWidth < 36 {
+		boxWidth = 36
+	}
+
+	// Inner content width inside padding(1, 2) and border(1, 1) is boxWidth - 6
+	innerWidth := boxWidth - 6
 
 	title := theme.StyleTitle.Render("◈ NEW DIRECT MESSAGE ◈")
 	desc := theme.StyleDim.Render("Enter username to initiate conversation:")
 
-	inputRendered := lipgloss.NewStyle().
+	// Input box inside rounded border and padding(0, 1)
+	inputBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
-		Width(boxWidth - 6).
+		Width(innerWidth - 4).
 		Padding(0, 1).
 		Render(m.input.View())
 
@@ -83,22 +90,21 @@ func (m NewDMModel) View(width, height int) string {
 	)
 
 	items := []string{
-		lipgloss.NewStyle().Width(boxWidth - 4).Align(lipgloss.Center).Render(title),
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(title),
 		"",
 		desc,
-		inputRendered,
+		inputBox,
 	}
 	if errBanner != "" {
 		items = append(items, errBanner)
 	}
-	items = append(items, "", lipgloss.NewStyle().Width(boxWidth-4).Align(lipgloss.Center).Render(actions))
+	items = append(items, "", lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(actions))
 
 	content := lipgloss.JoinVertical(lipgloss.Left, items...)
 
 	modal := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
-		Background(theme.ColorPanelBg).
 		Padding(1, 2).
 		Width(boxWidth).
 		Render(content)

@@ -76,7 +76,6 @@ var (
 	StyleModal = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorMagenta).
-			Background(ColorPanelBg).
 			Padding(1, 2)
 
 	StyleStatusBar = lipgloss.NewStyle().

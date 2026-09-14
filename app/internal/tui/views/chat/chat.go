@@ -130,9 +130,36 @@ func (m *Model) RefreshMessages() {
 	m.viewport.SetContent(sb.String())
 }
 
+func (m *Model) ScrollUp(lines int) {
+	m.viewport.LineUp(lines)
+}
+
+func (m *Model) ScrollDown(lines int) {
+	m.viewport.LineDown(lines)
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		if msg.Button == tea.MouseButtonWheelUp || msg.Type == tea.MouseWheelUp {
+			m.viewport.LineUp(3)
+			return m, nil
+		}
+		if msg.Button == tea.MouseButtonWheelDown || msg.Type == tea.MouseWheelDown {
+			m.viewport.LineDown(3)
+			return m, nil
+		}
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			// Check if click was in the bottom input area (last 4 lines of chat pane)
+			if msg.Y >= m.height-5 {
+				m.FocusInput()
+				return m, nil
+			}
+		}
+	}
 
 	if m.isFocused {
 		switch msg := msg.(type) {

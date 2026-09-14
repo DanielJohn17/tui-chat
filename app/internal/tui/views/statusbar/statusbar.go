@@ -29,7 +29,7 @@ func Render(activeChat *client.Chat, isInputFocused bool, width int) string {
 		leftText = theme.StyleKeyBadge.Render("NAV MODE")
 	}
 
-	shortcuts := theme.StyleDim.Render("j/k: select • i: write • n: new DM • p: profile • h: help • q: quit")
+	shortcuts := theme.StyleDim.Render("j/k: select • i: write • n: new DM • p: profile • ?: help • q: quit")
 	onlineStatus := theme.StyleSuccess.Render("● CONNECTED")
 
 	spaces1 := (contentWidth - lipgloss.Width(leftText) - lipgloss.Width(shortcuts) - lipgloss.Width(onlineStatus)) / 2

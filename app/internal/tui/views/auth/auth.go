@@ -368,7 +368,7 @@ func (m Model) View() string {
 
 	// Clean 2-line footer helper with Help Desk and Quit shortcuts
 	hint1 := theme.StyleDim.Render("Tab: next field  •  Ctrl+T: switch mode")
-	hint2 := theme.StyleDim.Render("F1 / Ctrl+H: help desk  •  Esc: quit")
+	hint2 := theme.StyleDim.Render("? / Ctrl+H / F1: help  •  Esc: quit")
 	footer := lipgloss.JoinVertical(lipgloss.Center,
 		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint1),
 		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint2),
@@ -397,7 +397,6 @@ func (m Model) View() string {
 	card := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
-		Background(theme.ColorPanelBg).
 		Padding(1, 2).
 		Width(cardWidth).
 		Render(cardContent)

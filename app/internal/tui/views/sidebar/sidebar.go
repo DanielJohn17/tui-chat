@@ -1,7 +1,7 @@
 package sidebar
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
@@ -11,22 +11,72 @@ import (
 type Model struct {
 	client        client.Client
 	selectedIndex int
+	scrollOffset  int
 	width         int
 	height        int
+
+	// Accurate click targets recorded on each render
+	clickableItems []ClickableItem
+	topScrollY     int
+	bottomScrollY  int
 }
 
 func New(c client.Client) Model {
 	return Model{
 		client:        c,
 		selectedIndex: 0,
-		width:         30,
+		scrollOffset:  0,
+		width:         32,
 		height:        24,
+		topScrollY:    -1,
+		bottomScrollY: -1,
 	}
 }
 
 func (m *Model) SetSize(w, h int) {
 	m.width = w
 	m.height = h
+}
+
+func (m *Model) ensureVisible() {
+	chats := m.client.Chats()
+	if len(chats) == 0 {
+		return
+	}
+	if m.selectedIndex < 0 {
+		m.selectedIndex = 0
+	}
+	if m.selectedIndex >= len(chats) {
+		m.selectedIndex = len(chats) - 1
+	}
+
+	if m.selectedIndex < m.scrollOffset {
+		m.scrollOffset = m.selectedIndex
+	}
+
+	availableListHeight := m.height - 7
+	if availableListHeight < 4 {
+		availableListHeight = 4
+	}
+
+	// Calculate lines needed from scrollOffset up to selectedIndex (accounting for expanded selected item)
+	lines := 0
+	for i := m.scrollOffset; i <= m.selectedIndex; i++ {
+		h := 2
+		if i == m.selectedIndex {
+			h = 3
+		}
+		lines += h
+	}
+
+	for lines > availableListHeight && m.scrollOffset < m.selectedIndex {
+		h := 2
+		if m.scrollOffset == m.selectedIndex {
+			h = 3
+		}
+		lines -= h
+		m.scrollOffset++
+	}
 }
 
 func (m *Model) MoveUp() {
@@ -36,6 +86,7 @@ func (m *Model) MoveUp() {
 	}
 	if m.selectedIndex > 0 {
 		m.selectedIndex--
+		m.ensureVisible()
 	}
 }
 
@@ -46,6 +97,15 @@ func (m *Model) MoveDown() {
 	}
 	if m.selectedIndex < len(chats)-1 {
 		m.selectedIndex++
+		m.ensureVisible()
+	}
+}
+
+func (m *Model) SelectIndex(idx int) {
+	chats := m.client.Chats()
+	if idx >= 0 && idx < len(chats) {
+		m.selectedIndex = idx
+		m.ensureVisible()
 	}
 }
 
@@ -61,131 +121,112 @@ func (m Model) SelectedChat() *client.Chat {
 	return &chats[m.selectedIndex]
 }
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	chats := m.client.Chats()
 	contentWidth := m.width - 4
 	if contentWidth < 20 {
 		contentWidth = 20
 	}
 
-	// 1. Header
-	headerLeft := theme.StyleTitle.Render("◈ CONVERSATIONS")
-	headerRight := theme.StyleSuccess.Render("[+n]")
-	headerSpaces := contentWidth - lipgloss.Width(headerLeft) - lipgloss.Width(headerRight)
-	if headerSpaces < 1 {
-		headerSpaces = 1
-	}
-	header := lipgloss.JoinHorizontal(lipgloss.Center,
-		headerLeft,
-		lipgloss.NewStyle().Width(headerSpaces).Render(""),
-		headerRight,
-	)
+	// 1. Header component
+	header := renderHeader(contentWidth)
 
-	// 2. Chat list items
-	var chatItems []string
-	availableListHeight := m.height - 6
+	// Available inner height inside rounded border
+	innerH := m.height - 2
+	if innerH < 8 {
+		innerH = 8
+	}
+
+	headerHeight := 2
+	footerHeight := 3
+	availableListHeight := innerH - headerHeight - footerHeight
 	if availableListHeight < 4 {
 		availableListHeight = 4
 	}
 
-	for i, ch := range chats {
+	m.ensureVisible()
+
+	// 2. Chat list items with bounded window rendering
+	var chatItems []string
+	m.clickableItems = nil
+	m.topScrollY = -1
+	m.bottomScrollY = -1
+
+	currentY := 3
+	hasTopScroll := m.scrollOffset > 0
+	if hasTopScroll {
+		m.topScrollY = currentY
+		currentY++
+	}
+
+	usedLines := 0
+	if hasTopScroll {
+		usedLines++
+	}
+
+	for i := m.scrollOffset; i < len(chats); i++ {
+		ch := chats[i]
 		isSelected := i == m.selectedIndex
 
-		var onlineDot string
-		if ch.Online {
-			onlineDot = theme.StyleSuccess.Render("●")
-		} else {
-			onlineDot = theme.StyleDim.Render("○")
+		itemBox := renderChatItem(ch, isSelected, contentWidth)
+		actualLines := lipgloss.Height(itemBox)
+
+		if usedLines+actualLines > availableListHeight && len(chatItems) > 0 {
+			break
 		}
 
-		var row1, row2, row3 string
-		if isSelected {
-			marker := theme.StyleTitle.Render("▶ ")
-			nameText := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render(theme.Truncate(ch.Name, contentWidth-8))
-			row1 = lipgloss.JoinHorizontal(lipgloss.Center, marker, nameText)
-			rSpaces := contentWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
-			if rSpaces < 1 {
-				rSpaces = 1
-			}
-			row1 = lipgloss.JoinHorizontal(lipgloss.Center, row1, lipgloss.NewStyle().Width(rSpaces).Render(""), onlineDot)
+		m.clickableItems = append(m.clickableItems, ClickableItem{
+			ChatIndex: i,
+			StartY:    currentY,
+			EndY:      currentY + actualLines - 1,
+		})
+		currentY += actualLines
+		usedLines += actualLines
+		chatItems = append(chatItems, itemBox)
+	}
 
-			userHandle := lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@" + theme.Truncate(ch.Username, contentWidth/2))
-			timeText := theme.StyleDim.Render(ch.Time)
-			uSpaces := contentWidth - lipgloss.Width(userHandle) - lipgloss.Width(timeText)
-			if uSpaces < 1 {
-				uSpaces = 1
-			}
-			row2 = lipgloss.JoinHorizontal(lipgloss.Center, userHandle, lipgloss.NewStyle().Width(uSpaces).Render(""), timeText)
-
-			if ch.LastMessage != "" {
-				row3 = theme.StyleDim.Render(theme.Truncate(ch.LastMessage, contentWidth-2))
-			}
-
-			itemBox := lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, false, false, true).
-				BorderForeground(theme.ColorCyan).
-				Padding(0, 1).
-				Render(lipgloss.JoinVertical(lipgloss.Left, row1, row2, row3))
-			chatItems = append(chatItems, itemBox)
-		} else {
-			marker := "  "
-			nameText := lipgloss.NewStyle().Foreground(theme.ColorWhite).Render(theme.Truncate(ch.Name, contentWidth-8))
-			row1 = lipgloss.JoinHorizontal(lipgloss.Center, marker, nameText)
-			rSpaces := contentWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
-			if rSpaces < 1 {
-				rSpaces = 1
-			}
-			row1 = lipgloss.JoinHorizontal(lipgloss.Center, row1, lipgloss.NewStyle().Width(rSpaces).Render(""), onlineDot)
-
-			var unreadPill string
-			if ch.Unread > 0 {
-				unreadPill = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorYellow).Render(fmt.Sprintf("(%d)", ch.Unread))
-			}
-			timeText := theme.StyleDim.Render(ch.Time)
-			trailing := lipgloss.JoinHorizontal(lipgloss.Center, unreadPill, " ", timeText)
-			userHandle := theme.StyleDim.Render("@" + theme.Truncate(ch.Username, contentWidth/2))
-			uSpaces := contentWidth - lipgloss.Width(userHandle) - lipgloss.Width(trailing)
-			if uSpaces < 1 {
-				uSpaces = 1
-			}
-			row2 = lipgloss.JoinHorizontal(lipgloss.Center, userHandle, lipgloss.NewStyle().Width(uSpaces).Render(""), trailing)
-
-			itemBox := lipgloss.NewStyle().
-				Padding(0, 1).
-				Render(lipgloss.JoinVertical(lipgloss.Left, row1, row2))
-			chatItems = append(chatItems, itemBox)
-		}
+	// Add scroll indicators if items exist above or below
+	if hasTopScroll && len(chatItems) > 0 {
+		chatItems[0] = theme.StyleDim.Render("   ▲ more above") + "\n" + chatItems[0]
+	}
+	if m.scrollOffset+len(chatItems) < len(chats) && len(chatItems) > 0 {
+		m.bottomScrollY = currentY
+		lastIdx := len(chatItems) - 1
+		chatItems[lastIdx] = chatItems[lastIdx] + "\n" + theme.StyleDim.Render("   ▼ more below")
 	}
 
 	chatsList := lipgloss.JoinVertical(lipgloss.Left, chatItems...)
 
-	// 3. User Profile Footer
-	prof := m.client.Profile()
-	profName := theme.Truncate(prof.Name, contentWidth/2)
-	profHandle := "@" + theme.Truncate(prof.Username, contentWidth/2-2)
-	pDot := theme.StyleSuccess.Render("●")
-	pLeft := lipgloss.JoinHorizontal(lipgloss.Center, pDot, " ", lipgloss.NewStyle().Bold(true).Foreground(theme.ColorWhite).Render(profName))
-	pRight := lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render(profHandle)
-	pSpaces := contentWidth - lipgloss.Width(pLeft) - lipgloss.Width(pRight)
-	if pSpaces < 1 {
-		pSpaces = 1
-	}
-	footer := lipgloss.JoinHorizontal(lipgloss.Center, pLeft, lipgloss.NewStyle().Width(pSpaces).Render(""), pRight)
+	// 3. User Profile Footer component pinned at the bottom
+	footerBlock := renderFooter(m.client.Profile(), contentWidth)
 
-	// Combine into container
-	box := lipgloss.NewStyle().
+	// Calculate blank filler lines between chat list and footer to pin footer to bottom
+	renderedChatsHeight := lipgloss.Height(chatsList)
+	fillerLinesCount := availableListHeight - renderedChatsHeight
+	if fillerLinesCount < 0 {
+		fillerLinesCount = 0
+	}
+	var filler string
+	if fillerLinesCount > 0 {
+		filler = strings.Repeat("\n", fillerLinesCount)
+	}
+
+	// Assemble sidebar container
+	bodyItems := []string{
+		header,
+		"",
+		chatsList,
+	}
+	if filler != "" {
+		bodyItems = append(bodyItems, filler)
+	}
+	bodyItems = append(bodyItems, footerBlock)
+
+	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorderDim).
 		Width(m.width).
 		Height(m.height).
 		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Left,
-			header,
-			"",
-			chatsList,
-			"",
-			footer,
-		))
-
-	return box
+		Render(lipgloss.JoinVertical(lipgloss.Left, bodyItems...))
 }
