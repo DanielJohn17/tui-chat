@@ -2,7 +2,6 @@ package auth
 
 import (
 	"strings"
-	"unicode"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
@@ -26,6 +25,8 @@ type AuthSuccessMsg struct {
 type AuthErrorMsg struct {
 	Err error
 }
+
+type OpenHelpMsg struct{}
 
 type Model struct {
 	client     client.Client
@@ -71,14 +72,14 @@ func New(c client.Client) Model {
 	}
 
 	// Login inputs
-	lu := createInput("Enter your username", false, 20)
+	lu := createInput("Enter username (or press Enter to pass)", false, 20)
 	lu.Focus()
-	lp := createInput("Enter your password", true, 50)
+	lp := createInput("Enter password (optional in dev)", true, 50)
 
 	// Register inputs
 	rn := createInput("e.g. Alex Mercer", false, 50)
-	ru := createInput("e.g. alexm (3-20 chars)", false, 20)
-	rp := createInput("Must contain A-Z and 0-9", true, 50)
+	ru := createInput("e.g. alexm", false, 20)
+	rp := createInput("Enter password (optional in dev)", true, 50)
 
 	return Model{
 		client:        c,
@@ -120,6 +121,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.errorMessage = "" // Clear error on new keypress
 
 		switch msg.String() {
+		case "esc":
+			return m, tea.Quit
+
+		case "f1", "ctrl+h":
+			return m, func() tea.Msg { return OpenHelpMsg{} }
+
 		case "tab", "down":
 			maxIndex := 1
 			if m.mode == ModeRegister {
@@ -202,71 +209,48 @@ func (m *Model) updateFocus() {
 	}
 }
 
-func hasUpperAndDigit(s string) (bool, bool) {
-	var hasUpper, hasDigit bool
-	for _, r := range s {
-		if unicode.IsUpper(r) {
-			hasUpper = true
-		}
-		if unicode.IsDigit(r) {
-			hasDigit = true
-		}
-	}
-	return hasUpper, hasDigit
-}
-
 func (m *Model) submit() tea.Cmd {
 	if m.mode == ModeLogin {
 		username := strings.TrimSpace(m.loginUsername.Value())
-		password := m.loginPassword.Value()
-
-		if len(username) < 3 || len(username) > 20 {
-			m.errorMessage = "Username must be between 3 and 20 characters."
-			return nil
-		}
-		hasUp, hasDig := hasUpperAndDigit(password)
-		if !hasUp || !hasDig {
-			m.errorMessage = "Password requires at least one uppercase letter (A-Z) and one number (0-9)."
-			return nil
+		if username == "" {
+			username = "alex"
 		}
 
-		m.loading = true
-		return tea.Batch(m.spinner.Tick, func() tea.Msg {
-			prof, err := m.client.Login(username, password)
-			if err != nil {
-				return AuthErrorMsg{Err: err}
+		// Pass to the chat app directly without requiring an API call
+		return func() tea.Msg {
+			return AuthSuccessMsg{
+				Profile: client.Profile{
+					ID:        1,
+					Name:      username,
+					Username:  username,
+					Token:     "mock-jwt-token-authenticated",
+					CreatedAt: "Today",
+				},
 			}
-			return AuthSuccessMsg{Profile: *prof}
-		})
-	}
-
-	// Register validation
-	name := strings.TrimSpace(m.regName.Value())
-	username := strings.TrimSpace(m.regUsername.Value())
-	password := m.regPassword.Value()
-
-	if len(name) < 3 || len(name) > 50 {
-		m.errorMessage = "Display name must be between 3 and 50 characters."
-		return nil
-	}
-	if len(username) < 3 || len(username) > 20 {
-		m.errorMessage = "Username must be between 3 and 20 characters."
-		return nil
-	}
-	hasUp, hasDig := hasUpperAndDigit(password)
-	if !hasUp || !hasDig {
-		m.errorMessage = "Password requires at least one uppercase letter (A-Z) and one number (0-9)."
-		return nil
-	}
-
-	m.loading = true
-	return tea.Batch(m.spinner.Tick, func() tea.Msg {
-		prof, err := m.client.Register(name, username, password)
-		if err != nil {
-			return AuthErrorMsg{Err: err}
 		}
-		return AuthSuccessMsg{Profile: *prof}
-	})
+	}
+
+	// Register mode - pass straight to the chat app
+	name := strings.TrimSpace(m.regName.Value())
+	if name == "" {
+		name = "Alex Mercer"
+	}
+	username := strings.TrimSpace(m.regUsername.Value())
+	if username == "" {
+		username = "alexm"
+	}
+
+	return func() tea.Msg {
+		return AuthSuccessMsg{
+			Profile: client.Profile{
+				ID:        1,
+				Name:      name,
+				Username:  username,
+				Token:     "mock-jwt-token-registered",
+				CreatedAt: "Today",
+			},
+		}
+	}
 }
 
 func (m Model) View() string {
@@ -281,7 +265,6 @@ func (m Model) View() string {
 	innerWidth := cardWidth - 6  // inside padding(1, 2)
 	inputWidth := innerWidth - 4 // inside input box margin/border
 
-	// Update text input widths
 	m.loginUsername.Width = inputWidth - 2
 	m.loginPassword.Width = inputWidth - 2
 	m.regName.Width = inputWidth - 2
@@ -356,15 +339,9 @@ func (m Model) View() string {
 		formContent = lipgloss.JoinVertical(lipgloss.Left, uBox, "", pBox)
 	} else {
 		nBox := renderField("Display Name", m.regName.View(), m.focusIndex == 0)
-		uBox := renderField("Username (3-20 chars)", m.regUsername.View(), m.focusIndex == 1)
-		pBox := renderField("Password (A-Z, 0-9)", m.regPassword.View(), m.focusIndex == 2)
-
-		// Subtle password rules helper for register
-		pwHelper := lipgloss.NewStyle().
-			Foreground(theme.ColorDimText).
-			Render("  • Must include ≥1 uppercase letter and ≥1 digit")
-
-		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox, pwHelper)
+		uBox := renderField("Username", m.regUsername.View(), m.focusIndex == 1)
+		pBox := renderField("Password", m.regPassword.View(), m.focusIndex == 2)
+		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox)
 	}
 
 	// Error banner if any
@@ -381,26 +358,17 @@ func (m Model) View() string {
 			Render("✖ " + m.errorMessage)
 	}
 
-	// Submit button or loading indicator
-	var submitAction string
-	if m.loading {
-		submitAction = lipgloss.JoinHorizontal(lipgloss.Center,
-			m.spinner.View(),
-			"  ",
-			theme.StyleSubtitle.Render("Authenticating with server..."),
-		)
-	} else {
-		actionText := "[ Enter: Login ]"
-		if m.mode == ModeRegister {
-			actionText = "[ Enter: Create Account ]"
-		}
-		submitAction = theme.StyleSuccess.Render(actionText)
+	// Submit button
+	actionText := "[ Enter: Login & Enter Chat ]"
+	if m.mode == ModeRegister {
+		actionText = "[ Enter: Create Account & Enter Chat ]"
 	}
+	submitAction := theme.StyleSuccess.Render(actionText)
 	submitActionCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(submitAction)
 
-	// Clean 2-line footer helper
+	// Clean 2-line footer helper with Help Desk and Quit shortcuts
 	hint1 := theme.StyleDim.Render("Tab: next field  •  Ctrl+T: switch mode")
-	hint2 := theme.StyleDim.Render("Enter: submit   •  Esc: quit")
+	hint2 := theme.StyleDim.Render("F1 / Ctrl+H: help desk  •  Esc: quit")
 	footer := lipgloss.JoinVertical(lipgloss.Center,
 		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint1),
 		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint2),
@@ -434,7 +402,6 @@ func (m Model) View() string {
 		Width(cardWidth).
 		Render(cardContent)
 
-	// Center on screen
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card)
 	}

@@ -101,7 +101,7 @@ func NewMock() Client {
 			Name:      "Alice Walker",
 			Username:  "alice",
 			Password:  "SecretPass123",
-			Token:     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxLCJ1c2VybmFtZSI6ImFsaWNlIn0",
+			Token:     "",
 			CreatedAt: "2026-09-01 10:00:00",
 		},
 		msgID: 6000,

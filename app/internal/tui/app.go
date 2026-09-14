@@ -77,14 +77,11 @@ func (m *AppModel) handleResize(w, h int) {
 
 	m.authView.SetSize(w, h)
 
-	// Layout allocation:
-	// Status bar uses 3 rows at bottom
 	mainHeight := h - 3
 	if mainHeight < 10 {
 		mainHeight = 10
 	}
 
-	// Sidebar takes 32 cols or 30% of width
 	sidebarWidth := 32
 	if w < 90 {
 		sidebarWidth = 28
@@ -114,6 +111,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chatView.SetActiveChat(chat.ID)
 		}
 		return m, nil
+
+	case auth.OpenHelpMsg:
+		m.modal = ModalHelp
+		return m, nil
 	}
 
 	// 1. If a modal is open, modal captures input
@@ -122,7 +123,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModalHelp:
 			if keyMsg, ok := msg.(tea.KeyMsg); ok {
 				switch keyMsg.String() {
-				case "esc", "enter", "h", "q":
+				case "esc", "enter", "h", "q", "f1", "ctrl+h":
 					m.modal = ModalNone
 					return m, nil
 				}
@@ -167,6 +168,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// 2. State-specific updates
 	switch m.state {
 	case StateAuth:
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			switch keyMsg.String() {
+			case "esc", "ctrl+c":
+				return m, tea.Quit
+			case "f1", "ctrl+h":
+				m.modal = ModalHelp
+				return m, nil
+			}
+		}
 		var cmd tea.Cmd
 		m.authView, cmd = m.authView.Update(msg)
 		return m, cmd
@@ -212,7 +222,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.modal = ModalProfile
 				return m, nil
 
-			case "h", "?":
+			case "h", "?", "f1":
 				m.modal = ModalHelp
 				return m, nil
 
@@ -232,7 +242,7 @@ func (m AppModel) View() string {
 		return "Initializing terminal..."
 	}
 
-	// Active modal overlays
+	// Active modal overlays (renders over either Auth or Chat state)
 	if m.modal != ModalNone {
 		switch m.modal {
 		case ModalHelp:

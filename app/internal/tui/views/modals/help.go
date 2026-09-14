@@ -6,13 +6,13 @@ import (
 )
 
 func RenderHelp(width, height int) string {
-	boxWidth := 52
-	if width > 0 && width < 56 {
+	boxWidth := 56
+	if width > 0 && width < 60 {
 		boxWidth = width - 4
 	}
 
-	title := theme.StyleTitle.Render("◈ KEYBOARD COMMANDS ◈")
-	closeHint := theme.StyleDim.Render("[ Esc / Enter / h: Close ]")
+	title := theme.StyleTitle.Render("◈ TUI HELP DESK & SHORTCUTS ◈")
+	closeHint := theme.StyleDim.Render("[ Esc / Enter / F1 / h: Close ]")
 
 	renderRow := func(key, desc string) string {
 		k := theme.StyleShortcut.Render(key)
@@ -24,24 +24,33 @@ func RenderHelp(width, height int) string {
 		return lipgloss.JoinHorizontal(lipgloss.Center, k, lipgloss.NewStyle().Width(spaces).Render(""), d)
 	}
 
-	secNav := theme.StyleSubtitle.Render("NAVIGATION")
+	secAuth := theme.StyleSubtitle.Render("AUTHENTICATION & ACCESS")
+	a1 := renderRow("Enter", "Login / Register (passes straight in)")
+	a2 := renderRow("Ctrl+T", "Switch between Login and Register")
+	a3 := renderRow("Tab / ↑↓", "Cycle through input fields")
+	a4 := renderRow("F1 / Ctrl+H", "Open this Help Desk anytime")
+
+	secNav := theme.StyleSubtitle.Render("CHAT NAVIGATION")
 	r1 := renderRow("j / ↓", "Move down conversation list")
 	r2 := renderRow("k / ↑", "Move up conversation list")
 	r3 := renderRow("i / Enter", "Focus message input box")
-	r4 := renderRow("Esc", "Unfocus input box / Close modal")
+	r4 := renderRow("Esc", "Unfocus input / Return to sidebar")
 
-	secChat := theme.StyleSubtitle.Render("CHATTING")
+	secChat := theme.StyleSubtitle.Render("MESSAGING")
 	r5 := renderRow("Enter", "Send active message")
-	r6 := renderRow("PgUp / PgDn", "Scroll message history")
+	r6 := renderRow("PgUp / PgDn", "Scroll chat history")
 
 	secActions := theme.StyleSubtitle.Render("ACTIONS & MODALS")
 	r7 := renderRow("n", "Start new Direct Message")
 	r8 := renderRow("p", "View user profile card")
-	r9 := renderRow("h / ?", "Toggle this help modal")
+	r9 := renderRow("h / ? / F1", "Toggle Help Desk")
 	r10 := renderRow("q / Ctrl+C", "Quit application")
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Width(boxWidth-4).Align(lipgloss.Center).Render(title),
+		"",
+		secAuth,
+		a1, a2, a3, a4,
 		"",
 		secNav,
 		r1, r2, r3, r4,
