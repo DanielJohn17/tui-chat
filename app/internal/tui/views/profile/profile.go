@@ -104,43 +104,64 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 			// Check if clicked inside form fields or buttons
 			// The card is centered vertically and horizontally
-			cardW := 60
-			if m.width > 0 && m.width < 64 {
-				cardW = m.width - 4
+			cardWidth := 62
+			if m.width > 0 && m.width < 66 {
+				cardWidth = m.width - 4
 			}
-			cardH := 24
+			if cardWidth < 40 {
+				cardWidth = 40
+			}
+			cardW := cardWidth + 6
+			cardH := 33
+			if m.errorMsg != "" || m.successMsg != "" {
+				cardH = 35
+			}
 			startX := (m.width - cardW) / 2
 			startY := (m.height - cardH) / 2
+			if startX < 0 {
+				startX = 0
+			}
+			if startY < 0 {
+				startY = 0
+			}
 
 			relY := msg.Y - startY
 			relX := msg.X - startX
 
 			if relX >= 0 && relX < cardW {
-				// Estimate row positions inside card:
-				// Header takes ~4 lines (lines 0-3)
-				// Name field: lines 4-6
-				// Username field: lines 7-9
-				// Status field: lines 10-12
-				// Actions: lines 17-19
-				if relY >= 4 && relY <= 6 {
+				alertOffset := 0
+				if m.errorMsg != "" || m.successMsg != "" {
+					alertOffset = 2
+				}
+
+				// Precise row positions inside card:
+				// Name field (label at 7, box at 8-10)
+				if relY >= 7+alertOffset && relY <= 10+alertOffset {
 					m.focusIndex = 0
 					m.updateFocus()
 					return m, nil
-				} else if relY >= 7 && relY <= 9 {
+				}
+				// Username field (label at 12, box at 13-15)
+				if relY >= 12+alertOffset && relY <= 15+alertOffset {
 					m.focusIndex = 1
 					m.updateFocus()
 					return m, nil
-				} else if relY >= 10 && relY <= 12 {
+				}
+				// Status / Bio field (label at 17, box at 18-20)
+				if relY >= 17+alertOffset && relY <= 20+alertOffset {
 					m.focusIndex = 2
 					m.updateFocus()
 					return m, nil
-				} else if relY >= 17 && relY <= 20 {
+				}
+				// Action buttons: Save Changes and Back to Chat (lines 26-28)
+				if relY >= 26+alertOffset && relY <= 28+alertOffset {
 					// Check left half (Save) vs right half (Cancel)
 					if relX < cardW/2 {
+						m.focusIndex = 3
 						return m.save()
-					} else {
-						return m, func() tea.Msg { return BackToChatMsg{} }
 					}
+					m.focusIndex = 4
+					return m, func() tea.Msg { return BackToChatMsg{} }
 				}
 			}
 		}
@@ -298,29 +319,32 @@ func (m Model) View() string {
 	// 4. Buttons
 	saveStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(theme.ColorBlack).
-		Background(theme.ColorGreen).
-		Padding(0, 2)
-	if m.focusIndex != 3 {
-		saveStyle = lipgloss.NewStyle().
-			Bold(true).
+		Border(lipgloss.RoundedBorder()).
+		Padding(0, 1)
+	if m.focusIndex == 3 {
+		saveStyle = saveStyle.
+			Foreground(theme.ColorBlack).
+			Background(theme.ColorGreen).
+			BorderForeground(theme.ColorGreen)
+	} else {
+		saveStyle = saveStyle.
 			Foreground(theme.ColorGreen).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(theme.ColorGreen).
-			Padding(0, 1)
+			BorderForeground(theme.ColorGreen)
 	}
 
 	cancelStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(theme.ColorBlack).
-		Background(theme.ColorCyan).
-		Padding(0, 2)
-	if m.focusIndex != 4 {
-		cancelStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(0, 1)
+	if m.focusIndex == 4 {
+		cancelStyle = cancelStyle.
+			Foreground(theme.ColorBlack).
+			Background(theme.ColorCyan).
+			BorderForeground(theme.ColorCyan)
+	} else {
+		cancelStyle = cancelStyle.
 			Foreground(theme.ColorDimText).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(theme.ColorBorderDim).
-			Padding(0, 1)
+			BorderForeground(theme.ColorBorderDim)
 	}
 
 	saveBtn := saveStyle.Render("✔ Save Changes [Enter]")

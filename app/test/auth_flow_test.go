@@ -48,3 +48,63 @@ func TestAuthEscQuits(t *testing.T) {
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	require.NotNil(t, cmd, "expected quit cmd on Esc")
 }
+
+func TestAuthMouseClicks(t *testing.T) {
+	c := client.NewMock()
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// 1. Click Register tab (X: 59, Y: 8)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      59,
+		Y:      8,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	assert.Contains(t, model.View(), "Display Name", "Clicking Register tab must switch to register form")
+
+	// 2. Click Username field in Register mode (X: 39, Y: 14)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      39,
+		Y:      14,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// 3. Click Password field in Register mode (X: 39, Y: 19)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      39,
+		Y:      19,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// 4. Click Login tab to switch back (X: 29, Y: 6)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      29,
+		Y:      6,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	assert.NotContains(t, model.View(), "Display Name", "Clicking Login tab must return to login form")
+
+	// 5. Click Password field in Login mode (X: 39, Y: 16)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      39,
+		Y:      16,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// 6. Click Submit button in Login mode (X: 49, Y: 20)
+	model, cmd := model.Update(tea.MouseMsg{
+		X:      49,
+		Y:      20,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	require.NotNil(t, cmd, "Clicking submit button must return cmd")
+	msg := cmd()
+	model, _ = model.Update(msg)
+	assert.Contains(t, model.View(), "CONVERSATIONS", "Submitting via mouse click must enter chat")
+}

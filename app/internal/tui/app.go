@@ -87,9 +87,9 @@ func (m *AppModel) handleResize(w, h int) {
 		mainHeight = 10
 	}
 
-	sidebarWidth := 32
-	if w < 90 {
-		sidebarWidth = 28
+	sidebarWidth := 38
+	if w < 100 {
+		sidebarWidth = 30
 	}
 	chatWidth := w - sidebarWidth
 	if chatWidth < 30 {
@@ -114,6 +114,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.client.SetProfile(msg.Profile)
 		m.profileView.ReloadProfile()
 		if chat := m.sidebarView.SelectedChat(); chat != nil {
+			m.client.MarkRead(chat.ID)
 			m.chatView.SetActiveChat(chat.ID)
 		}
 		return m, nil
@@ -235,9 +236,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case StateChat:
-		sidebarWidth := 32
-		if m.width < 90 {
-			sidebarWidth = 28
+		sidebarWidth := 38
+		if m.width < 100 {
+			sidebarWidth = 30
 		}
 		mainHeight := m.height - 3
 
@@ -248,6 +249,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if mouseMsg.X < sidebarWidth {
 					m.sidebarView.MoveUp()
 					if sel := m.sidebarView.SelectedChat(); sel != nil {
+						m.client.MarkRead(sel.ID)
 						m.chatView.SetActiveChat(sel.ID)
 					}
 				} else {
@@ -259,6 +261,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if mouseMsg.X < sidebarWidth {
 					m.sidebarView.MoveDown()
 					if sel := m.sidebarView.SelectedChat(); sel != nil {
+						m.client.MarkRead(sel.ID)
 						m.chatView.SetActiveChat(sel.ID)
 					}
 				} else {
@@ -318,6 +321,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 					if clickedChat != nil {
+						m.client.MarkRead(clickedChat.ID)
 						m.chatView.SetActiveChat(clickedChat.ID)
 						m.chatView.BlurInput()
 						return m, nil
@@ -357,6 +361,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "j", "down":
 				m.sidebarView.MoveDown()
 				if sel := m.sidebarView.SelectedChat(); sel != nil {
+					m.client.MarkRead(sel.ID)
 					m.chatView.SetActiveChat(sel.ID)
 				}
 				return m, nil
@@ -364,6 +369,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "k", "up":
 				m.sidebarView.MoveUp()
 				if sel := m.sidebarView.SelectedChat(); sel != nil {
+					m.client.MarkRead(sel.ID)
 					m.chatView.SetActiveChat(sel.ID)
 				}
 				return m, nil

@@ -9,6 +9,11 @@ import (
 )
 
 func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
+	innerWidth := contentWidth - 2
+	if innerWidth < 12 {
+		innerWidth = 12
+	}
+
 	var onlineDot string
 	if ch.Online {
 		onlineDot = theme.StyleSuccess.Render("●")
@@ -16,63 +21,84 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 		onlineDot = theme.StyleDim.Render("○")
 	}
 
+	// Line 1: Indicator + Name (left) and Time (right)
+	var indicator string
+	var nameStyle lipgloss.Style
 	if isSelected {
-		itemWidth := contentWidth - 1
-		if itemWidth < 10 {
-			itemWidth = 10
-		}
-		marker := theme.StyleTitle.Render("▶ ")
-		nameText := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render(theme.Truncate(ch.Name, itemWidth-8))
-		row1 := lipgloss.JoinHorizontal(lipgloss.Center, marker, nameText)
-		rSpaces := itemWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
-		if rSpaces < 1 {
-			rSpaces = 1
-		}
-		row1 = lipgloss.JoinHorizontal(lipgloss.Center, row1, lipgloss.NewStyle().Width(rSpaces).Render(""), onlineDot)
+		indicator = theme.StyleTitle.Render("▶ ")
+		nameStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan)
+	} else {
+		indicator = onlineDot + " "
+		nameStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorWhite)
+	}
 
-		userHandle := lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@" + theme.Truncate(ch.Username, itemWidth/2))
-		timeText := theme.StyleDim.Render(ch.Time)
-		uSpaces := itemWidth - lipgloss.Width(userHandle) - lipgloss.Width(timeText)
-		if uSpaces < 1 {
-			uSpaces = 1
-		}
-		row2 := lipgloss.JoinHorizontal(lipgloss.Center, userHandle, lipgloss.NewStyle().Width(uSpaces).Render(""), timeText)
+	timeText := theme.StyleDim.Render(ch.Time)
+	timeW := lipgloss.Width(timeText)
 
-		var rows []string
-		rows = append(rows, row1, row2)
-		if ch.LastMessage != "" {
-			row3 := theme.StyleDim.Render(theme.Truncate(ch.LastMessage, itemWidth-2))
-			rows = append(rows, row3)
-		}
+	availNameW := innerWidth - timeW - lipgloss.Width(indicator) - 1
+	if availNameW < 4 {
+		availNameW = 4
+	}
+	leftPart1 := indicator + nameStyle.Render(theme.Truncate(ch.Name, availNameW))
+	spaces1 := innerWidth - lipgloss.Width(leftPart1) - timeW
+	if spaces1 < 1 {
+		spaces1 = 1
+	}
+	row1 := lipgloss.JoinHorizontal(lipgloss.Center, leftPart1, lipgloss.NewStyle().Width(spaces1).Render(""), timeText)
 
+	// Line 2: Last message preview (left) and Unread badge pill (right)
+	preview := ch.LastMessage
+	if preview == "" {
+		preview = "@" + ch.Username
+	}
+
+	var unreadBadge string
+	if ch.Unread > 0 {
+		badgeStr := fmt.Sprintf("%d", ch.Unread)
+		if ch.Unread > 99 {
+			badgeStr = "99+"
+		}
+		unreadBadge = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(theme.ColorBlack).
+			Background(theme.ColorGreen).
+			Padding(0, 1).
+			Render(badgeStr)
+	}
+
+	unreadW := lipgloss.Width(unreadBadge)
+	availMsgW := innerWidth - unreadW - 3
+	if availMsgW < 4 {
+		availMsgW = 4
+	}
+
+	var msgStyle lipgloss.Style
+	if isSelected {
+		msgStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
+	} else {
+		msgStyle = theme.StyleDim
+	}
+
+	leftPart2 := "  " + msgStyle.Render(theme.Truncate(preview, availMsgW))
+	spaces2 := innerWidth - lipgloss.Width(leftPart2) - unreadW
+	if spaces2 < 1 {
+		spaces2 = 1
+	}
+	row2 := lipgloss.JoinHorizontal(lipgloss.Center, leftPart2, lipgloss.NewStyle().Width(spaces2).Render(""), unreadBadge)
+
+	rowBlank := lipgloss.NewStyle().Width(innerWidth).Render("")
+
+	rows := lipgloss.JoinVertical(lipgloss.Left, row1, rowBlank, row2)
+
+	if isSelected {
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(theme.ColorCyan).
-			Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+			Padding(0, 1, 0, 0).
+			Render(rows)
 	}
 
-	// Unselected chat item
-	marker := "  "
-	nameText := lipgloss.NewStyle().Foreground(theme.ColorWhite).Render(theme.Truncate(ch.Name, contentWidth-8))
-	row1 := lipgloss.JoinHorizontal(lipgloss.Center, marker, nameText)
-	rSpaces := contentWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
-	if rSpaces < 1 {
-		rSpaces = 1
-	}
-	row1 = lipgloss.JoinHorizontal(lipgloss.Center, row1, lipgloss.NewStyle().Width(rSpaces).Render(""), onlineDot)
-
-	var unreadPill string
-	if ch.Unread > 0 {
-		unreadPill = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorYellow).Render(fmt.Sprintf("(%d)", ch.Unread))
-	}
-	timeText := theme.StyleDim.Render(ch.Time)
-	trailing := lipgloss.JoinHorizontal(lipgloss.Center, unreadPill, " ", timeText)
-	userHandle := theme.StyleDim.Render("@" + theme.Truncate(ch.Username, contentWidth/2))
-	uSpaces := contentWidth - lipgloss.Width(userHandle) - lipgloss.Width(trailing)
-	if uSpaces < 1 {
-		uSpaces = 1
-	}
-	row2 := lipgloss.JoinHorizontal(lipgloss.Center, userHandle, lipgloss.NewStyle().Width(uSpaces).Render(""), trailing)
-
-	return lipgloss.JoinVertical(lipgloss.Left, row1, row2)
+	return lipgloss.NewStyle().
+		Padding(0, 1).
+		Render(rows)
 }

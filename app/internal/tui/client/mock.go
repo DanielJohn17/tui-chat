@@ -127,7 +127,7 @@ func NewMock() Client {
 				Username:    "sofia",
 				LastMessage: "Terminal animations feeling butter-smooth now!",
 				Time:        t(520),
-				Unread:      0,
+				Unread:      4,
 				Online:      true,
 			},
 			{
@@ -147,7 +147,7 @@ func NewMock() Client {
 				Username:    "rachel",
 				LastMessage: "Docs updated with keyboard shortcuts reference.",
 				Time:        "Yesterday",
-				Unread:      0,
+				Unread:      12,
 				Online:      true,
 			},
 			{
@@ -335,4 +335,13 @@ func (m *mockClient) IsAuthenticated() bool {
 
 func (m *mockClient) SetProfile(p Profile) {
 	m.profile = p
+}
+
+func (m *mockClient) MarkRead(chatID int64) {
+	for i := range m.chats {
+		if m.chats[i].ID == chatID {
+			m.chats[i].Unread = 0
+			break
+		}
+	}
 }

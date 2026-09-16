@@ -65,26 +65,19 @@ func (m *Model) ensureVisible() {
 	if m.selectedIndex < len(chats)-1 {
 		maxItemsHeight--
 	}
-	if maxItemsHeight < 2 {
-		maxItemsHeight = 2
+	if maxItemsHeight < 4 {
+		maxItemsHeight = 4
 	}
 
-	// Calculate lines needed from scrollOffset up to selectedIndex (accounting for expanded selected item)
-	lines := 0
-	for i := m.scrollOffset; i <= m.selectedIndex; i++ {
-		h := 2
-		if i == m.selectedIndex {
-			h = 3
-		}
-		lines += h
+	// Each item takes 3 lines + 1 separator line = 4 lines (first item doesn't have leading separator)
+	count := m.selectedIndex - m.scrollOffset + 1
+	lines := count*4 - 1
+	if lines < 0 {
+		lines = 0
 	}
 
 	for lines > maxItemsHeight && m.scrollOffset < m.selectedIndex {
-		h := 2
-		if m.scrollOffset == m.selectedIndex {
-			h = 3
-		}
-		lines -= h
+		lines -= 4
 		m.scrollOffset++
 	}
 }
@@ -182,12 +175,24 @@ func (m *Model) View() string {
 		actualLines := lipgloss.Height(itemBox)
 
 		linesNeeded := actualLines
+		if len(chatItems) > 0 {
+			linesNeeded += 1 // 1 separator line before this item
+		}
 		if i < len(chats)-1 {
 			linesNeeded++ // reserve 1 line for bottom scroll indicator
 		}
 
 		if usedLines+linesNeeded > availableListHeight && len(chatItems) > 0 {
 			break
+		}
+
+		if len(chatItems) > 0 {
+			if len(m.clickableItems) > 0 {
+				m.clickableItems[len(m.clickableItems)-1].EndY++
+			}
+			chatItems = append(chatItems, "")
+			currentY++
+			usedLines++
 		}
 
 		m.clickableItems = append(m.clickableItems, ClickableItem{
@@ -204,7 +209,7 @@ func (m *Model) View() string {
 	if hasTopScroll && len(chatItems) > 0 {
 		chatItems[0] = theme.StyleDim.Render("   ▲ more above") + "\n" + chatItems[0]
 	}
-	if m.scrollOffset+len(chatItems) < len(chats) && len(chatItems) > 0 {
+	if m.scrollOffset+len(m.clickableItems) < len(chats) && len(chatItems) > 0 {
 		m.bottomScrollY = currentY
 		lastIdx := len(chatItems) - 1
 		chatItems[lastIdx] = chatItems[lastIdx] + "\n" + theme.StyleDim.Render("   ▼ more below")

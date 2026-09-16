@@ -38,6 +38,7 @@ type Client interface {
 	UpdateProfile(Profile)
 	Send(chatID int64, text string)
 	AddChat(name, username string) Chat
+	MarkRead(chatID int64)
 
 	// Auth operations
 	Login(username, password string) (*Profile, error)

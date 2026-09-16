@@ -160,3 +160,7 @@ func (h *HTTPClient) Send(chatID int64, text string) {
 func (h *HTTPClient) AddChat(name, username string) Chat {
 	return h.mock.AddChat(name, username)
 }
+
+func (h *HTTPClient) MarkRead(chatID int64) {
+	h.mock.MarkRead(chatID)
+}

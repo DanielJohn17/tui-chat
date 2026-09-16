@@ -103,6 +103,14 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 }
 
+func (m Model) Mode() Mode {
+	return m.mode
+}
+
+func (m Model) FocusIndex() int {
+	return m.focusIndex
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
@@ -116,6 +124,106 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = false
 		m.errorMessage = msg.Err.Error()
 		return m, nil
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			cardWidth := 56
+			if m.width > 0 && m.width < 60 {
+				cardWidth = m.width - 4
+			}
+			if cardWidth < 44 {
+				cardWidth = 44
+			}
+			cardW := cardWidth + 6
+
+			cardH := 23
+			if m.mode == ModeRegister {
+				cardH = 28
+			}
+			if m.errorMessage != "" {
+				cardH += 4
+			}
+
+			startX := (m.width - cardW) / 2
+			startY := (m.height - cardH) / 2
+			if startX < 0 {
+				startX = 0
+			}
+			if startY < 0 {
+				startY = 0
+			}
+
+			relX := msg.X - startX
+			relY := msg.Y - startY
+
+			if relX >= 0 && relX < cardW {
+				// 1. Tabs row (line 5)
+				if relY >= 4 && relY <= 5 {
+					if relX < cardW/2 {
+						m.mode = ModeLogin
+					} else {
+						m.mode = ModeRegister
+					}
+					m.focusIndex = 0
+					m.updateFocus()
+					return m, nil
+				}
+
+				errorOffset := 0
+				if m.errorMessage != "" {
+					errorOffset = 4
+				}
+
+				if m.mode == ModeLogin {
+					// Username field (lines 7-10 + errorOffset)
+					if relY >= 7+errorOffset && relY <= 10+errorOffset {
+						m.focusIndex = 0
+						m.updateFocus()
+						return m, nil
+					}
+					// Password field (lines 12-15 + errorOffset)
+					if relY >= 12+errorOffset && relY <= 15+errorOffset {
+						m.focusIndex = 1
+						m.updateFocus()
+						return m, nil
+					}
+					// Submit button (lines 16-18 + errorOffset)
+					if relY >= 16+errorOffset && relY <= 18+errorOffset {
+						if !m.loading {
+							return m, m.submit()
+						}
+						return m, nil
+					}
+				} else {
+					// Register mode
+					// Display Name field (lines 7-10 + errorOffset)
+					if relY >= 7+errorOffset && relY <= 10+errorOffset {
+						m.focusIndex = 0
+						m.updateFocus()
+						return m, nil
+					}
+					// Username field (lines 12-15 + errorOffset)
+					if relY >= 12+errorOffset && relY <= 15+errorOffset {
+						m.focusIndex = 1
+						m.updateFocus()
+						return m, nil
+					}
+					// Password field (lines 17-20 + errorOffset)
+					if relY >= 17+errorOffset && relY <= 20+errorOffset {
+						m.focusIndex = 2
+						m.updateFocus()
+						return m, nil
+					}
+					// Submit button (lines 21-23 + errorOffset)
+					if relY >= 21+errorOffset && relY <= 23+errorOffset {
+						if !m.loading {
+							return m, m.submit()
+						}
+						return m, nil
+					}
+				}
+			}
+		}
 
 	case tea.KeyMsg:
 		m.errorMessage = "" // Clear error on new keypress

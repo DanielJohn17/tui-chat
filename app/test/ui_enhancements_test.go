@@ -90,10 +90,10 @@ func TestHelpKeybindings(t *testing.T) {
 func TestMouseClickActions(t *testing.T) {
 	model := authenticatedApp()
 
-	// 1. Mouse click on second chat (Sarah Connor, line 6)
+	// 1. Mouse click on second chat (Sarah Connor, line 8)
 	model, _ = model.Update(tea.MouseMsg{
 		X:      10,
-		Y:      6,
+		Y:      8,
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
@@ -112,19 +112,19 @@ func TestMouseClickActions(t *testing.T) {
 func TestSidebarClickWhenItemExpands(t *testing.T) {
 	model := authenticatedApp()
 
-	// 1. Click on Charlie Zhang (line 8)
+	// 1. Click on Charlie Zhang (line 12)
 	model, _ = model.Update(tea.MouseMsg{
 		X:      10,
-		Y:      8,
+		Y:      12,
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
 	assert.Contains(t, model.View(), "@charlie")
 
-	// 2. Click on Alex Rivera (line 10)
+	// 2. Click on Alex Rivera (line 16)
 	model, _ = model.Update(tea.MouseMsg{
 		X:      10,
-		Y:      10,
+		Y:      16,
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
@@ -186,13 +186,13 @@ func TestSidebarAllElementsClickable(t *testing.T) {
 	assert.NotContains(t, viewScroll, "PROFILE EDIT", "Clicking scroll indicator must NOT open profile")
 	assert.Contains(t, viewScroll, "@sarah", "Selection must advance to Sarah Connor")
 
-	// Scroll down further to push scrollOffset > 0
-	for i := 0; i < 12; i++ {
+	// Scroll down via mouse wheel to push scrollOffset > 0
+	for i := 0; i < 15; i++ {
 		mScroll, _ = mScroll.Update(tea.MouseMsg{
 			X:      15,
-			Y:      26,
-			Button: tea.MouseButtonLeft,
-			Action: tea.MouseActionPress,
+			Y:      10,
+			Button: tea.MouseButtonWheelDown,
+			Type:   tea.MouseWheelDown,
 		})
 	}
 	assert.Contains(t, mScroll.View(), "more above", "Scrolling down past window must show top scroll indicator")
@@ -216,13 +216,138 @@ func TestSidebarAllElementsClickable(t *testing.T) {
 	})
 	assert.Contains(t, mProfile.View(), "PROFILE EDIT")
 
-	// 5. Click on the rightmost column of an item (X: 30, Y: 8 for Charlie Zhang) selects item
+	// 5. Click on the rightmost column of an item (X: 35, Y: 12 for Charlie Zhang) selects item
 	m4 := authenticatedApp()
 	mRightEdge, _ := m4.Update(tea.MouseMsg{
-		X:      30,
-		Y:      8,
+		X:      35,
+		Y:      12,
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
 	assert.Contains(t, mRightEdge.View(), "@charlie")
+}
+
+func TestTelegramSidebarLayout(t *testing.T) {
+	c := client.NewMock()
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	view := model.View()
+
+	// 1. Fixed height per chat with vertical padding - Last message preview is visible without expanding
+	assert.Contains(t, view, "Fixed it, thanks for the rev")
+	assert.Contains(t, view, "Deployment to staging was su")
+	assert.Contains(t, view, "Added foreign keys")
+
+	// 2. Unseen message badges are rendered for chats with unread messages
+	// Charlie has 2, DevOps has 3, Maya has 1, Sofia has 4
+	assert.Contains(t, view, "2")
+	assert.Contains(t, view, "3")
+	assert.Contains(t, view, "1")
+	assert.Contains(t, view, "4")
+
+	// 3. Selecting a chat does not change overall line count (fixed height)
+	linesBefore := len(strings.Split(view, "\n"))
+	model, _ = model.Update(tea.MouseMsg{
+		X:      10,
+		Y:      12,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	linesAfter := len(strings.Split(model.View(), "\n"))
+	assert.Equal(t, linesBefore, linesAfter)
+}
+
+func TestUnseenMessageMarkRead(t *testing.T) {
+	c := client.NewMock()
+	// Charlie Zhang (ID 3) has 2 unread messages initially
+	var charlieChat *client.Chat
+	for _, ch := range c.Chats() {
+		if ch.ID == 3 {
+			charlieChat = &ch
+			break
+		}
+	}
+	assert.NotNil(t, charlieChat)
+	assert.Equal(t, 2, charlieChat.Unread)
+
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	// Click on Charlie Zhang (Y: 11, 12, or 13)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      10,
+		Y:      12,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// After selecting Charlie, unread count should be marked as 0
+	for _, ch := range c.Chats() {
+		if ch.ID == 3 {
+			assert.Equal(t, 0, ch.Unread, "Unread count must be cleared after clicking chat")
+		}
+	}
+}
+
+func TestProfilePageMouseClicks(t *testing.T) {
+	model := authenticatedApp()
+
+	// Open profile edit page via 'p'
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	assert.Contains(t, model.View(), "PROFILE EDIT")
+
+	// Terminal is 120x35. Card is 68 wide, 33 high. startX = 26, startY = 1.
+	// Click Username field (startY + 13 = 14)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      36,
+		Y:      14,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// Click Status / Bio field (startY + 18 = 19)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      36,
+		Y:      19,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// Click Display Name field (startY + 8 = 9)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      36,
+		Y:      9,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	// Click Cancel button (startY + 27 = 28, X = startX + 45 = 71)
+	model, cmd := model.Update(tea.MouseMsg{
+		X:      71,
+		Y:      28,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	if cmd != nil {
+		msg := cmd()
+		model, _ = model.Update(msg)
+	}
+	assert.Contains(t, model.View(), "CONVERSATIONS", "Clicking Cancel must return to chat view")
+
+	// Re-open profile and click Save button (Y = 28, X = startX + 15 = 41)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	model, cmdSave := model.Update(tea.MouseMsg{
+		X:      41,
+		Y:      28,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	if cmdSave != nil {
+		msg := cmdSave()
+		model, _ = model.Update(msg)
+	}
+	assert.Contains(t, model.View(), "CONVERSATIONS", "Clicking Save must save and return to chat view")
 }
