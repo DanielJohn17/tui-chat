@@ -27,7 +27,12 @@ var _ UserHandlerInt = (*UserHandler)(nil)
 func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 
 	ctx := c.Request.Context()
-	req := c.MustGet("params").(types.URLParamString)
+	params, exists := c.Get("params")
+	if !exists {
+		helpers.WriteError(c, errors.NewBadRequestError("invalid parameters"))
+		return
+	}
+	req := params.(types.URLParamString)
 
 	if req.Str == "" {
 		helpers.WriteError(c, errors.NewBadRequestError("username is not present"))
@@ -45,7 +50,12 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	ctx := c.Request.Context()
-	req := c.MustGet("params").(types.URLParamInt)
+	params, exists := c.Get("params")
+	if !exists {
+		helpers.WriteError(c, errors.NewBadRequestError("invalid parameters"))
+		return
+	}
+	req := params.(types.URLParamInt)
 
 	if req.ID == 0 {
 		helpers.WriteError(c, errors.NewBadRequestError("id is not present"))

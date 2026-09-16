@@ -44,11 +44,12 @@ func (h *ConvHandler) GetOrCreateDirectConversation(c *gin.Context) {
 func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	userID, exists := c.MustGet("userId").(int64)
+	userIDParam, exists := c.Get("userId")
 	if !exists {
 		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
 		return
 	}
+	userID := userIDParam.(int64)
 
 	conversations, err := h.s.GetConvsByUserID(ctx, userID)
 	if err != nil {
@@ -64,7 +65,11 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 }
 
 func (h *ConvHandler) GetConvChats(c *gin.Context) {
-	params := c.MustGet("params").(types.URLParamInt)
+	params, exists := c.Get("params")
+	if !exists {
+		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
+		return
+	}
 	var queries types.URLQueryParams
 	if q, exists := c.Get("queries"); exists {
 		if qParams, ok := q.(types.URLQueryParams); ok {
@@ -73,7 +78,7 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 
-	convID := params.ID
+	convID := params.(types.URLParamInt).ID
 
 	chats := h.s.GetConvChats(ctx, int64(convID), queries)
 
