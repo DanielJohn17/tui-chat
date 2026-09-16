@@ -2,7 +2,10 @@ package conversations
 
 import (
 	"context"
+	"log/slog"
+	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
@@ -27,15 +30,26 @@ type ConvServiceInt interface {
 		ctx context.Context,
 		convID, senderID int64, content string,
 	) (*CreateMessageResponseType, error)
+
+	WipeConversation(ctx context.Context, convID, userID int64) error
 }
 
 type ConvService struct {
-	r ConvRepositoryInt
-	u users.UserServiceInt
+	r          ConvRepositoryInt
+	u          users.UserServiceInt
+	sem        chan struct{}
+	batchSize  int64
+	sleepDelay time.Duration
 }
 
 func NewConvService(r ConvRepositoryInt, u users.UserServiceInt) *ConvService {
-	return &ConvService{r: r, u: u}
+	return &ConvService{
+		r:          r,
+		u:          u,
+		sem:        make(chan struct{}, 5),
+		batchSize:  500,
+		sleepDelay: time.Millisecond * 15,
+	}
 }
 
 var _ ConvServiceInt = (*ConvService)(nil)
@@ -116,4 +130,80 @@ func (s *ConvService) CreateMessage(
 	}
 
 	return chat, nil
+}
+
+func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64) error {
+	if found := s.r.IsUserInConversation(ctx, convID, userID); !found {
+		return errors.NewForbiddenError("forbidden")
+	}
+
+	if err := s.r.MarkConvForDeleting(ctx, convID); err != nil {
+		return errors.NewInternalServerError(err.Error(), err)
+	}
+
+	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Minute)
+
+	go func() {
+		defer cancel()
+		defer func() {
+			if err := recover(); err != nil {
+				stackTree := string(debug.Stack())
+				slog.Error("Panic recoverd", "error", err, "stackTreee", stackTree)
+			}
+		}()
+
+		select {
+		case s.sem <- struct{}{}:
+			defer func() {
+				<-s.sem
+			}()
+		case <-ctx.Done():
+			return
+		}
+
+		for {
+			if err := bgCtx.Err(); err != nil {
+				slog.WarnContext(bgCtx, "conversation wipeout aborted: context expired",
+					"conv_id", convID,
+					"error", err,
+				)
+				return
+			}
+
+			rowsDeleted, err := s.r.DeleteMessagesAsBatch(bgCtx, convID, s.batchSize)
+			if err != nil {
+				slog.ErrorContext(bgCtx, "failed to delete message batch during wipeout",
+					"conv_id", convID,
+					"batch_size", s.batchSize,
+					"error", err,
+				)
+				return // critical: return immediatly
+			}
+
+			if rowsDeleted < s.batchSize {
+				break
+			}
+
+			select {
+			case <-bgCtx.Done():
+				return
+			case <-time.After(s.sleepDelay):
+			}
+		}
+
+		if err := s.r.DeleteConvByID(ctx, convID); err != nil {
+			slog.ErrorContext(bgCtx, "failed to delete conversation row after messages purged",
+				"conv_id", convID,
+				"error", err,
+			)
+			return
+		}
+
+		slog.InfoContext(bgCtx, "conversation wipeout completed successfully",
+			"conv_id", convID,
+		)
+
+	}()
+
+	return nil
 }

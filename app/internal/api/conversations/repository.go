@@ -37,6 +37,14 @@ type ConvRepositoryInt interface {
 		convID, senderID int64,
 		content string,
 	) (*CreateMessageResponseType, error)
+
+	IsUserInConversation(ctx context.Context, convID, userID int64) bool
+
+	MarkConvForDeleting(ctx context.Context, convID int64) error
+
+	DeleteMessagesAsBatch(ctx context.Context, convID, batchSize int64) (int64, error)
+
+	DeleteConvByID(ctx context.Context, id int64) error
 }
 
 type ConvQuerier interface {
@@ -64,6 +72,17 @@ type ConvQuerier interface {
 		ctx context.Context,
 		arg database.CreateMessageAndGetRecipientParams,
 	) (database.CreateMessageAndGetRecipientRow, error)
+
+	IsUserInConversation(ctx context.Context, arg database.IsUserInConversationParams) (bool, error)
+
+	MarkConversationDeleting(ctx context.Context, id int64) error
+
+	DeleteMessagesAsBatch(
+		ctx context.Context,
+		arg database.DeleteMessagesAsBatchParams,
+	) (int64, error)
+
+	DeleteConversationById(ctx context.Context, id int64) error
 }
 
 type ConvRepository struct {
@@ -227,4 +246,55 @@ func (r *ConvRepository) CreateMessage(
 		UpdatedAt:   chat.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
 
+}
+
+func (r *ConvRepository) IsUserInConversation(
+	ctx context.Context,
+	convID, userID int64,
+) bool {
+	params := database.IsUserInConversationParams{
+		ConvID: convID,
+		UserID: userID,
+	}
+
+	found, err := r.q.IsUserInConversation(ctx, params)
+	if err != nil {
+		return false
+	}
+
+	return found
+}
+
+func (r *ConvRepository) MarkConvForDeleting(ctx context.Context, convID int64) error {
+
+	if err := r.q.MarkConversationDeleting(ctx, convID); err != nil {
+		return fmt.Errorf("error marking conversation for delete")
+	}
+
+	return nil
+}
+
+func (r *ConvRepository) DeleteMessagesAsBatch(
+	ctx context.Context,
+	convID, batchSize int64,
+) (int64, error) {
+	params := database.DeleteMessagesAsBatchParams{
+		ConvID:    convID,
+		BatchSize: batchSize,
+	}
+
+	rowsDeleted, err := r.q.DeleteMessagesAsBatch(ctx, params)
+	if err != nil {
+		return 0, err
+	}
+
+	return rowsDeleted, nil
+}
+
+func (r *ConvRepository) DeleteConvByID(ctx context.Context, id int64) error {
+	if err := r.q.DeleteConversationById(ctx, id); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -13,15 +13,15 @@ import (
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO
-  users (name, username, password)
+users (name, username, password)
 VALUES
-  ($1, $2, $3)
+($1, $2, $3)
 RETURNING
-  id,
-  name,
-  username,
-  created_at,
-  updated_at
+    id,
+    name,
+    username,
+    created_at,
+    updated_at
 `
 
 type CreateUserParams struct {
@@ -54,11 +54,11 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 const deleteUser = `-- name: DeleteUser :one
 DELETE FROM users
 WHERE
-  id = $1
+    id = $1
 RETURNING
-  id,
-  name,
-  username
+    id,
+    name,
+    username
 `
 
 type DeleteUserRow struct {
@@ -75,12 +75,16 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) (DeleteUserRow, erro
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT 
-  id, name, username, created_at, updated_at 
-FROM 
-  users 
-WHERE 
-  id = $1
+SELECT
+    id,
+    name,
+    username,
+    created_at,
+    updated_at
+FROM
+    users
+WHERE
+    id = $1
 `
 
 type GetUserByIdRow struct {
@@ -106,11 +110,14 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) (GetUserByIdRow, er
 
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT
-  id, name, username, password
+    id,
+    name,
+    username,
+    password
 FROM
-  users
+    users
 WHERE
-  username = $1
+    username = $1
 `
 
 type GetUserByUsernameRow struct {
