@@ -1,8 +1,6 @@
 package sidebar
 
 import (
-	"strings"
-
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
 	"github.com/charmbracelet/lipgloss"
@@ -59,6 +57,18 @@ func (m *Model) ensureVisible() {
 		availableListHeight = 4
 	}
 
+	// Effective max lines available for items taking scroll indicators into account
+	maxItemsHeight := availableListHeight
+	if m.scrollOffset > 0 {
+		maxItemsHeight--
+	}
+	if m.selectedIndex < len(chats)-1 {
+		maxItemsHeight--
+	}
+	if maxItemsHeight < 2 {
+		maxItemsHeight = 2
+	}
+
 	// Calculate lines needed from scrollOffset up to selectedIndex (accounting for expanded selected item)
 	lines := 0
 	for i := m.scrollOffset; i <= m.selectedIndex; i++ {
@@ -69,7 +79,7 @@ func (m *Model) ensureVisible() {
 		lines += h
 	}
 
-	for lines > availableListHeight && m.scrollOffset < m.selectedIndex {
+	for lines > maxItemsHeight && m.scrollOffset < m.selectedIndex {
 		h := 2
 		if m.scrollOffset == m.selectedIndex {
 			h = 3
@@ -171,7 +181,12 @@ func (m *Model) View() string {
 		itemBox := renderChatItem(ch, isSelected, contentWidth)
 		actualLines := lipgloss.Height(itemBox)
 
-		if usedLines+actualLines > availableListHeight && len(chatItems) > 0 {
+		linesNeeded := actualLines
+		if i < len(chats)-1 {
+			linesNeeded++ // reserve 1 line for bottom scroll indicator
+		}
+
+		if usedLines+linesNeeded > availableListHeight && len(chatItems) > 0 {
 			break
 		}
 
@@ -206,10 +221,6 @@ func (m *Model) View() string {
 	if fillerLinesCount < 0 {
 		fillerLinesCount = 0
 	}
-	var filler string
-	if fillerLinesCount > 0 {
-		filler = strings.Repeat("\n", fillerLinesCount)
-	}
 
 	// Assemble sidebar container
 	bodyItems := []string{
@@ -217,16 +228,25 @@ func (m *Model) View() string {
 		"",
 		chatsList,
 	}
-	if filler != "" {
-		bodyItems = append(bodyItems, filler)
+	for k := 0; k < fillerLinesCount; k++ {
+		bodyItems = append(bodyItems, "")
 	}
 	bodyItems = append(bodyItems, footerBlock)
+
+	boxWidth := m.width - 2
+	if boxWidth < 10 {
+		boxWidth = 10
+	}
+	boxHeight := m.height - 2
+	if boxHeight < 6 {
+		boxHeight = 6
+	}
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorderDim).
-		Width(m.width).
-		Height(m.height).
+		Width(boxWidth).
+		Height(boxHeight).
 		Padding(0, 1).
 		Render(lipgloss.JoinVertical(lipgloss.Left, bodyItems...))
 }

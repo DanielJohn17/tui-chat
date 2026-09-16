@@ -51,8 +51,8 @@ func (m *Model) SetSize(w, h int) {
 	if vpWidth < 20 {
 		vpWidth = 20
 	}
-	// Reserve 3 lines for header, 4 lines for input box, 2 lines for borders
-	vpHeight := h - 9
+	// Reserve 2 lines for header, 3 lines for input box, 1 blank line before input, 2 lines for outer borders
+	vpHeight := h - 8
 	if vpHeight < 4 {
 		vpHeight = 4
 	}
@@ -235,19 +235,32 @@ func (m Model) View(activeChat *client.Chat) string {
 	if m.isFocused {
 		inputBorder = theme.ColorCyan
 	}
+	inputBoxWidth := contentWidth - 2
+	if inputBoxWidth < 10 {
+		inputBoxWidth = 10
+	}
 	inputRendered := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(inputBorder).
-		Width(contentWidth).
+		Width(inputBoxWidth).
 		Padding(0, 1).
 		Render(m.input.View())
 
 	// Assemble Pane
+	boxWidth := m.width - 2
+	if boxWidth < 10 {
+		boxWidth = 10
+	}
+	boxHeight := m.height - 2
+	if boxHeight < 6 {
+		boxHeight = 6
+	}
+
 	pane := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorderDim).
-		Width(m.width).
-		Height(m.height).
+		Width(boxWidth).
+		Height(boxHeight).
 		Padding(0, 1).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			header,

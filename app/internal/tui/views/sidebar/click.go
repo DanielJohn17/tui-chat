@@ -20,17 +20,17 @@ func (m *Model) HandleClick(relX, relY int) (*client.Chat, bool, bool) {
 		return nil, false, false
 	}
 
+	// If clickableItems not yet initialized, render once to populate positions
+	if len(m.clickableItems) == 0 {
+		_ = m.View()
+	}
+
 	// Line 0: top border; Line 1: Header [+n]
 	if relY <= 1 {
 		if relX >= m.width-10 {
 			return nil, true, false
 		}
 		return nil, false, false
-	}
-
-	// Bottom 4 lines: divider + profile info + profile hint + bottom border
-	if relY >= m.height-4 {
-		return nil, false, true
 	}
 
 	// Top scroll indicator clicked
@@ -45,9 +45,9 @@ func (m *Model) HandleClick(relX, relY int) (*client.Chat, bool, bool) {
 		return m.SelectedChat(), false, false
 	}
 
-	// If clickableItems not yet initialized, render once to populate
-	if len(m.clickableItems) == 0 {
-		_ = m.View()
+	// Bottom 4 lines: divider + profile info + profile hint + bottom border
+	if relY >= m.height-4 && relY < m.height {
+		return nil, false, true
 	}
 
 	// Match against accurately recorded clickable items from render

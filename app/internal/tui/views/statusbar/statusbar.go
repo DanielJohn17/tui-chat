@@ -20,17 +20,37 @@ func Render(activeChat *client.Chat, isInputFocused bool, width int) string {
 			theme.StyleDim.Render("Esc to unfocus"),
 		)
 	} else if activeChat != nil {
+		badgeText := "NAV MODE"
+		nameLimit := 16
+		if width < 85 {
+			badgeText = "NAV"
+			nameLimit = 10
+		}
 		leftText = lipgloss.JoinHorizontal(lipgloss.Center,
-			theme.StyleKeyBadge.Render("NAV MODE"),
+			theme.StyleKeyBadge.Render(badgeText),
 			" ",
-			theme.StyleSubtitle.Render(activeChat.Name),
+			theme.StyleSubtitle.Render(theme.Truncate(activeChat.Name, nameLimit)),
 		)
 	} else {
 		leftText = theme.StyleKeyBadge.Render("NAV MODE")
 	}
 
-	shortcuts := theme.StyleDim.Render("j/k: select • i: write • n: new DM • p: profile • ?: help • q: quit")
-	onlineStatus := theme.StyleSuccess.Render("● CONNECTED")
+	var shortcutsText string
+	if width < 85 {
+		shortcutsText = "j/k • i: write • n: DM • ?: help • q: quit"
+	} else if width < 105 {
+		shortcutsText = "j/k: nav • i: write • n: DM • p: profile • ?: help • q: quit"
+	} else {
+		shortcutsText = "j/k: select • i: write • n: new DM • p: profile • ?: help • q: quit"
+	}
+	shortcuts := theme.StyleDim.Render(shortcutsText)
+
+	var onlineStatus string
+	if width < 85 {
+		onlineStatus = theme.StyleSuccess.Render("●")
+	} else {
+		onlineStatus = theme.StyleSuccess.Render("● CONNECTED")
+	}
 
 	spaces1 := (contentWidth - lipgloss.Width(leftText) - lipgloss.Width(shortcuts) - lipgloss.Width(onlineStatus)) / 2
 	if spaces1 < 1 {
@@ -49,10 +69,15 @@ func Render(activeChat *client.Chat, isInputFocused bool, width int) string {
 		onlineStatus,
 	)
 
+	boxWidth := width - 2
+	if boxWidth < 20 {
+		boxWidth = 20
+	}
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorderDim).
-		Width(width).
+		Width(boxWidth).
 		Padding(0, 1).
 		Render(bar)
 }

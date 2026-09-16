@@ -17,18 +17,22 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 	}
 
 	if isSelected {
+		itemWidth := contentWidth - 1
+		if itemWidth < 10 {
+			itemWidth = 10
+		}
 		marker := theme.StyleTitle.Render("▶ ")
-		nameText := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render(theme.Truncate(ch.Name, contentWidth-8))
+		nameText := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render(theme.Truncate(ch.Name, itemWidth-8))
 		row1 := lipgloss.JoinHorizontal(lipgloss.Center, marker, nameText)
-		rSpaces := contentWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
+		rSpaces := itemWidth - lipgloss.Width(row1) - lipgloss.Width(onlineDot)
 		if rSpaces < 1 {
 			rSpaces = 1
 		}
 		row1 = lipgloss.JoinHorizontal(lipgloss.Center, row1, lipgloss.NewStyle().Width(rSpaces).Render(""), onlineDot)
 
-		userHandle := lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@" + theme.Truncate(ch.Username, contentWidth/2))
+		userHandle := lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@" + theme.Truncate(ch.Username, itemWidth/2))
 		timeText := theme.StyleDim.Render(ch.Time)
-		uSpaces := contentWidth - lipgloss.Width(userHandle) - lipgloss.Width(timeText)
+		uSpaces := itemWidth - lipgloss.Width(userHandle) - lipgloss.Width(timeText)
 		if uSpaces < 1 {
 			uSpaces = 1
 		}
@@ -37,14 +41,13 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 		var rows []string
 		rows = append(rows, row1, row2)
 		if ch.LastMessage != "" {
-			row3 := theme.StyleDim.Render(theme.Truncate(ch.LastMessage, contentWidth-2))
+			row3 := theme.StyleDim.Render(theme.Truncate(ch.LastMessage, itemWidth-2))
 			rows = append(rows, row3)
 		}
 
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(theme.ColorCyan).
-			Padding(0, 1).
 			Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 	}
 
@@ -71,7 +74,5 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 	}
 	row2 := lipgloss.JoinHorizontal(lipgloss.Center, userHandle, lipgloss.NewStyle().Width(uSpaces).Render(""), trailing)
 
-	return lipgloss.NewStyle().
-		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Left, row1, row2))
+	return lipgloss.JoinVertical(lipgloss.Left, row1, row2)
 }
