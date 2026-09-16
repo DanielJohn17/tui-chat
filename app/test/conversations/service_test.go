@@ -3,9 +3,6 @@ package conversations_test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,113 +10,100 @@ import (
 	apierrors "github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-// mockConvRepo implements conversations.ConvRepositoryInt for unit testing.
-type mockConvRepo struct {
-	mu sync.Mutex
-
-	isUserInConversationFn  func(ctx context.Context, convID, userID int64) bool
-	markConvForDeletingFn   func(ctx context.Context, convID int64) error
-	deleteMessagesAsBatchFn func(ctx context.Context, convID, batchSize int64) (int64, error)
-	deleteConvByIDFn        func(ctx context.Context, id int64) error
-	getOrCreateDirectConvFn func(ctx context.Context, input conversations.GetOrCreateDirectConvType) ([]conversations.GetConvParticipantType, error)
-	getConvsByUserIDFn      func(ctx context.Context, input int64) []conversations.GetConvParticipantType
-	getConvChatsFn          func(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType
-	getConvChatsPaginatedFn func(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType
-	createMessageFn         func(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error)
-
-	batchCalls  int64
-	deleteCalls int64
+// MockConvRepo mocks conversations.ConvRepositoryInt using testify/mock.
+type MockConvRepo struct {
+	mock.Mock
 }
 
-func (m *mockConvRepo) IsUserInConversation(ctx context.Context, convID, userID int64) bool {
-	if m.isUserInConversationFn != nil {
-		return m.isUserInConversationFn(ctx, convID, userID)
+func (m *MockConvRepo) IsUserInConversation(ctx context.Context, convID, userID int64) bool {
+	return m.Called(ctx, convID, userID).Bool(0)
+}
+
+func (m *MockConvRepo) MarkConvForDeleting(ctx context.Context, convID int64) error {
+	return m.Called(ctx, convID).Error(0)
+}
+
+func (m *MockConvRepo) DeleteMessagesAsBatch(ctx context.Context, convID, batchSize int64) (int64, error) {
+	args := m.Called(ctx, convID, batchSize)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockConvRepo) DeleteConvByID(ctx context.Context, id int64) error {
+	return m.Called(ctx, id).Error(0)
+}
+
+func (m *MockConvRepo) GetOrCreateDirectConversation(ctx context.Context, input conversations.GetOrCreateDirectConvType) ([]conversations.GetConvParticipantType, error) {
+	args := m.Called(ctx, input)
+	if res := args.Get(0); res != nil {
+		return res.([]conversations.GetConvParticipantType), args.Error(1)
 	}
-	return true
+	return nil, args.Error(1)
 }
 
-func (m *mockConvRepo) MarkConvForDeleting(ctx context.Context, convID int64) error {
-	if m.markConvForDeletingFn != nil {
-		return m.markConvForDeletingFn(ctx, convID)
-	}
-	return nil
-}
-
-func (m *mockConvRepo) DeleteMessagesAsBatch(ctx context.Context, convID, batchSize int64) (int64, error) {
-	atomic.AddInt64(&m.batchCalls, 1)
-	if m.deleteMessagesAsBatchFn != nil {
-		return m.deleteMessagesAsBatchFn(ctx, convID, batchSize)
-	}
-	return 0, nil
-}
-
-func (m *mockConvRepo) DeleteConvByID(ctx context.Context, id int64) error {
-	atomic.AddInt64(&m.deleteCalls, 1)
-	if m.deleteConvByIDFn != nil {
-		return m.deleteConvByIDFn(ctx, id)
+func (m *MockConvRepo) GetConvsByUserID(ctx context.Context, input int64) []conversations.GetConvParticipantType {
+	args := m.Called(ctx, input)
+	if res := args.Get(0); res != nil {
+		return res.([]conversations.GetConvParticipantType)
 	}
 	return nil
 }
 
-func (m *mockConvRepo) GetOrCreateDirectConversation(ctx context.Context, input conversations.GetOrCreateDirectConvType) ([]conversations.GetConvParticipantType, error) {
-	if m.getOrCreateDirectConvFn != nil {
-		return m.getOrCreateDirectConvFn(ctx, input)
-	}
-	return nil, nil
-}
-
-func (m *mockConvRepo) GetConvsByUserID(ctx context.Context, input int64) []conversations.GetConvParticipantType {
-	if m.getConvsByUserIDFn != nil {
-		return m.getConvsByUserIDFn(ctx, input)
+func (m *MockConvRepo) GetConvChats(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
+	args := m.Called(ctx, convID, input)
+	if res := args.Get(0); res != nil {
+		return res.([]conversations.GetConvChatResponseType)
 	}
 	return nil
 }
 
-func (m *mockConvRepo) GetConvChats(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
-	if m.getConvChatsFn != nil {
-		return m.getConvChatsFn(ctx, convID, input)
+func (m *MockConvRepo) GetConvChatsPaginated(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
+	args := m.Called(ctx, convID, input)
+	if res := args.Get(0); res != nil {
+		return res.([]conversations.GetConvChatResponseType)
 	}
 	return nil
 }
 
-func (m *mockConvRepo) GetConvChatsPaginated(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
-	if m.getConvChatsPaginatedFn != nil {
-		return m.getConvChatsPaginatedFn(ctx, convID, input)
+func (m *MockConvRepo) CreateMessage(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error) {
+	args := m.Called(ctx, convID, senderID, content)
+	if res := args.Get(0); res != nil {
+		return res.(*conversations.CreateMessageResponseType), args.Error(1)
 	}
-	return nil
+	return nil, args.Error(1)
 }
 
-func (m *mockConvRepo) CreateMessage(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error) {
-	if m.createMessageFn != nil {
-		return m.createMessageFn(ctx, convID, senderID, content)
+// MockUserService mocks users.UserServiceInt using testify/mock.
+type MockUserService struct {
+	mock.Mock
+}
+
+func (m *MockUserService) CreateUser(ctx context.Context, input users.CreateUserType) (*users.CreateUserResponseType, error) {
+	return nil, m.Called(ctx, input).Error(1)
+}
+
+func (m *MockUserService) GetUserByUsername(ctx context.Context, input string) (*users.GetUserResponseType, error) {
+	args := m.Called(ctx, input)
+	if res := args.Get(0); res != nil {
+		return res.(*users.GetUserResponseType), args.Error(1)
 	}
-	return nil, nil
+	return nil, args.Error(1)
 }
 
-// mockUserService implements users.UserServiceInt for testing.
-type mockUserService struct {
-	getUserByIDFn func(ctx context.Context, id int64) (*users.GetUserResponseType, error)
-}
-
-func (m *mockUserService) CreateUser(ctx context.Context, input users.CreateUserType) (*users.CreateUserResponseType, error) {
-	return nil, nil
-}
-
-func (m *mockUserService) GetUserByUsername(ctx context.Context, input string) (*users.GetUserResponseType, error) {
-	return nil, nil
-}
-
-func (m *mockUserService) GetUserByID(ctx context.Context, input int64) (*users.GetUserResponseType, error) {
-	if m.getUserByIDFn != nil {
-		return m.getUserByIDFn(ctx, input)
+func (m *MockUserService) GetUserByID(ctx context.Context, input int64) (*users.GetUserResponseType, error) {
+	args := m.Called(ctx, input)
+	if res := args.Get(0); res != nil {
+		return res.(*users.GetUserResponseType), args.Error(1)
 	}
-	return &users.GetUserResponseType{ID: input, Name: "Test User", Username: "testuser"}, nil
+	return nil, args.Error(1)
 }
 
-func (m *mockUserService) DeleteUser(ctx context.Context, input int64) (*users.DeleteUserResponseType, error) {
-	return nil, nil
+func (m *MockUserService) DeleteUser(ctx context.Context, input int64) (*users.DeleteUserResponseType, error) {
+	return nil, m.Called(ctx, input).Error(1)
 }
 
 // -----------------------------------------------------------------------------
@@ -127,153 +111,70 @@ func (m *mockUserService) DeleteUser(ctx context.Context, input int64) (*users.D
 // -----------------------------------------------------------------------------
 
 func TestWipeConversation_UserNotParticipant(t *testing.T) {
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return false
-		},
-	}
-	uService := &mockUserService{}
-	s := conversations.NewConvService(repo, uService)
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, int64(10), int64(99)).Return(false)
 
+	s := conversations.NewConvService(repo, new(MockUserService))
 	err := s.WipeConversation(context.Background(), 10, 99)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
 
 	var apiErr *apierrors.APIError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *apierrors.APIError, got %T", err)
-	}
-
-	if apiErr.Code != 403 {
-		t.Fatalf("expected HTTP 403 Forbidden, got %d", apiErr.Code)
-	}
-
-	if atomic.LoadInt64(&repo.batchCalls) != 0 {
-		t.Errorf("expected 0 batch calls, got %d", repo.batchCalls)
-	}
-	if atomic.LoadInt64(&repo.deleteCalls) != 0 {
-		t.Errorf("expected 0 delete calls, got %d", repo.deleteCalls)
-	}
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 403, apiErr.Code)
+	repo.AssertNotCalled(t, "DeleteMessagesAsBatch", mock.Anything, mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "DeleteConvByID", mock.Anything, mock.Anything)
 }
 
 func TestWipeConversation_MarkDeletingFailure(t *testing.T) {
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return true
-		},
-		markConvForDeletingFn: func(ctx context.Context, convID int64) error {
-			return errors.New("db error marking conversation")
-		},
-	}
-	uService := &mockUserService{}
-	s := conversations.NewConvService(repo, uService)
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, int64(10), int64(99)).Return(true)
+	repo.On("MarkConvForDeleting", mock.Anything, int64(10)).Return(errors.New("db error"))
 
+	s := conversations.NewConvService(repo, new(MockUserService))
 	err := s.WipeConversation(context.Background(), 10, 99)
-	if err == nil {
-		t.Fatal("expected error from MarkConvForDeleting, got nil")
-	}
 
 	var apiErr *apierrors.APIError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *apierrors.APIError, got %T", err)
-	}
-	if apiErr.Code != 500 {
-		t.Fatalf("expected HTTP 500 InternalServerError, got %d", apiErr.Code)
-	}
-
-	if atomic.LoadInt64(&repo.batchCalls) != 0 {
-		t.Errorf("expected 0 batch calls, got %d", repo.batchCalls)
-	}
-	if atomic.LoadInt64(&repo.deleteCalls) != 0 {
-		t.Errorf("expected 0 delete calls, got %d", repo.deleteCalls)
-	}
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 500, apiErr.Code)
+	repo.AssertNotCalled(t, "DeleteMessagesAsBatch", mock.Anything, mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "DeleteConvByID", mock.Anything, mock.Anything)
 }
 
 func TestWipeConversation_AsyncBatchChunkingSuccess(t *testing.T) {
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, int64(42), int64(1)).Return(true)
+	repo.On("MarkConvForDeleting", mock.Anything, int64(42)).Return(nil)
+
 	deletedDone := make(chan struct{})
-	var batchStep int64
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(500), nil).Once()
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(500), nil).Once()
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(120), nil).Once()
+	repo.On("DeleteConvByID", mock.Anything, int64(42)).Return(nil).Run(func(args mock.Arguments) {
+		close(deletedDone)
+	}).Once()
 
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return true
-		},
-		markConvForDeletingFn: func(ctx context.Context, convID int64) error {
-			return nil
-		},
-		deleteMessagesAsBatchFn: func(ctx context.Context, convID, batchSize int64) (int64, error) {
-			step := atomic.AddInt64(&batchStep, 1)
-			if step == 1 {
-				return 500, nil // Full batch 1
-			}
-			if step == 2 {
-				return 500, nil // Full batch 2
-			}
-			if step == 3 {
-				return 120, nil // Last partial batch (< 500)
-			}
-			return 0, nil
-		},
-		deleteConvByIDFn: func(ctx context.Context, id int64) error {
-			if id != 42 {
-				t.Errorf("expected convID 42, got %d", id)
-			}
-			close(deletedDone)
-			return nil
-		},
-	}
+	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 5, 500, 1*time.Millisecond)
+	require.NoError(t, s.WipeConversation(context.Background(), 42, 1))
 
-	uService := &mockUserService{}
-	s := conversations.NewConvServiceWithOptions(repo, uService, 5, 500, 1*time.Millisecond)
-
-	// Call WipeConversation (should return nil immediately)
-	err := s.WipeConversation(context.Background(), 42, 1)
-	if err != nil {
-		t.Fatalf("WipeConversation failed: %v", err)
-	}
-
-	// Wait for background goroutine to finish deleting
 	select {
 	case <-deletedDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for conversation deletion to finish")
+		t.Fatal("timed out waiting for conversation deletion")
 	}
 
-	if calls := atomic.LoadInt64(&repo.batchCalls); calls != 3 {
-		t.Errorf("expected 3 batch delete calls, got %d", calls)
-	}
-	if calls := atomic.LoadInt64(&repo.deleteCalls); calls != 1 {
-		t.Errorf("expected 1 delete conversation call, got %d", calls)
-	}
+	repo.AssertExpectations(t)
 }
 
 func TestWipeConversation_BatchDeleteErrorAbortsBeforeDeleteConv(t *testing.T) {
 	batchAttempted := make(chan struct{})
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, int64(55), int64(1)).Return(true)
+	repo.On("MarkConvForDeleting", mock.Anything, int64(55)).Return(nil)
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(55), int64(500)).Return(int64(0), errors.New("db timeout")).Run(func(args mock.Arguments) {
+		close(batchAttempted)
+	})
 
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return true
-		},
-		markConvForDeletingFn: func(ctx context.Context, convID int64) error {
-			return nil
-		},
-		deleteMessagesAsBatchFn: func(ctx context.Context, convID, batchSize int64) (int64, error) {
-			close(batchAttempted)
-			return 0, errors.New("simulated database timeout")
-		},
-		deleteConvByIDFn: func(ctx context.Context, id int64) error {
-			t.Fatal("DeleteConvByID must NEVER be called when batch deletion fails!")
-			return nil
-		},
-	}
-
-	uService := &mockUserService{}
-	s := conversations.NewConvService(repo, uService)
-
-	err := s.WipeConversation(context.Background(), 55, 1)
-	if err != nil {
-		t.Fatalf("WipeConversation failed: %v", err)
-	}
+	s := conversations.NewConvService(repo, new(MockUserService))
+	require.NoError(t, s.WipeConversation(context.Background(), 55, 1))
 
 	select {
 	case <-batchAttempted:
@@ -281,109 +182,68 @@ func TestWipeConversation_BatchDeleteErrorAbortsBeforeDeleteConv(t *testing.T) {
 		t.Fatal("timed out waiting for batch attempt")
 	}
 
-	// Allow goroutine time to exit cleanly
 	time.Sleep(50 * time.Millisecond)
-
-	if calls := atomic.LoadInt64(&repo.deleteCalls); calls != 0 {
-		t.Errorf("expected 0 deleteCalls on batch error, got %d", calls)
-	}
+	repo.AssertNotCalled(t, "DeleteConvByID", mock.Anything, mock.Anything)
 }
 
 func TestWipeConversation_PanicRecovery(t *testing.T) {
 	panicAttempted := make(chan struct{})
 	secondWipeDone := make(chan struct{})
 
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return true
-		},
-		markConvForDeletingFn: func(ctx context.Context, convID int64) error {
-			return nil
-		},
-		deleteMessagesAsBatchFn: func(ctx context.Context, convID, batchSize int64) (int64, error) {
-			if convID == 77 {
-				close(panicAttempted)
-				panic("simulated critical runtime panic in worker")
-			}
-			return 0, nil
-		},
-		deleteConvByIDFn: func(ctx context.Context, id int64) error {
-			if id == 78 {
-				close(secondWipeDone)
-			}
-			return nil
-		},
-	}
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, mock.Anything, mock.Anything).Return(true)
+	repo.On("MarkConvForDeleting", mock.Anything, mock.Anything).Return(nil)
 
-	uService := &mockUserService{}
-	// Use 1 worker slot to strictly test semaphore release on panic
-	s := conversations.NewConvServiceWithOptions(repo, uService, 1, 500, 1*time.Millisecond)
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(77), int64(500)).Run(func(args mock.Arguments) {
+		close(panicAttempted)
+		panic("simulated worker panic")
+	})
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(78), int64(500)).Return(int64(0), nil)
+	repo.On("DeleteConvByID", mock.Anything, int64(78)).Return(nil).Run(func(args mock.Arguments) {
+		close(secondWipeDone)
+	})
 
-	err := s.WipeConversation(context.Background(), 77, 1)
-	if err != nil {
-		t.Fatalf("WipeConversation returned error on initiation: %v", err)
-	}
+	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 1, 500, 1*time.Millisecond)
+	require.NoError(t, s.WipeConversation(context.Background(), 77, 1))
 
 	select {
 	case <-panicAttempted:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for panic to occur")
+		t.Fatal("timed out waiting for panic")
 	}
 
-	// Wait for recover() to run
 	time.Sleep(50 * time.Millisecond)
 
-	// Since workerSlots = 1, if the slot leaked, the next wipe cannot execute
-	err = s.WipeConversation(context.Background(), 78, 1)
-	if err != nil {
-		t.Fatalf("second WipeConversation failed: %v", err)
-	}
+	// Since workerSlots = 1, if slot leaked, second wipe would block
+	require.NoError(t, s.WipeConversation(context.Background(), 78, 1))
 
 	select {
 	case <-secondWipeDone:
-		// Successfully executed next wipe, proving semaphore token was released on panic
 	case <-time.After(2 * time.Second):
-		t.Fatal("semaphore slot was leaked after panic; second wipe blocked")
+		t.Fatal("semaphore slot was leaked after panic")
 	}
 }
 
 func TestWipeConversation_ParentContextCancellationDoesNotAbortWorker(t *testing.T) {
 	deletedDone := make(chan struct{})
+	repo := new(MockConvRepo)
+	repo.On("IsUserInConversation", mock.Anything, int64(88), int64(1)).Return(true)
+	repo.On("MarkConvForDeleting", mock.Anything, int64(88)).Return(nil)
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(88), int64(500)).Return(int64(0), nil)
+	repo.On("DeleteConvByID", mock.Anything, int64(88)).Return(nil).Run(func(args mock.Arguments) {
+		close(deletedDone)
+	})
 
-	repo := &mockConvRepo{
-		isUserInConversationFn: func(ctx context.Context, convID, userID int64) bool {
-			return true
-		},
-		markConvForDeletingFn: func(ctx context.Context, convID int64) error {
-			return nil
-		},
-		deleteMessagesAsBatchFn: func(ctx context.Context, convID, batchSize int64) (int64, error) {
-			return 0, nil // 0 messages deleted = finished
-		},
-		deleteConvByIDFn: func(ctx context.Context, id int64) error {
-			close(deletedDone)
-			return nil
-		},
-	}
-
-	uService := &mockUserService{}
-	s := conversations.NewConvServiceWithOptions(repo, uService, 5, 500, 1*time.Millisecond)
+	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 5, 500, 1*time.Millisecond)
 
 	parentCtx, parentCancel := context.WithCancel(context.Background())
-
-	err := s.WipeConversation(parentCtx, 88, 1)
-	if err != nil {
-		t.Fatalf("WipeConversation failed: %v", err)
-	}
-
-	// Simulate HTTP response ending and cancelling parent context immediately
+	require.NoError(t, s.WipeConversation(parentCtx, 88, 1))
 	parentCancel()
 
 	select {
 	case <-deletedDone:
-		// Worker successfully completed despite parent context cancellation
 	case <-time.After(2 * time.Second):
-		t.Fatal("worker was aborted when parent context cancelled; WithoutCancel failed")
+		t.Fatal("worker aborted when parent context was cancelled")
 	}
 }
 
@@ -392,124 +252,86 @@ func TestWipeConversation_ParentContextCancellationDoesNotAbortWorker(t *testing
 // -----------------------------------------------------------------------------
 
 func TestGetOrCreateDirectConversation_Success(t *testing.T) {
-	repo := &mockConvRepo{
-		getOrCreateDirectConvFn: func(ctx context.Context, input conversations.GetOrCreateDirectConvType) ([]conversations.GetConvParticipantType, error) {
-			return []conversations.GetConvParticipantType{
-				{ConvID: 1, UserID: 10, Name: "User 10", Username: "user10"},
-				{ConvID: 1, UserID: 20, Name: "User 20", Username: "user20"},
-			}, nil
-		},
+	expected := []conversations.GetConvParticipantType{
+		{ConvID: 1, UserID: 10, Name: "User 10", Username: "user10"},
+		{ConvID: 1, UserID: 20, Name: "User 20", Username: "user20"},
 	}
-	uService := &mockUserService{}
-	s := conversations.NewConvService(repo, uService)
+	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20}
 
-	participants, err := s.GetOrCreateDirectConversation(context.Background(), conversations.GetOrCreateDirectConvType{
-		UserIDOne: 10,
-		UserIDTwo: 20,
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(participants) != 2 {
-		t.Fatalf("expected 2 participants, got %d", len(participants))
-	}
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).Return(&users.GetUserResponseType{ID: 20}, nil)
+
+	repo := new(MockConvRepo)
+	repo.On("GetOrCreateDirectConversation", mock.Anything, input).Return(expected, nil)
+
+	s := conversations.NewConvService(repo, uService)
+	participants, err := s.GetOrCreateDirectConversation(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, participants)
 }
 
 func TestGetOrCreateDirectConversation_UserNotFound(t *testing.T) {
-	repo := &mockConvRepo{}
-	uService := &mockUserService{
-		getUserByIDFn: func(ctx context.Context, id int64) (*users.GetUserResponseType, error) {
-			if id == 999 {
-				return nil, fmt.Errorf("user not found")
-			}
-			return &users.GetUserResponseType{ID: id}, nil
-		},
-	}
-	s := conversations.NewConvService(repo, uService)
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(999)).Return(nil, errors.New("user not found"))
 
+	s := conversations.NewConvService(new(MockConvRepo), uService)
 	_, err := s.GetOrCreateDirectConversation(context.Background(), conversations.GetOrCreateDirectConvType{
 		UserIDOne: 10,
 		UserIDTwo: 999,
 	})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+
 	var apiErr *apierrors.APIError
-	if !errors.As(err, &apiErr) || apiErr.Code != 404 {
-		t.Fatalf("expected 404 NotFound error, got: %v", err)
-	}
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 404, apiErr.Code)
 }
 
 func TestGetConvsByUserID(t *testing.T) {
-	repo := &mockConvRepo{
-		getConvsByUserIDFn: func(ctx context.Context, input int64) []conversations.GetConvParticipantType {
-			return []conversations.GetConvParticipantType{
-				{ConvID: 1, UserID: 2, Name: "Alice", Username: "alice"},
-			}
-		},
+	expected := []conversations.GetConvParticipantType{
+		{ConvID: 1, UserID: 2, Name: "Alice", Username: "alice"},
 	}
-	uService := &mockUserService{}
-	s := conversations.NewConvService(repo, uService)
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(1)).Return(&users.GetUserResponseType{ID: 1}, nil)
 
+	repo := new(MockConvRepo)
+	repo.On("GetConvsByUserID", mock.Anything, int64(1)).Return(expected)
+
+	s := conversations.NewConvService(repo, uService)
 	convs, err := s.GetConvsByUserID(context.Background(), 1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(convs) != 1 || convs[0].ConvID != 1 {
-		t.Fatalf("expected 1 conv with ID 1, got %v", convs)
-	}
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, convs)
 }
 
 func TestGetConvChats_PaginationBranches(t *testing.T) {
-	unpaginatedCalled := false
-	paginatedCalled := false
+	repo := new(MockConvRepo)
+	unpaginatedResp := []conversations.GetConvChatResponseType{{ID: 1, Content: "First"}}
+	paginatedResp := []conversations.GetConvChatResponseType{{ID: 2, Content: "Paginated"}}
 
-	repo := &mockConvRepo{
-		getConvChatsFn: func(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
-			unpaginatedCalled = true
-			return []conversations.GetConvChatResponseType{{ID: 1, Content: "First"}}
-		},
-		getConvChatsPaginatedFn: func(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
-			paginatedCalled = true
-			return []conversations.GetConvChatResponseType{{ID: 2, Content: "Paginated"}}
-		},
-	}
-	s := conversations.NewConvService(repo, &mockUserService{})
+	emptyQuery := types.URLQueryParams{}
+	cursorQuery := types.URLQueryParams{CursorID: 1, CursorTime: time.Now()}
 
-	// 1. Unpaginated (no cursor)
-	res1 := s.GetConvChats(context.Background(), 1, types.URLQueryParams{})
-	if !unpaginatedCalled || len(res1) != 1 || res1[0].Content != "First" {
-		t.Fatalf("expected unpaginated path, got %v", res1)
-	}
+	repo.On("GetConvChats", mock.Anything, int64(1), emptyQuery).Return(unpaginatedResp)
+	repo.On("GetConvChatsPaginated", mock.Anything, int64(1), cursorQuery).Return(paginatedResp)
 
-	// 2. Paginated (has cursor ID and Time)
-	res2 := s.GetConvChats(context.Background(), 1, types.URLQueryParams{
-		CursorID:   1,
-		CursorTime: time.Now(),
-	})
-	if !paginatedCalled || len(res2) != 1 || res2[0].Content != "Paginated" {
-		t.Fatalf("expected paginated path, got %v", res2)
-	}
+	s := conversations.NewConvService(repo, new(MockUserService))
+
+	assert.Equal(t, unpaginatedResp, s.GetConvChats(context.Background(), 1, emptyQuery))
+	assert.Equal(t, paginatedResp, s.GetConvChats(context.Background(), 1, cursorQuery))
 }
 
 func TestCreateMessage(t *testing.T) {
-	repo := &mockConvRepo{
-		createMessageFn: func(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error) {
-			return &conversations.CreateMessageResponseType{
-				ID:       101,
-				ConvID:   convID,
-				SenderID: senderID,
-				Content:  content,
-			}, nil
-		},
+	expected := &conversations.CreateMessageResponseType{
+		ID: 101, ConvID: 1, SenderID: 2, Content: "hello world",
 	}
-	s := conversations.NewConvService(repo, &mockUserService{})
+	repo := new(MockConvRepo)
+	repo.On("CreateMessage", mock.Anything, int64(1), int64(2), "hello world").Return(expected, nil)
 
+	s := conversations.NewConvService(repo, new(MockUserService))
 	msg, err := s.CreateMessage(context.Background(), 1, 2, "hello world")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if msg.ID != 101 || msg.Content != "hello world" {
-		t.Fatalf("unexpected message: %+v", msg)
-	}
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, msg)
 }

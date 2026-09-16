@@ -2,9 +2,12 @@ package test
 
 import (
 	"testing"
+
 	"github.com/DanielJohn17/tui-chat/app/internal/tui"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAuthPassThrough(t *testing.T) {
@@ -14,17 +17,12 @@ func TestAuthPassThrough(t *testing.T) {
 
 	// 1. Test Enter passes straight to chat app without API call
 	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("expected command from Enter")
-	}
+	require.NotNil(t, cmd, "expected command from Enter")
 
 	// Execute cmd
 	msg := cmd()
 	newModel, _ = newModel.Update(msg)
-	view := newModel.View()
-	if !contains(view, "CONVERSATIONS") {
-		t.Fatalf("expected view to transition to chat app, got:\n%s", view)
-	}
+	assert.Contains(t, newModel.View(), "CONVERSATIONS")
 }
 
 func TestAuthHelpModal(t *testing.T) {
@@ -34,17 +32,11 @@ func TestAuthHelpModal(t *testing.T) {
 
 	// 2. Test F1 opens Help Desk modal
 	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyF1})
-	view := newModel.View()
-	if !contains(view, "HELP DESK") {
-		t.Fatalf("expected Help Desk modal, got:\n%s", view)
-	}
+	assert.Contains(t, newModel.View(), "HELP DESK")
 
 	// 3. Test Esc closes Help Desk modal and returns to auth card
 	newModel, _ = newModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	view = newModel.View()
-	if !contains(view, "LOGIN") {
-		t.Fatalf("expected return to Login card, got:\n%s", view)
-	}
+	assert.Contains(t, newModel.View(), "LOGIN")
 }
 
 func TestAuthEscQuits(t *testing.T) {
@@ -54,20 +46,5 @@ func TestAuthEscQuits(t *testing.T) {
 
 	// 4. Test Esc in auth quits the app
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if cmd == nil {
-		t.Fatal("expected quit cmd on Esc")
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
-}
-
-func stringContains(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
+	require.NotNil(t, cmd, "expected quit cmd on Esc")
 }
