@@ -13,6 +13,7 @@ type ConvHandlerInt interface {
 	GetOrCreateDirectConversation(c *gin.Context)
 	GetConvsByUserID(c *gin.Context)
 	GetConvChats(c *gin.Context)
+	WipeConversation(c *gin.Context)
 }
 
 type ConvHandler struct {
@@ -22,6 +23,8 @@ type ConvHandler struct {
 func NewConvHandler(s ConvServiceInt) *ConvHandler {
 	return &ConvHandler{s: s}
 }
+
+var _ ConvHandlerInt = (*ConvHandler)(nil)
 
 func (h *ConvHandler) GetOrCreateDirectConversation(c *gin.Context) {
 	var params GetOrCreateDirectConvType
@@ -96,4 +99,29 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	}
 
 	helpers.WriteJSONWithMeta(c, http.StatusOK, chats, meta)
+}
+
+func (h *ConvHandler) WipeConversation(c *gin.Context) {
+	userIDParam, exists := c.Get("userId")
+	if !exists {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+	userID := userIDParam.(int64)
+
+	ConvIDParam, exists := c.Get("params")
+	if !exists {
+		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
+		return
+	}
+	convID := int64(ConvIDParam.(types.URLParamInt).ID)
+
+	ctx := c.Request.Context()
+
+	if err := h.s.WipeConversation(ctx, convID, userID); err != nil {
+		helpers.WriteError(c, err)
+		return
+	}
+
+	helpers.WriteJSON(c, http.StatusAccepted, gin.H{"message": "Conversation deleted"})
 }

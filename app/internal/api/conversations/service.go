@@ -43,12 +43,29 @@ type ConvService struct {
 }
 
 func NewConvService(r ConvRepositoryInt, u users.UserServiceInt) *ConvService {
+	return NewConvServiceWithOptions(r, u, 5, 500, time.Millisecond*15)
+}
+
+// NewConvServiceWithOptions used for testing purpose to configure zero-sleep and custom batch sizes and worker limits.
+func NewConvServiceWithOptions(
+	r ConvRepositoryInt,
+	u users.UserServiceInt,
+	workerSlots int,
+	batchSize int64,
+	sleepDelay time.Duration,
+) *ConvService {
+	if workerSlots <= 0 {
+		workerSlots = 5
+	}
+	if batchSize <= 0 {
+		batchSize = 500
+	}
 	return &ConvService{
 		r:          r,
 		u:          u,
-		sem:        make(chan struct{}, 5),
-		batchSize:  500,
-		sleepDelay: time.Millisecond * 15,
+		sem:        make(chan struct{}, workerSlots),
+		batchSize:  batchSize,
+		sleepDelay: sleepDelay,
 	}
 }
 
@@ -157,7 +174,7 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 			defer func() {
 				<-s.sem
 			}()
-		case <-ctx.Done():
+		case <-bgCtx.Done():
 			return
 		}
 
@@ -191,7 +208,7 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 			}
 		}
 
-		if err := s.r.DeleteConvByID(ctx, convID); err != nil {
+		if err := s.r.DeleteConvByID(bgCtx, convID); err != nil {
 			slog.ErrorContext(bgCtx, "failed to delete conversation row after messages purged",
 				"conv_id", convID,
 				"error", err,

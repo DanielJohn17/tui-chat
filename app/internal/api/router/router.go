@@ -47,7 +47,11 @@ func NewRouter(h Handlers) *gin.Engine {
 			h.Conv.GetConvChats,
 		)
 		subRouter.POST("/conversations", h.Conv.GetOrCreateDirectConversation)
-		// subRouter.DELETE("/conversations/:id", handlers ...gin.HandlerFunc)
+		subRouter.DELETE(
+			"/conversations/:id",
+			middleware.ValidateURIParams[types.URLParamInt](),
+			h.Conv.WipeConversation,
+		)
 
 		// websocket routes
 		subRouter.GET(
