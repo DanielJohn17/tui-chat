@@ -1,10 +1,18 @@
 package ws
 
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+)
+
 type DirectMessage struct {
-	SenderID    int64
-	RecipientID int64
-	ConvID      int64
-	Payload     []byte
+	SenderID       int64
+	SenderUsername string
+	RecipientID    int64
+	ConvID         int64
+	Message        WSMessage
+	UnreadCount    int
 }
 
 type Hub struct {
@@ -14,7 +22,8 @@ type Hub struct {
 	// set active clients in conversation
 	convs map[int64]map[*Client]bool
 
-	SendDirect chan *DirectMessage
+	SendDirect    chan *DirectMessage
+	BroadcastRead chan *ConversationReadPayload
 
 	Register   chan *Client
 	UnRegister chan *Client
@@ -22,11 +31,12 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		users:      make(map[int64]map[*Client]bool),
-		convs:      make(map[int64]map[*Client]bool),
-		SendDirect: make(chan *DirectMessage, 256),
-		Register:   make(chan *Client, 32),
-		UnRegister: make(chan *Client, 32),
+		users:         make(map[int64]map[*Client]bool),
+		convs:         make(map[int64]map[*Client]bool),
+		SendDirect:    make(chan *DirectMessage, 256),
+		BroadcastRead: make(chan *ConversationReadPayload, 256),
+		Register:      make(chan *Client, 32),
+		UnRegister:    make(chan *Client, 32),
 	}
 }
 
@@ -74,31 +84,101 @@ func (h *Hub) Run() {
 
 		case msg := <-h.SendDirect:
 			// Deliver direct message to recipient
-			if msg.RecipientID > 0 {
-				if recipientClients, ok := h.users[msg.RecipientID]; ok {
-					for c := range recipientClients {
+			if msg.RecipientID <= 0 {
+				continue
+			}
+
+			chatMsgFrame, err := json.Marshal(WSNotification{
+				Type:    TypeChatMessage,
+				Payload: msg.Message,
+			})
+			if err != nil {
+				continue
+			}
+
+			notificationFrame, err := json.Marshal(WSNotification{
+				Type: TypeChatNotification,
+				Payload: ChatNotificationPayload{
+					ConvID:      msg.ConvID,
+					SenderID:    msg.SenderID,
+					SenderName:  msg.SenderUsername,
+					Content:     msg.Message.Content,
+					UnreadCount: msg.UnreadCount,
+					CreatedAt:   msg.Message.CreatedAt,
+				},
+			})
+			if err != nil {
+				continue
+			}
+
+			if recipientClients, isOnline := h.users[msg.RecipientID]; isOnline {
+				for c := range recipientClients {
+					activeConv := c.ActiveConvID.Load()
+
+					if activeConv < 0 {
+						h.dropClient(c)
+						continue
+					}
+
+					if activeConv == msg.ConvID {
+						// User is in the current looking conversation
 						select {
-						case c.Send <- msg.Payload:
+						case c.Send <- chatMsgFrame:
+							// Auto-mark as read in background since recipient is actively looking
+							go c.convService.MarkAsRead(
+								context.Background(),
+								msg.Message.ID,
+								c.UserID,
+								msg.ConvID,
+							)
+						default:
+							h.dropClient(c)
+						}
+					} else {
+						// Recipient is in another conversation or in the sidebar
+						select {
+						case c.Send <- notificationFrame:
 						default:
 							h.dropClient(c)
 						}
 					}
 
-					// Echo back to the sender's client(s) for delivery confirmation
-					if senderClints, ok := h.users[msg.SenderID]; ok {
-						for c := range senderClints {
-							select {
-							case c.Send <- msg.Payload:
-							default:
-								h.dropClient(c)
+				}
+			}
 
-							}
+			// Echo back to the sender's client(s) for delivery confirmation
+			if msg.SenderID != msg.RecipientID {
+				if senderClients, ok := h.users[msg.SenderID]; ok {
+					for c := range senderClients {
+						select {
+						case c.Send <- chatMsgFrame:
+						default:
+							h.dropClient(c)
 						}
 					}
-					continue
+				}
+			}
+		case readEvt := <-h.BroadcastRead:
+			frame, err := json.Marshal(WSNotification{
+				Type:    TypeConversationRead,
+				Payload: readEvt,
+			})
+			if err != nil {
+				slog.Error("failed to create read event frame to be sent", "error", err)
+				continue
+			}
+
+			if readClients, ok := h.users[readEvt.UserID]; ok {
+				for c := range readClients {
+					select {
+					case c.Send <- frame:
+					default:
+						h.dropClient(c)
+					}
 				}
 			}
 		}
+
 	}
 }
 

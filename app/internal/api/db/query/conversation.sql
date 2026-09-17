@@ -70,25 +70,56 @@ JOIN users u ON u.id = p.user_id;
 
 -- name: GetConversationsByUserId :many
 WITH
-target_conv AS (
-    SELECT p.conv_id
+  target_conv AS (
+    SELECT
+      p.conv_id, c.created_at
     FROM
-        participants p
-    JOIN conversations c ON c.id = p.conv_id
+      participants p
+      JOIN conversations c ON c.id = p.conv_id
     WHERE
-        p.user_id = $1
-        AND c.is_deleting = FALSE
-)
-
+      p.user_id = $1
+      AND c.is_deleting = FALSE
+  )
 SELECT
-    tc.conv_id,
-    u.id AS user_id,
-    u.name,
-    u.username
+  tc.conv_id,
+  u.id AS user_id,
+  u.name,
+  u.username,
+  COALESCE(lm.content, '') AS last_message,
+  COALESCE(lm.created_at, tc.created_at) AS last_message_time,
+  COALESCE(unread.count, 0)::int AS unread_count
 FROM
-    target_conv tc
-JOIN participants p ON p.conv_id = tc.conv_id AND p.user_id <> $1
-JOIN users u ON u.id = p.user_id;
+  target_conv tc
+  JOIN participants other_p ON other_p.conv_id = tc.conv_id
+  AND other_p.user_id <> $1
+  JOIN users u ON u.id = other_p.user_id
+  JOIN participants my_p ON my_p.conv_id = tc.conv_id
+  AND my_p.user_id = $1
+  -- Latest message per conversation
+  LEFT JOIN LATERAL (
+    SELECT
+      content,
+      created_at
+    FROM
+      messages
+    WHERE
+      conv_id = tc.conv_id
+    ORDER BY
+      id DESC
+    LIMIT
+      1
+  ) lm ON TRUE
+  -- Unread messages since my last read watermark
+  LEFT JOIN LATERAL (
+    SELECT
+      count(*) AS count
+    FROM
+      messages m
+    WHERE
+      m.conv_id = tc.conv_id
+      AND m.id > my_p.last_read_message_id
+      AND m.sender_id <> $1
+  ) unread ON TRUE;
 
 -- name: GetConvChats :many
 SELECT
@@ -206,3 +237,27 @@ WHERE id IN (SELECT id FROM batch);
 -- name: DeleteConversationById :exec
 DELETE FROM conversations
 WHERE id = $1;
+
+-- name: MarkConversationRead :exec
+UPDATE participants
+SET
+  last_read_message_id = GREATEST(
+    last_read_message_id,
+    sqlc.arg (message_id)::bigint
+  ),
+  last_read_at = NOW()
+WHERE
+  conv_id = sqlc.arg (conv_id)
+  AND user_id = sqlc.arg (user_id);
+
+-- name: GetUnreadCountForUser :one
+SELECT
+  COUNT(*)::int AS unread_count
+FROM
+  messages m
+  JOIN participants p ON p.conv_id = m.conv_id
+  AND p.user_id = sqlc.arg (user_id)
+WHERE
+  m.conv_id = sqlc.arg (conv_id)
+  AND m.id > p.last_read_message_id
+  AND m.sender_id <> sqlc.arg (user_id);

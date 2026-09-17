@@ -6,10 +6,13 @@ type GetOrCreateDirectConvType struct {
 }
 
 type GetConvParticipantType struct {
-	ConvID   int64  `json:"conv_id"`
-	UserID   int64  `json:"user_id"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
+	ConvID          int64  `json:"conv_id"`
+	UserID          int64  `json:"user_id"`
+	Name            string `json:"name"`
+	Username        string `json:"username"`
+	LastMessage     string `json:"last_message,omitempty"`
+	LastMessageTime string `json:"last_message_time,omitempty"`
+	UnreadCount     int    `json:"unread_count"`
 }
 type CreateMessageType struct {
 	SenderID int64

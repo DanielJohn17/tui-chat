@@ -32,6 +32,13 @@ type ConvServiceInt interface {
 	) (*CreateMessageResponseType, error)
 
 	WipeConversation(ctx context.Context, convID, userID int64) error
+
+	GetUnreadCount(
+		ctx context.Context,
+		userID, convID int64,
+	) (int, error)
+
+	MarkAsRead(ctx context.Context, messageID, userID, convID int64)
 }
 
 type ConvService struct {
@@ -178,6 +185,7 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 			return
 		}
 
+		// batch delete
 		for {
 			if err := bgCtx.Err(); err != nil {
 				slog.WarnContext(bgCtx, "conversation wipeout aborted: context expired",
@@ -223,4 +231,44 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 	}()
 
 	return nil
+}
+
+func (s *ConvService) GetUnreadCount(
+	ctx context.Context,
+	userID, convID int64,
+) (int, error) {
+	count, err := s.r.GetUnreadCount(ctx, userID, convID)
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"failed counting unread messages",
+			"userID",
+			userID,
+			"convID",
+			convID,
+			"error",
+			err,
+		)
+
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (s *ConvService) MarkAsRead(ctx context.Context, messageID, userID, convID int64) {
+	if err := s.r.MarkAsRead(ctx, messageID, userID, convID); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"failed to mark message as read",
+			"messageID",
+			messageID,
+			"userID",
+			userID,
+			"convID",
+			convID,
+			"error",
+			err,
+		)
+	}
 }

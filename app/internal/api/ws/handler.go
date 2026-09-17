@@ -81,6 +81,8 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		convService: h.convService,
 	}
 
+	client.ActiveConvID.Store(0)
+
 	h.hub.Register <- client
 
 	go client.readPump()

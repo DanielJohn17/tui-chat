@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
@@ -23,16 +25,24 @@ type MessagePersister interface {
 		convID, senderID int64,
 		content string,
 	) (*conversations.CreateMessageResponseType, error)
+
+	GetUnreadCount(
+		ctx context.Context,
+		userID, convID int64,
+	) (int, error)
+
+	MarkAsRead(ctx context.Context, messageID, userID, convID int64)
 }
 
 type Client struct {
-	UserID      int64
-	Username    string
-	ConvID      int64
-	Send        chan []byte
-	Conn        *websocket.Conn
-	Hub         *Hub
-	convService MessagePersister
+	UserID       int64
+	Username     string
+	ActiveConvID atomic.Int64
+	ConvID       int64
+	Send         chan []byte
+	Conn         *websocket.Conn
+	Hub          *Hub
+	convService  MessagePersister
 }
 
 func (c *Client) readPump() {
@@ -64,57 +74,37 @@ func (c *Client) readPump() {
 
 		var inboundMessage InboundMessage
 		if err := json.Unmarshal(message, &inboundMessage); err != nil {
-			inboundMessage.Content = string(message)
-		}
-
-		convID := c.ConvID
-		if inboundMessage.ConvID > 0 {
-			convID = inboundMessage.ConvID
-		}
-
-		if inboundMessage.Content == "" {
+			slog.Error("invalid inboundmessage", "error", err)
 			continue
 		}
 
-		saved, err := c.convService.CreateMessage(
-			context.Background(),
-			convID,
-			c.UserID,
-			inboundMessage.Content,
-		)
-		if err != nil {
-			log.Printf("failed to persist message from user %d: %v", c.UserID, err)
-			c.sendError(
-				convID,
-				inboundMessage.Content,
-				"Failed to save message. Please retry.",
-				true,
-			)
+		switch inboundMessage.Action {
+		case ActionFocusConv:
+			var payload FocusConvPayload
+			if err := json.Unmarshal(inboundMessage.Payload, &payload); err != nil {
+				slog.Error("invalid focus_conv", "error", err)
+				continue
+			}
+
+			c.ActiveConvID.Store(payload.ConvID)
 			continue
-		}
-
-		outbound := WSMessage{
-			ID:          saved.ID,
-			SenderID:    saved.SenderID,
-			RecipientID: saved.RecipientID,
-			ConvID:      saved.ConvID,
-			Content:     saved.Content,
-			CreatedAt:   saved.CreatedAt,
-			UpdatedAt:   saved.UpdatedAt,
-		}
-
-		encoding, err := json.Marshal(outbound)
-		if err != nil {
-			log.Printf("ws marshal error: %v", err)
+		case ActionSendMessage:
+			c.handleSendMessage(inboundMessage.Payload)
 			continue
+
+		case ActionMarkRead:
+			var payload MarkReadPayload
+			if err := json.Unmarshal(inboundMessage.Payload, &payload); err != nil {
+				slog.Error("invalid mark_read", "error", err)
+				continue
+			}
+
+			if payload.ConvID > 0 && payload.MessageID > 0 {
+				c.triggerReadReceipt(payload)
+			}
+
 		}
 
-		c.Hub.SendDirect <- &DirectMessage{
-			SenderID:    saved.SenderID,
-			RecipientID: saved.RecipientID,
-			ConvID:      saved.ConvID,
-			Payload:     encoding,
-		}
 	}
 }
 
@@ -191,5 +181,84 @@ func (c *Client) sendError(convID int64, content, errMsg string, retryable bool)
 	case c.Send <- errPayload:
 	default:
 		log.Printf("ws send buffer full for user %d, dropped error frame", c.UserID)
+	}
+}
+
+func (c *Client) triggerReadReceipt(payload MarkReadPayload) {
+	// Persist to DB asynchronously so not to block the websocket read loop
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		c.convService.MarkAsRead(ctx, payload.MessageID, c.UserID, payload.ConvID)
+	}()
+
+	// hub broadcast
+	c.Hub.BroadcastRead <- &ConversationReadPayload{
+		ConvID:    payload.ConvID,
+		UserID:    c.UserID,
+		MessageID: payload.MessageID,
+	}
+}
+
+func (c *Client) handleSendMessage(rawPayload json.RawMessage) {
+	var payload SendMessagePayload
+	if err := json.Unmarshal(rawPayload, &payload); err != nil {
+		slog.Error("invalid send_message", "error", err)
+		return
+	}
+
+	convID := c.ConvID
+	if payload.ConvID > 0 {
+		convID = payload.ConvID
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	saved, err := c.convService.CreateMessage(
+		ctx,
+		convID,
+		c.UserID,
+		payload.Content,
+	)
+	if err != nil {
+		slog.Error("failed to persist message from user", "ID", c.UserID, "error", err)
+		c.sendError(
+			convID,
+			payload.Content,
+			"Failed to save message. Please retry.",
+			true,
+		)
+		return
+	}
+
+	unreadCount, err := c.convService.GetUnreadCount(
+		ctx,
+		saved.RecipientID,
+		saved.ConvID,
+	)
+	if err != nil {
+		slog.Error("failed fetching unread count", "error", err)
+		unreadCount = 1
+	}
+
+	outbound := WSMessage{
+		ID:          saved.ID,
+		SenderID:    saved.SenderID,
+		RecipientID: saved.RecipientID,
+		ConvID:      saved.ConvID,
+		Content:     saved.Content,
+		CreatedAt:   saved.CreatedAt,
+		UpdatedAt:   saved.UpdatedAt,
+	}
+
+	c.Hub.SendDirect <- &DirectMessage{
+		SenderUsername: c.Username,
+		SenderID:       saved.SenderID,
+		RecipientID:    saved.RecipientID,
+		ConvID:         saved.ConvID,
+		Message:        outbound,
+		UnreadCount:    unreadCount,
 	}
 }

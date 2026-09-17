@@ -24,8 +24,10 @@ type Message struct {
 }
 
 type Participant struct {
-	ConvID int64
-	UserID int64
+	ConvID            int64
+	UserID            int64
+	LastReadMessageID int64
+	LastReadAt        pgtype.Timestamptz
 }
 
 type User struct {

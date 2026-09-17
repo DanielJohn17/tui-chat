@@ -258,32 +258,66 @@ func (q *Queries) GetConvChatsPaginated(ctx context.Context, arg GetConvChatsPag
 
 const getConversationsByUserId = `-- name: GetConversationsByUserId :many
 WITH
-target_conv AS (
-    SELECT p.conv_id
+  target_conv AS (
+    SELECT
+      p.conv_id, c.created_at
     FROM
-        participants p
-    JOIN conversations c ON c.id = p.conv_id
+      participants p
+      JOIN conversations c ON c.id = p.conv_id
     WHERE
-        p.user_id = $1
-        AND c.is_deleting = FALSE
-)
-
+      p.user_id = $1
+      AND c.is_deleting = FALSE
+  )
 SELECT
-    tc.conv_id,
-    u.id AS user_id,
-    u.name,
-    u.username
+  tc.conv_id,
+  u.id AS user_id,
+  u.name,
+  u.username,
+  COALESCE(lm.content, '') AS last_message,
+  COALESCE(lm.created_at, tc.created_at) AS last_message_time,
+  COALESCE(unread.count, 0)::int AS unread_count
 FROM
-    target_conv tc
-JOIN participants p ON p.conv_id = tc.conv_id AND p.user_id <> $1
-JOIN users u ON u.id = p.user_id
+  target_conv tc
+  JOIN participants other_p ON other_p.conv_id = tc.conv_id
+  AND other_p.user_id <> $1
+  JOIN users u ON u.id = other_p.user_id
+  JOIN participants my_p ON my_p.conv_id = tc.conv_id
+  AND my_p.user_id = $1
+  -- Latest message per conversation
+  LEFT JOIN LATERAL (
+    SELECT
+      content,
+      created_at
+    FROM
+      messages
+    WHERE
+      conv_id = tc.conv_id
+    ORDER BY
+      id DESC
+    LIMIT
+      1
+  ) lm ON TRUE
+  -- Unread messages since my last read watermark
+  LEFT JOIN LATERAL (
+    SELECT
+      count(*) AS count
+    FROM
+      messages m
+    WHERE
+      m.conv_id = tc.conv_id
+      AND m.id > my_p.last_read_message_id
+      AND m.sender_id <> $1
+  ) unread ON TRUE
 `
 
 type GetConversationsByUserIdRow struct {
-	ConvID   int64
-	UserID   int64
-	Name     string
-	Username string
+	ConvID          int64
+	UserID          int64
+	Name            string
+	Username        string
+	LastMessage     string
+	LastMessageTime pgtype.Timestamptz
+	UnreadCount     int32
 }
 
 func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([]GetConversationsByUserIdRow, error) {
@@ -300,6 +334,9 @@ func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([
 			&i.UserID,
 			&i.Name,
 			&i.Username,
+			&i.LastMessage,
+			&i.LastMessageTime,
+			&i.UnreadCount,
 		); err != nil {
 			return nil, err
 		}
@@ -419,6 +456,31 @@ func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCr
 	return items, nil
 }
 
+const getUnreadCountForUser = `-- name: GetUnreadCountForUser :one
+SELECT
+  COUNT(*)::int AS unread_count
+FROM
+  messages m
+  JOIN participants p ON p.conv_id = m.conv_id
+  AND p.user_id = $1
+WHERE
+  m.conv_id = $2
+  AND m.id > p.last_read_message_id
+  AND m.sender_id <> $1
+`
+
+type GetUnreadCountForUserParams struct {
+	UserID int64
+	ConvID int64
+}
+
+func (q *Queries) GetUnreadCountForUser(ctx context.Context, arg GetUnreadCountForUserParams) (int32, error) {
+	row := q.db.QueryRow(ctx, getUnreadCountForUser, arg.UserID, arg.ConvID)
+	var unread_count int32
+	err := row.Scan(&unread_count)
+	return unread_count, err
+}
+
 const isUserInConversation = `-- name: IsUserInConversation :one
 SELECT EXISTS(
     SELECT 1 FROM participants
@@ -445,5 +507,29 @@ WHERE c.id = $1
 
 func (q *Queries) MarkConversationDeleting(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, markConversationDeleting, id)
+	return err
+}
+
+const markConversationRead = `-- name: MarkConversationRead :exec
+UPDATE participants
+SET
+  last_read_message_id = GREATEST(
+    last_read_message_id,
+    $1::bigint
+  ),
+  last_read_at = NOW()
+WHERE
+  conv_id = $2
+  AND user_id = $3
+`
+
+type MarkConversationReadParams struct {
+	MessageID int64
+	ConvID    int64
+	UserID    int64
+}
+
+func (q *Queries) MarkConversationRead(ctx context.Context, arg MarkConversationReadParams) error {
+	_, err := q.db.Exec(ctx, markConversationRead, arg.MessageID, arg.ConvID, arg.UserID)
 	return err
 }

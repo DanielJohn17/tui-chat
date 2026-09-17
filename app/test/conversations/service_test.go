@@ -28,7 +28,10 @@ func (m *MockConvRepo) MarkConvForDeleting(ctx context.Context, convID int64) er
 	return m.Called(ctx, convID).Error(0)
 }
 
-func (m *MockConvRepo) DeleteMessagesAsBatch(ctx context.Context, convID, batchSize int64) (int64, error) {
+func (m *MockConvRepo) DeleteMessagesAsBatch(
+	ctx context.Context,
+	convID, batchSize int64,
+) (int64, error) {
 	args := m.Called(ctx, convID, batchSize)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -37,7 +40,10 @@ func (m *MockConvRepo) DeleteConvByID(ctx context.Context, id int64) error {
 	return m.Called(ctx, id).Error(0)
 }
 
-func (m *MockConvRepo) GetOrCreateDirectConversation(ctx context.Context, input conversations.GetOrCreateDirectConvType) ([]conversations.GetConvParticipantType, error) {
+func (m *MockConvRepo) GetOrCreateDirectConversation(
+	ctx context.Context,
+	input conversations.GetOrCreateDirectConvType,
+) ([]conversations.GetConvParticipantType, error) {
 	args := m.Called(ctx, input)
 	if res := args.Get(0); res != nil {
 		return res.([]conversations.GetConvParticipantType), args.Error(1)
@@ -45,7 +51,10 @@ func (m *MockConvRepo) GetOrCreateDirectConversation(ctx context.Context, input 
 	return nil, args.Error(1)
 }
 
-func (m *MockConvRepo) GetConvsByUserID(ctx context.Context, input int64) []conversations.GetConvParticipantType {
+func (m *MockConvRepo) GetConvsByUserID(
+	ctx context.Context,
+	input int64,
+) []conversations.GetConvParticipantType {
 	args := m.Called(ctx, input)
 	if res := args.Get(0); res != nil {
 		return res.([]conversations.GetConvParticipantType)
@@ -53,7 +62,11 @@ func (m *MockConvRepo) GetConvsByUserID(ctx context.Context, input int64) []conv
 	return nil
 }
 
-func (m *MockConvRepo) GetConvChats(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
+func (m *MockConvRepo) GetConvChats(
+	ctx context.Context,
+	convID int64,
+	input types.URLQueryParams,
+) []conversations.GetConvChatResponseType {
 	args := m.Called(ctx, convID, input)
 	if res := args.Get(0); res != nil {
 		return res.([]conversations.GetConvChatResponseType)
@@ -61,7 +74,11 @@ func (m *MockConvRepo) GetConvChats(ctx context.Context, convID int64, input typ
 	return nil
 }
 
-func (m *MockConvRepo) GetConvChatsPaginated(ctx context.Context, convID int64, input types.URLQueryParams) []conversations.GetConvChatResponseType {
+func (m *MockConvRepo) GetConvChatsPaginated(
+	ctx context.Context,
+	convID int64,
+	input types.URLQueryParams,
+) []conversations.GetConvChatResponseType {
 	args := m.Called(ctx, convID, input)
 	if res := args.Get(0); res != nil {
 		return res.([]conversations.GetConvChatResponseType)
@@ -69,7 +86,11 @@ func (m *MockConvRepo) GetConvChatsPaginated(ctx context.Context, convID int64, 
 	return nil
 }
 
-func (m *MockConvRepo) CreateMessage(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error) {
+func (m *MockConvRepo) CreateMessage(
+	ctx context.Context,
+	convID, senderID int64,
+	content string,
+) (*conversations.CreateMessageResponseType, error) {
 	args := m.Called(ctx, convID, senderID, content)
 	if res := args.Get(0); res != nil {
 		return res.(*conversations.CreateMessageResponseType), args.Error(1)
@@ -77,16 +98,38 @@ func (m *MockConvRepo) CreateMessage(ctx context.Context, convID, senderID int64
 	return nil, args.Error(1)
 }
 
+func (m *MockConvRepo) GetUnreadCount(
+	ctx context.Context,
+	userID, convID int64,
+) (int, error) {
+	args := m.Called(ctx, userID, convID)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockConvRepo) MarkAsRead(
+	ctx context.Context,
+	messageID, userID, convID int64,
+) error {
+	return m.Called(ctx, messageID, userID, convID).Error(0)
+}
+
+
 // MockUserService mocks users.UserServiceInt using testify/mock.
 type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) CreateUser(ctx context.Context, input users.CreateUserType) (*users.CreateUserResponseType, error) {
+func (m *MockUserService) CreateUser(
+	ctx context.Context,
+	input users.CreateUserType,
+) (*users.CreateUserResponseType, error) {
 	return nil, m.Called(ctx, input).Error(1)
 }
 
-func (m *MockUserService) GetUserByUsername(ctx context.Context, input string) (*users.GetUserResponseType, error) {
+func (m *MockUserService) GetUserByUsername(
+	ctx context.Context,
+	input string,
+) (*users.GetUserResponseType, error) {
 	args := m.Called(ctx, input)
 	if res := args.Get(0); res != nil {
 		return res.(*users.GetUserResponseType), args.Error(1)
@@ -94,7 +137,10 @@ func (m *MockUserService) GetUserByUsername(ctx context.Context, input string) (
 	return nil, args.Error(1)
 }
 
-func (m *MockUserService) GetUserByID(ctx context.Context, input int64) (*users.GetUserResponseType, error) {
+func (m *MockUserService) GetUserByID(
+	ctx context.Context,
+	input int64,
+) (*users.GetUserResponseType, error) {
 	args := m.Called(ctx, input)
 	if res := args.Get(0); res != nil {
 		return res.(*users.GetUserResponseType), args.Error(1)
@@ -102,7 +148,10 @@ func (m *MockUserService) GetUserByID(ctx context.Context, input int64) (*users.
 	return nil, args.Error(1)
 }
 
-func (m *MockUserService) DeleteUser(ctx context.Context, input int64) (*users.DeleteUserResponseType, error) {
+func (m *MockUserService) DeleteUser(
+	ctx context.Context,
+	input int64,
+) (*users.DeleteUserResponseType, error) {
 	return nil, m.Called(ctx, input).Error(1)
 }
 
@@ -145,14 +194,26 @@ func TestWipeConversation_AsyncBatchChunkingSuccess(t *testing.T) {
 	repo.On("MarkConvForDeleting", mock.Anything, int64(42)).Return(nil)
 
 	deletedDone := make(chan struct{})
-	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(500), nil).Once()
-	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(500), nil).Once()
-	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).Return(int64(120), nil).Once()
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).
+		Return(int64(500), nil).
+		Once()
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).
+		Return(int64(500), nil).
+		Once()
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(42), int64(500)).
+		Return(int64(120), nil).
+		Once()
 	repo.On("DeleteConvByID", mock.Anything, int64(42)).Return(nil).Run(func(args mock.Arguments) {
 		close(deletedDone)
 	}).Once()
 
-	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 5, 500, 1*time.Millisecond)
+	s := conversations.NewConvServiceWithOptions(
+		repo,
+		new(MockUserService),
+		5,
+		500,
+		1*time.Millisecond,
+	)
 	require.NoError(t, s.WipeConversation(context.Background(), 42, 1))
 
 	select {
@@ -169,9 +230,11 @@ func TestWipeConversation_BatchDeleteErrorAbortsBeforeDeleteConv(t *testing.T) {
 	repo := new(MockConvRepo)
 	repo.On("IsUserInConversation", mock.Anything, int64(55), int64(1)).Return(true)
 	repo.On("MarkConvForDeleting", mock.Anything, int64(55)).Return(nil)
-	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(55), int64(500)).Return(int64(0), errors.New("db timeout")).Run(func(args mock.Arguments) {
-		close(batchAttempted)
-	})
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(55), int64(500)).
+		Return(int64(0), errors.New("db timeout")).
+		Run(func(args mock.Arguments) {
+			close(batchAttempted)
+		})
 
 	s := conversations.NewConvService(repo, new(MockUserService))
 	require.NoError(t, s.WipeConversation(context.Background(), 55, 1))
@@ -194,16 +257,23 @@ func TestWipeConversation_PanicRecovery(t *testing.T) {
 	repo.On("IsUserInConversation", mock.Anything, mock.Anything, mock.Anything).Return(true)
 	repo.On("MarkConvForDeleting", mock.Anything, mock.Anything).Return(nil)
 
-	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(77), int64(500)).Run(func(args mock.Arguments) {
-		close(panicAttempted)
-		panic("simulated worker panic")
-	})
+	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(77), int64(500)).
+		Run(func(args mock.Arguments) {
+			close(panicAttempted)
+			panic("simulated worker panic")
+		})
 	repo.On("DeleteMessagesAsBatch", mock.Anything, int64(78), int64(500)).Return(int64(0), nil)
 	repo.On("DeleteConvByID", mock.Anything, int64(78)).Return(nil).Run(func(args mock.Arguments) {
 		close(secondWipeDone)
 	})
 
-	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 1, 500, 1*time.Millisecond)
+	s := conversations.NewConvServiceWithOptions(
+		repo,
+		new(MockUserService),
+		1,
+		500,
+		1*time.Millisecond,
+	)
 	require.NoError(t, s.WipeConversation(context.Background(), 77, 1))
 
 	select {
@@ -234,7 +304,13 @@ func TestWipeConversation_ParentContextCancellationDoesNotAbortWorker(t *testing
 		close(deletedDone)
 	})
 
-	s := conversations.NewConvServiceWithOptions(repo, new(MockUserService), 5, 500, 1*time.Millisecond)
+	s := conversations.NewConvServiceWithOptions(
+		repo,
+		new(MockUserService),
+		5,
+		500,
+		1*time.Millisecond,
+	)
 
 	parentCtx, parentCancel := context.WithCancel(context.Background())
 	require.NoError(t, s.WipeConversation(parentCtx, 88, 1))
@@ -259,8 +335,10 @@ func TestGetOrCreateDirectConversation_Success(t *testing.T) {
 	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20}
 
 	uService := new(MockUserService)
-	uService.On("GetUserByID", mock.Anything, int64(10)).Return(&users.GetUserResponseType{ID: 10}, nil)
-	uService.On("GetUserByID", mock.Anything, int64(20)).Return(&users.GetUserResponseType{ID: 20}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).
+		Return(&users.GetUserResponseType{ID: 20}, nil)
 
 	repo := new(MockConvRepo)
 	repo.On("GetOrCreateDirectConversation", mock.Anything, input).Return(expected, nil)
@@ -274,14 +352,18 @@ func TestGetOrCreateDirectConversation_Success(t *testing.T) {
 
 func TestGetOrCreateDirectConversation_UserNotFound(t *testing.T) {
 	uService := new(MockUserService)
-	uService.On("GetUserByID", mock.Anything, int64(10)).Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
 	uService.On("GetUserByID", mock.Anything, int64(999)).Return(nil, errors.New("user not found"))
 
 	s := conversations.NewConvService(new(MockConvRepo), uService)
-	_, err := s.GetOrCreateDirectConversation(context.Background(), conversations.GetOrCreateDirectConvType{
-		UserIDOne: 10,
-		UserIDTwo: 999,
-	})
+	_, err := s.GetOrCreateDirectConversation(
+		context.Background(),
+		conversations.GetOrCreateDirectConvType{
+			UserIDOne: 10,
+			UserIDTwo: 999,
+		},
+	)
 
 	var apiErr *apierrors.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -293,7 +375,8 @@ func TestGetConvsByUserID(t *testing.T) {
 		{ConvID: 1, UserID: 2, Name: "Alice", Username: "alice"},
 	}
 	uService := new(MockUserService)
-	uService.On("GetUserByID", mock.Anything, int64(1)).Return(&users.GetUserResponseType{ID: 1}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(1)).
+		Return(&users.GetUserResponseType{ID: 1}, nil)
 
 	repo := new(MockConvRepo)
 	repo.On("GetConvsByUserID", mock.Anything, int64(1)).Return(expected)

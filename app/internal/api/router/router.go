@@ -55,8 +55,7 @@ func NewRouter(h Handlers) *gin.Engine {
 
 		// websocket routes
 		subRouter.GET(
-			"/conversations/:id/ws",
-			middleware.ValidateURIParams[types.URLParamInt](),
+			"/ws",
 			h.WS.HandleWS,
 		)
 	}

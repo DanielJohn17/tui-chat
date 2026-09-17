@@ -45,6 +45,13 @@ type ConvRepositoryInt interface {
 	DeleteMessagesAsBatch(ctx context.Context, convID, batchSize int64) (int64, error)
 
 	DeleteConvByID(ctx context.Context, id int64) error
+
+	GetUnreadCount(
+		ctx context.Context,
+		userID, convID int64,
+	) (int, error)
+
+	MarkAsRead(ctx context.Context, messageID, userID, convID int64) error
 }
 
 type ConvQuerier interface {
@@ -83,6 +90,13 @@ type ConvQuerier interface {
 	) (int64, error)
 
 	DeleteConversationById(ctx context.Context, id int64) error
+
+	GetUnreadCountForUser(
+		ctx context.Context,
+		arg database.GetUnreadCountForUserParams,
+	) (int32, error)
+
+	MarkConversationRead(ctx context.Context, arg database.MarkConversationReadParams) error
 }
 
 type ConvRepository struct {
@@ -113,7 +127,12 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 
 	participants := make([]GetConvParticipantType, len(convParticipants))
 	for i, v := range convParticipants {
-		participants[i] = GetConvParticipantType(v)
+		participants[i] = GetConvParticipantType{
+			ConvID:   v.ConvID,
+			UserID:   v.UserID,
+			Name:     v.Name,
+			Username: v.Username,
+		}
 	}
 
 	return participants, nil
@@ -131,7 +150,15 @@ func (r *ConvRepository) GetConvsByUserID(
 
 	convParticipants := make([]GetConvParticipantType, len(conversations))
 	for i, v := range conversations {
-		convParticipants[i] = GetConvParticipantType(v)
+		convParticipants[i] = GetConvParticipantType{
+			ConvID:          v.ConvID,
+			UserID:          v.UserID,
+			Name:            v.Name,
+			Username:        v.Username,
+			LastMessage:     v.LastMessage,
+			LastMessageTime: v.LastMessageTime.Time.Format(time.RFC3339),
+			UnreadCount:     int(v.UnreadCount),
+		}
 	}
 
 	return convParticipants
@@ -293,6 +320,36 @@ func (r *ConvRepository) DeleteMessagesAsBatch(
 
 func (r *ConvRepository) DeleteConvByID(ctx context.Context, id int64) error {
 	if err := r.q.DeleteConversationById(ctx, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ConvRepository) GetUnreadCount(
+	ctx context.Context,
+	userID, convID int64,
+) (int, error) {
+	params := database.GetUnreadCountForUserParams{
+		UserID: userID,
+		ConvID: convID,
+	}
+
+	unreadCount, err := r.q.GetUnreadCountForUser(ctx, params)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(unreadCount), nil
+}
+func (r *ConvRepository) MarkAsRead(ctx context.Context, messageID, userID, convID int64) error {
+	params := database.MarkConversationReadParams{
+		MessageID: messageID,
+		ConvID:    convID,
+		UserID:    userID,
+	}
+
+	if err := r.q.MarkConversationRead(ctx, params); err != nil {
 		return err
 	}
 
