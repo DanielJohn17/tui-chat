@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,6 +44,7 @@ type Client struct {
 	Conn         *websocket.Conn
 	Hub          *Hub
 	convService  MessagePersister
+	closeSend    sync.Once
 }
 
 func (c *Client) readPump() {
@@ -201,6 +203,14 @@ func (c *Client) triggerReadReceipt(payload MarkReadPayload) {
 	}
 }
 
+func (c *Client) closeSendChannel() {
+	c.closeSend.Do(func() {
+		if c.Send != nil {
+			close(c.Send)
+		}
+	})
+}
+
 func (c *Client) handleSendMessage(rawPayload json.RawMessage) {
 	var payload SendMessagePayload
 	if err := json.Unmarshal(rawPayload, &payload); err != nil {
@@ -208,10 +218,16 @@ func (c *Client) handleSendMessage(rawPayload json.RawMessage) {
 		return
 	}
 
-	convID := c.ConvID
-	if payload.ConvID > 0 {
-		convID = payload.ConvID
+	if payload.ConvID <= 0 {
+		c.sendError(
+			payload.ConvID,
+			payload.Content,
+			"Invalid conversation ID.",
+			false,
+		)
+		return
 	}
+	convID := payload.ConvID
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

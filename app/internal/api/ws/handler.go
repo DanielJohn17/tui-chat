@@ -7,7 +7,6 @@ import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -56,9 +55,15 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 
-	params, exists := c.Get("params")
-	if !exists {
-		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
+	userID, ok := userIDParam.(int64)
+	if !ok {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
+	username, ok := usernameParam.(string)
+	if !ok {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
@@ -67,14 +72,10 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 
-	userID := userIDParam.(int64)
-	username := usernameParam.(string)
-	convID := int64(params.(types.URLParamInt).ID)
-
 	client := &Client{
 		UserID:      userID,
 		Username:    username,
-		ConvID:      convID,
+		ConvID:      0,
 		Conn:        conn,
 		Send:        make(chan []byte, 256),
 		Hub:         h.hub,
