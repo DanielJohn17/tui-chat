@@ -78,11 +78,12 @@ jobs:
     name: Auto Deploy to cPanel
     needs: build-and-release
     runs-on: ubuntu-latest
-    # Only runs if CPANEL_SSH_KEY secret is configured in GitHub repository
-    if: ${{ secrets.CPANEL_SSH_KEY != '' }}
     steps:
       - name: SSH and Update API on cPanel
+        if: ${{ env.CPANEL_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
         with:
           host: ${{ secrets.CPANEL_HOST || '198.38.92.6' }}
           username: ${{ secrets.CPANEL_USER || 'natchevy' }}
@@ -97,4 +98,5 @@ jobs:
             mv api.new api
             ./start.sh
             echo "Deployment to cPanel complete!"
+
 
