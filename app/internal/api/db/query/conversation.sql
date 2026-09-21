@@ -119,7 +119,10 @@ FROM
       m.conv_id = tc.conv_id
       AND m.id > my_p.last_read_message_id
       AND m.sender_id <> $1
-  ) unread ON TRUE;
+  ) unread ON TRUE
+ORDER BY
+  COALESCE(lm.created_at, tc.created_at) DESC,
+  tc.conv_id DESC;
 
 -- name: GetConvChats :many
 SELECT

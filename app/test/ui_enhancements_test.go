@@ -351,3 +351,50 @@ func TestProfilePageMouseClicks(t *testing.T) {
 	}
 	assert.Contains(t, model.View(), "CONVERSATIONS", "Clicking Save must save and return to chat view")
 }
+
+func TestDynamicConversationSortingOnSendAndNewDM(t *testing.T) {
+	c := client.NewMock()
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	// 1. Initial order: Chat 1 (Bob) is index 0, Chat 2 (Sarah) is index 1, Chat 3 (Charlie) is index 2
+	assert.Equal(t, int64(1), c.Chats()[0].ID)
+	assert.Equal(t, int64(2), c.Chats()[1].ID)
+	assert.Equal(t, int64(3), c.Chats()[2].ID)
+
+	// 2. Select Charlie Zhang (Chat 3)
+	model, _ = model.Update(tea.MouseMsg{
+		X:      10,
+		Y:      12,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	assert.Contains(t, model.View(), "@charlie")
+
+	// Focus input and send a message in Charlie's chat
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	for _, r := range "Hey Charlie, bumped to top!" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Charlie (Chat 3) MUST now be at index 0 (top of the slice)
+	assert.Equal(t, int64(3), c.Chats()[0].ID, "Chat 3 must move to top of slice after sending message")
+	assert.Equal(t, "Hey Charlie, bumped to top!", c.Chats()[0].LastMessage)
+
+	// The active view must still be Charlie
+	assert.Contains(t, model.View(), "@charlie")
+
+	// 3. Unfocus input with Esc and create a new direct message with David
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	for _, r := range "david" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// New chat (David) must be at index 0
+	assert.Equal(t, "david", c.Chats()[0].Username, "New DM must be prepended to top of sidebar")
+	assert.Contains(t, model.View(), "@david")
+}

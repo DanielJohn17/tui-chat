@@ -174,7 +174,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								return m, nil
 							}
 							newChat := m.client.AddChat(username, username)
-							m.sidebarView.MoveDown()
+							m.sidebarView.SelectIndex(0)
 							m.chatView.SetActiveChat(newChat.ID)
 							m.modal = ModalNone
 							return m, nil
@@ -198,7 +198,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 					newChat := m.client.AddChat(username, username)
-					m.sidebarView.MoveDown()
+					m.sidebarView.SelectIndex(0)
 					m.chatView.SetActiveChat(newChat.ID)
 					m.modal = ModalNone
 					return m, nil
@@ -349,6 +349,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.chatView.IsInputFocused() {
 			var cmd tea.Cmd
 			m.chatView, cmd = m.chatView.Update(msg)
+			if m.chatView.ActiveChatID() != 0 {
+				m.sidebarView.SelectChatByID(m.chatView.ActiveChatID())
+			}
 			return m, cmd
 		}
 

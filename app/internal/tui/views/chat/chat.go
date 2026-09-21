@@ -71,6 +71,10 @@ func (m *Model) SetActiveChat(chatID int64) {
 	}
 }
 
+func (m Model) ActiveChatID() int64 {
+	return m.activeChatID
+}
+
 func (m *Model) FocusInput() {
 	m.isFocused = true
 	m.input.Focus()

@@ -270,11 +270,16 @@ func (m *mockClient) Send(chatID int64, text string) {
 	}
 	m.messages[chatID] = append(m.messages[chatID], msg)
 
-	// Update last message in chat
+	// Update last message in chat and move to top
 	for i := range m.chats {
 		if m.chats[i].ID == chatID {
 			m.chats[i].LastMessage = text
 			m.chats[i].Time = now
+			if i > 0 {
+				target := m.chats[i]
+				m.chats = append(m.chats[:i], m.chats[i+1:]...)
+				m.chats = append([]Chat{target}, m.chats...)
+			}
 			break
 		}
 	}
@@ -293,7 +298,7 @@ func (m *mockClient) AddChat(name, username string) Chat {
 		Unread:      0,
 		Online:      true,
 	}
-	m.chats = append(m.chats, chat)
+	m.chats = append([]Chat{chat}, m.chats...)
 	m.messages[newID] = []Message{
 		{
 			ID:        m.msgID + 1,

@@ -308,6 +308,9 @@ FROM
       AND m.id > my_p.last_read_message_id
       AND m.sender_id <> $1
   ) unread ON TRUE
+ORDER BY
+  COALESCE(lm.created_at, tc.created_at) DESC,
+  tc.conv_id DESC
 `
 
 type GetConversationsByUserIdRow struct {

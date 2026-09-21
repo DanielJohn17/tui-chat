@@ -112,6 +112,17 @@ func (m *Model) SelectIndex(idx int) {
 	}
 }
 
+func (m *Model) SelectChatByID(id int64) {
+	chats := m.client.Chats()
+	for i, ch := range chats {
+		if ch.ID == id {
+			m.selectedIndex = i
+			m.ensureVisible()
+			return
+		}
+	}
+}
+
 func (m Model) SelectedIndex() int {
 	return m.selectedIndex
 }
