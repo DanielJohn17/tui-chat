@@ -3,6 +3,7 @@ package router
 
 import (
 	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
+	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/middleware"
 	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
@@ -19,7 +20,12 @@ type Handlers struct {
 }
 
 func NewRouter(h Handlers) *gin.Engine {
+	if config.ENV.GoEnv == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	router := gin.Default()
+	_ = router.SetTrustedProxies(nil)
 
 	// Enable CORS & client header validation
 	router.Use(middleware.CORS())

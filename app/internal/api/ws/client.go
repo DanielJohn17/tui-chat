@@ -97,7 +97,14 @@ func (c *Client) readPump() {
 			}
 
 			c.ActiveConvID.Store(payload.ConvID)
+			if payload.ConvID > 0 {
+				c.triggerReadReceipt(MarkReadPayload{
+					ConvID:    payload.ConvID,
+					MessageID: 0,
+				})
+			}
 			continue
+
 		case ActionSendMessage:
 			c.handleSendMessage(inboundMessage.Payload)
 			continue
@@ -109,10 +116,10 @@ func (c *Client) readPump() {
 				continue
 			}
 
-			if payload.ConvID > 0 && payload.MessageID > 0 {
+			if payload.ConvID > 0 {
 				c.triggerReadReceipt(payload)
 			}
-
+			continue
 		}
 
 	}

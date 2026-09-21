@@ -88,13 +88,28 @@ var (
 				Foreground(ColorCyan)
 )
 
-// Helper for text truncation
+// Helper for text truncation using visual cell width to preserve UTF-8 runes and emojis
 func Truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= maxLen {
 		return s
 	}
-	if maxLen <= 3 {
-		return s[:maxLen]
+	if maxLen <= 1 {
+		return "…"
 	}
-	return s[:maxLen-1] + "…"
+
+	targetWidth := maxLen - 1
+	var curWidth int
+	var runes []rune
+	for _, r := range s {
+		rw := lipgloss.Width(string(r))
+		if curWidth+rw > targetWidth {
+			break
+		}
+		curWidth += rw
+		runes = append(runes, r)
+	}
+	return string(runes) + "…"
 }

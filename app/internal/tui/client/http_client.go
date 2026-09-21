@@ -359,14 +359,17 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	}
 	h.mu.RUnlock()
 
-	messages := make([]Message, len(res.Data))
+	n := len(res.Data)
+	messages := make([]Message, n)
 	for i, c := range res.Data {
 		isSelf := c.SenderID == currentUserID
 		senderName := recipientName
 		if isSelf {
 			senderName = "You"
 		}
-		messages[i] = Message{
+		// API returns chats in DESC order (newest first).
+		// Store them chronologically (oldest at index 0, newest at bottom index n-1)
+		messages[n-1-i] = Message{
 			ID:        c.ID,
 			SenderID:  c.SenderID,
 			Sender:    senderName,

@@ -90,14 +90,6 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 
 	rows := lipgloss.JoinVertical(lipgloss.Left, row1, rowBlank, row2)
 
-	if isSelected {
-		return lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, false, false, true).
-			BorderForeground(theme.ColorCyan).
-			Padding(0, 1, 0, 0).
-			Render(rows)
-	}
-
 	return lipgloss.NewStyle().
 		Padding(0, 1).
 		Render(rows)

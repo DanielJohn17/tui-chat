@@ -187,6 +187,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MessagesLoadedMsg:
 		if msg.Err == nil && msg.ChatID == m.chatView.ActiveChatID() {
 			m.chatView.RefreshMessages()
+			msgs := m.client.Messages(msg.ChatID)
+			if len(msgs) > 0 {
+				lastMsg := msgs[len(msgs)-1]
+				_ = m.client.MarkRead(msg.ChatID, lastMsg.ID)
+			}
 		}
 		return m, nil
 

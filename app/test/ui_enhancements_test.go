@@ -6,6 +6,7 @@ import (
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -397,4 +398,29 @@ func TestDynamicConversationSortingOnSendAndNewDM(t *testing.T) {
 	// New chat (David) must be at index 0
 	assert.Equal(t, "david", c.Chats()[0].Username, "New DM must be prepended to top of sidebar")
 	assert.Contains(t, model.View(), "@david")
+}
+
+func TestProfileDateFormattingAndNoUserID(t *testing.T) {
+	model := authenticatedApp()
+
+	// Open profile edit page via 'p'
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	view := model.View()
+
+	assert.Contains(t, view, "PAGE: PROFILE EDIT")
+	assert.NotContains(t, view, "User ID:", "Profile view should not expose User ID")
+	assert.Contains(t, view, "Member Since:", "Profile view must display Member Since")
+	assert.Contains(t, view, "Status:", "Profile view must display Status")
+}
+
+func TestUTF8EmojiTruncation(t *testing.T) {
+	msgWithEmoji := "Sounds great! See you then 👍"
+	// Should not corrupt emoji bytes or produce \uFFFD replacement char
+	res := theme.Truncate(msgWithEmoji, 30)
+	assert.Equal(t, msgWithEmoji, res)
+	assert.NotContains(t, res, "\uFFFD")
+
+	truncated := theme.Truncate(msgWithEmoji, 20)
+	assert.NotContains(t, truncated, "\uFFFD")
+	assert.True(t, lipgloss.Width(truncated) <= 20)
 }

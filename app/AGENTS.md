@@ -1,9 +1,15 @@
 # Project Rules: TUI Chat
 
-## Go-TUI & GSX Standards
-- **Generation & Build**: After any edit to `.gsx` files, always run:
-  `go run github.com/grindlemire/go-tui/cmd/tui@v0.19.0 generate ./... && go build ./...`
-- **Keymap Dispatch Safety**: Never register duplicate `OnStop` or `On` key patterns on the same component or conflicting tree paths. Use centralized, mutually exclusive `KeyMap()` routing in `app.gsx` for modals and sub-views.
-- **Text Truncation**: Always apply `truncate()` to dynamic text fields in fixed-width containers (e.g. sidebar items) to avoid line wrapping and visual overlap.
-- **Focus Discipline**: Do not auto-focus input fields on app launch; preserve top-level keyboard navigation (`j/k`, `n`, `p`, `h`, `q`) on startup.
-- **Terminal Aesthetics**: Maintain OpenCode / Posting.sh terminal styling with rich cyberpunk color accents (`text-magenta`, `text-cyan`, `text-yellow`, `text-green`) and minimal box border clutter.
+## 1. Make-First Workflow
+Always use `make` targets for development, building, testing, and formatting:
+- **Build**: `make build` (builds both `bin/api` and `bin/tui`), `make build-api`, `make build-tui`
+- **Testing & Verification**: `make test`, `make test-api`, `make test-tui`, `make test-cover`
+- **Code Quality**: `make fmt` (formats code), `make vet` (runs go vet), `make tidy`
+- **Database & Migrations**: `make migrate` (runs goose migrations), `make seed` (populates database), `make sqlc` (generates query models)
+- **Execution**: `make run-api` (starts Gin server), `make run-tui` (launches TUI), `make dev-api` (live reload)
+
+## 2. Terminal UI (Bubble Tea & Lipgloss) Standards
+- **UTF-8 & Emoji Safety**: Always use `theme.Truncate()` for text truncation in fixed-width containers to count visual cell width and avoid slicing multi-byte runes.
+- **Layout Dimensions**: Calculate container widths and heights precisely taking borders (`2 cells`) and padding (`2 cells`) into account so total row width equals terminal width without line wrapping.
+- **Focus Discipline**: Do not auto-focus chat inputs on app launch; preserve top-level keyboard navigation (`j/k`, `i`, `n`, `p`, `?`, `q`).
+- **Terminal Aesthetics**: Maintain clean cyberpunk dark palette (`theme.ColorMagenta`, `theme.ColorCyan`, `theme.ColorGreen`, `theme.ColorYellow`, `theme.ColorDimText`).

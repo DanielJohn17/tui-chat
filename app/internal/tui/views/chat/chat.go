@@ -132,6 +132,7 @@ func (m *Model) RefreshMessages() {
 	}
 
 	m.viewport.SetContent(sb.String())
+	m.viewport.GotoBottom()
 }
 
 func (m *Model) ScrollUp(lines int) {

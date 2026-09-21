@@ -68,7 +68,7 @@ build-tui: ## Build the Go TUI binary (optionally: make build-tui API_URL=https:
 ## ----------------------------------------------------------------------------
 ## Execute / Run Targets
 ## ----------------------------------------------------------------------------
-.PHONY: run-api run-tui dev-api
+.PHONY: run-api run-tui dev-api seed
 run-api: ## Run Go API server directly with go run
 	@printf "$(YELLOW)Starting Go API server...$(RESET)\n"
 	@go run ./cmd/api
@@ -76,6 +76,10 @@ run-api: ## Run Go API server directly with go run
 run-tui: ## Run Go TUI application directly with go run
 	@printf "$(YELLOW)Starting Go TUI client...$(RESET)\n"
 	@go run ./cmd/tui
+
+seed: ## Populate database with sample users, conversations, and messages
+	@printf "$(YELLOW)Populating database with seed data...$(RESET)\n"
+	@go run ./cmd/seed
 
 dev-api: ## Run API with live reloading (uses air if available, falls back to go run)
 	@if command -v air >/dev/null 2>&1; then \

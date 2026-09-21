@@ -518,7 +518,10 @@ UPDATE participants
 SET
   last_read_message_id = GREATEST(
     last_read_message_id,
-    $1::bigint
+    CASE
+      WHEN $1::bigint > 0 THEN $1::bigint
+      ELSE COALESCE((SELECT MAX(id) FROM messages WHERE conv_id = $2), 0)
+    END
   ),
   last_read_at = NOW()
 WHERE

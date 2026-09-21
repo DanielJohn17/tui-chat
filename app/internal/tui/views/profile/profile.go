@@ -1,8 +1,8 @@
 package profile
 
 import (
-	"fmt"
 	"strings"
+	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
@@ -112,9 +112,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				cardWidth = 40
 			}
 			cardW := cardWidth + 6
-			cardH := 33
+			cardH := 32
 			if m.errorMsg != "" || m.successMsg != "" {
-				cardH = 35
+				cardH = 34
 			}
 			startX := (m.width - cardW) / 2
 			startY := (m.height - cardH) / 2
@@ -153,8 +153,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.updateFocus()
 					return m, nil
 				}
-				// Action buttons: Save Changes and Back to Chat (lines 26-28)
-				if relY >= 26+alertOffset && relY <= 28+alertOffset {
+				// Action buttons: Save Changes and Back to Chat (lines 25-28)
+				if relY >= 25+alertOffset && relY <= 28+alertOffset {
 					// Check left half (Save) vs right half (Cancel)
 					if relX < cardW/2 {
 						m.focusIndex = 3
@@ -301,17 +301,13 @@ func (m Model) View() string {
 		return lipgloss.JoinHorizontal(lipgloss.Center, left, lipgloss.NewStyle().Width(spaces).Render(""), right)
 	}
 
-	created := prof.CreatedAt
-	if created == "" {
-		created = "Active Session"
-	}
+	created := formatFriendlyDate(prof.CreatedAt)
 
 	infoBox := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		BorderForeground(theme.ColorBorderDim).
 		Padding(0, 1).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
-			renderDetail("User ID:", fmt.Sprintf("#%d", prof.ID)),
 			renderDetail("Member Since:", created),
 			renderDetail("Status:", "● Connected & Authenticated"),
 		))
@@ -410,4 +406,25 @@ func (m Model) View() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card)
 	}
 	return card
+}
+
+func formatFriendlyDate(tStr string) string {
+	if tStr == "" {
+		return "Active Session"
+	}
+	layouts := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05-07:00",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, tStr); err == nil {
+			return t.Local().Format("Jan 02, 2006 15:04")
+		}
+	}
+	return tStr
 }
