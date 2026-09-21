@@ -19,14 +19,7 @@ import (
 )
 
 func main() {
-	dbURL := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s",
-		config.ENV.DBUser,
-		config.ENV.DBPassword,
-		config.ENV.DBHost,
-		config.ENV.DBport,
-		config.ENV.DBName,
-	)
+	dbURL := config.ENV.GetDBURL()
 
 	ctx := context.Background()
 
@@ -77,7 +70,8 @@ func main() {
 
 	router := router.NewRouter(handlers)
 
-	if err := router.Run(":8080"); err != nil {
+	serverAddr := config.ENV.GetServerAddr()
+	if err := router.Run(serverAddr); err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to start gin server: %v\n", err)
 		os.Exit(1)
 	}

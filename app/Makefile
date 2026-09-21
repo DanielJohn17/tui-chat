@@ -13,8 +13,13 @@ endif
 # Default shell
 SHELL := /bin/bash
 
-# Database connection URL built from .env variables
-DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
+# Database connection URL (uses DATABASE_URL if defined, otherwise builds from components)
+DB_SSLMODE ?= require
+ifdef DATABASE_URL
+    DB_URL ?= $(DATABASE_URL)
+else
+    DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
+endif
 
 BIN_DIR := bin
 API_BIN := $(BIN_DIR)/api

@@ -24,14 +24,7 @@ type seedMessage struct {
 }
 
 func main() {
-	dbURL := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s",
-		config.ENV.DBUser,
-		config.ENV.DBPassword,
-		config.ENV.DBHost,
-		config.ENV.DBport,
-		config.ENV.DBName,
-	)
+	dbURL := config.ENV.GetDBURL()
 
 	ctx := context.Background()
 	conn, err := pgxpool.New(ctx, dbURL)

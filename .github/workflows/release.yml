@@ -1,0 +1,100 @@
+name: Release & Build Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Publish Release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: app/go.sum
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Build Binaries for All Platforms
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          mkdir -p dist
+
+          # -------------------------------------------------------------
+          # 1. Build API Binaries (Linux amd64/arm64)
+          # -------------------------------------------------------------
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/api-linux-amd64 ./cmd/api
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/api-linux-arm64 ./cmd/api
+
+          # -------------------------------------------------------------
+          # 2. Build TUI Binaries (Linux, Windows, macOS)
+          # -------------------------------------------------------------
+          # Linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-linux-amd64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-linux-arm64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=linux GOARCH=386   go build -ldflags="-s -w" -o dist/tui-linux-386   ./cmd/tui
+
+          # Windows
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-windows-amd64.exe ./cmd/tui
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-windows-arm64.exe ./cmd/tui
+          CGO_ENABLED=0 GOOS=windows GOARCH=386   go build -ldflags="-s -w" -o dist/tui-windows-386.exe   ./cmd/tui
+
+          # macOS (Darwin)
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-darwin-amd64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-darwin-arm64 ./cmd/tui
+
+          # -------------------------------------------------------------
+          # 3. Generate SHA256 Checksums
+          # -------------------------------------------------------------
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cd ..
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  deploy-to-cpanel:
+    name: Auto Deploy to cPanel
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    # Only runs if CPANEL_SSH_KEY secret is configured in GitHub repository
+    if: ${{ secrets.CPANEL_SSH_KEY != '' }}
+    steps:
+      - name: SSH and Update API on cPanel
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CPANEL_HOST || '198.38.92.6' }}
+          username: ${{ secrets.CPANEL_USER || 'natchevy' }}
+          key: ${{ secrets.CPANEL_SSH_KEY }}
+          port: ${{ secrets.CPANEL_PORT || 22 }}
+          script: |
+            cd /home/natchevy/apps/api || exit 1
+            echo "Fetching latest API binary from GitHub Releases..."
+            curl -sL "https://github.com/${{ github.repository }}/releases/latest/download/api-linux-amd64" -o api.new
+            chmod +x api.new
+            pkill -f "/home/natchevy/apps/api/api" || true
+            mv api.new api
+            ./start.sh
+            echo "Deployment to cPanel complete!"
+
