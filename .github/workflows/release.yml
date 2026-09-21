@@ -77,15 +77,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: SSH and Update API on cPanel
-        if: ${{ env.CPANEL_SSH_KEY != '' }}
+        if: ${{ env.CPANEL_SSH_KEY != '' || env.CPANEL_PASSWORD != '' }}
         uses: appleboy/ssh-action@v1.0.3
         env:
           CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
+          CPANEL_PASSWORD: ${{ secrets.CPANEL_PASSWORD }}
         with:
           host: ${{ secrets.CPANEL_HOST || '198.38.92.6' }}
           username: ${{ secrets.CPANEL_USER || 'natchevy' }}
           key: ${{ secrets.CPANEL_SSH_KEY }}
           passphrase: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
+          password: ${{ secrets.CPANEL_PASSWORD }}
           port: ${{ secrets.CPANEL_PORT || 22 }}
           script: |
             cd /home/natchevy/apps/api || exit 1
