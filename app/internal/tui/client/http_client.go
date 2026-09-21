@@ -26,6 +26,7 @@ type HTTPClient struct {
 	baseURL     string
 	httpClient  *http.Client
 	profile     Profile
+	sessionPath string
 	mu          sync.RWMutex
 	chats       []Chat
 	messages    map[int64][]Message
@@ -168,7 +169,13 @@ func (h *HTTPClient) Login(username, password string) (*Profile, error) {
 		Token:     res.Data.Token,
 		CreatedAt: res.Data.CreatedAt,
 	}
+	sessPath := h.sessionPath
+	profCopy := h.profile
 	h.mu.Unlock()
+
+	if sessPath != "" {
+		_ = SaveSession(sessPath, profCopy)
+	}
 
 	return &h.profile, nil
 }
@@ -216,9 +223,42 @@ func (h *HTTPClient) Register(name, username, password string) (*Profile, error)
 		Token:     res.Data.Token,
 		CreatedAt: res.Data.CreatedAt,
 	}
+	sessPath := h.sessionPath
+	profCopy := h.profile
 	h.mu.Unlock()
 
+	if sessPath != "" {
+		_ = SaveSession(sessPath, profCopy)
+	}
+
 	return &h.profile, nil
+}
+
+func (h *HTTPClient) Logout() error {
+	_ = h.CloseWS()
+	h.mu.Lock()
+	sessPath := h.sessionPath
+	h.profile = Profile{}
+	h.chats = nil
+	h.messages = make(map[int64][]Message)
+	h.mu.Unlock()
+
+	if sessPath != "" {
+		_ = ClearSession(sessPath)
+	}
+	return nil
+}
+
+func (h *HTTPClient) SessionPath() string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.sessionPath
+}
+
+func (h *HTTPClient) SetSessionPath(path string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.sessionPath = path
 }
 
 func (h *HTTPClient) IsAuthenticated() bool {
@@ -241,8 +281,14 @@ func (h *HTTPClient) SetProfile(p Profile) {
 
 func (h *HTTPClient) UpdateProfile(p Profile) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.profile = p
+	sessPath := h.sessionPath
+	profCopy := h.profile
+	h.mu.Unlock()
+
+	if sessPath != "" && profCopy.Token != "" {
+		_ = SaveSession(sessPath, profCopy)
+	}
 }
 
 func (h *HTTPClient) FetchChats() ([]Chat, error) {

@@ -7,10 +7,11 @@ import (
 )
 
 type TestClient struct {
-	profile  client.Profile
-	chats    []client.Chat
-	messages map[int64][]client.Message
-	msgID    int64
+	profile     client.Profile
+	sessionPath string
+	chats       []client.Chat
+	messages    map[int64][]client.Message
+	msgID       int64
 }
 
 func newTestClient() *TestClient {
@@ -205,6 +206,19 @@ func (m *TestClient) Register(name, username, password string) (*client.Profile,
 	m.profile.Username = username
 	m.profile.Token = "registered-token"
 	return &m.profile, nil
+}
+
+func (m *TestClient) Logout() error {
+	m.profile = client.Profile{}
+	return nil
+}
+
+func (m *TestClient) SessionPath() string {
+	return m.sessionPath
+}
+
+func (m *TestClient) SetSessionPath(path string) {
+	m.sessionPath = path
 }
 
 func (m *TestClient) IsAuthenticated() bool {

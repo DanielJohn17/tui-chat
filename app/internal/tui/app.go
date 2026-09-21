@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
@@ -171,6 +172,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case ChatsLoadedMsg:
+		if msg.Err != nil {
+			errStr := strings.ToLower(msg.Err.Error())
+			if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "invalid token") || strings.Contains(errStr, "401") || strings.Contains(errStr, "unauthenticated") {
+				_ = m.client.Logout()
+				m.state = StateAuth
+				m.authView.SetErrorMessage("Session expired. Please log in again.")
+				return m, nil
+			}
+		}
 		if msg.Err == nil && len(msg.Chats) > 0 {
 			m.sidebarView.SelectIndex(0)
 			if firstChat := m.sidebarView.SelectedChat(); firstChat != nil {
@@ -213,7 +223,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				senderName = "You"
 			}
 
-			if !isSelf {
+			// Check if message is already stored in client memory (avoids duplication on sender window)
+			existing := m.client.Messages(p.ConvID)
+			alreadyExists := false
+			for _, ex := range existing {
+				if (p.ID > 0 && ex.ID == p.ID) || (isSelf && ex.ID == 0 && ex.Text == p.Content) {
+					alreadyExists = true
+					break
+				}
+			}
+
+			if !alreadyExists {
 				m.client.AppendMessage(client.Message{
 					ID:        p.ID,
 					SenderID:  p.SenderID,
@@ -221,7 +241,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					ConvID:    p.ConvID,
 					Text:      p.Content,
 					Timestamp: "now",
-					Self:      false,
+					Self:      isSelf,
 				})
 			}
 
@@ -232,7 +252,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, nil)
 			} else {
-				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 1, nil)
+				unreadDelta := 1
+				if isSelf {
+					unreadDelta = 0
+				}
+				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", unreadDelta, nil)
 			}
 
 		case client.WSChatNotificationPayload:
@@ -242,6 +266,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if p.UserID == m.client.Profile().ID {
 				zero := 0
 				m.client.UpdateChatSnippet(p.ConvID, "", "", 0, &zero)
+			}
+
+		case client.WSErrorPayload:
+			if strings.Contains(strings.ToLower(p.Error), "unauthorized") {
+				_ = m.client.Logout()
+				m.state = StateAuth
+				m.authView.SetErrorMessage("Session expired. Please log in again.")
+				return m, nil
 			}
 		}
 		return m, tea.Batch(nextCmds...)
@@ -257,6 +289,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case profile.ProfileSavedMsg:
 		m.client.SetProfile(msg.Profile)
 		m.state = StateChat
+		return m, nil
+
+	case profile.LogoutMsg:
+		_ = m.client.Logout()
+		m.state = StateAuth
+		m.authView.SetErrorMessage("Logged out successfully.")
 		return m, nil
 	}
 

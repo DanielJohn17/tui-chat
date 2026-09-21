@@ -104,6 +104,11 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 }
 
+func (m *Model) SetErrorMessage(msg string) {
+	m.errorMessage = msg
+	m.loading = false
+}
+
 func (m Model) Mode() Mode {
 	return m.mode
 }

@@ -69,10 +69,13 @@ type Client interface {
 	// Auth operations
 	Login(username, password string) (*Profile, error)
 	Register(name, username, password string) (*Profile, error)
+	Logout() error
 	IsAuthenticated() bool
 	Profile() Profile
 	SetProfile(Profile)
 	UpdateProfile(Profile)
+	SessionPath() string
+	SetSessionPath(string)
 
 	// REST Data operations
 	FetchChats() ([]Chat, error)

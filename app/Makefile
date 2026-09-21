@@ -43,11 +43,14 @@ help: ## Display this help message
 		printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2 \
 	}' $(MAKEFILE_LIST)
 
+GO_ENV ?= development
+API_URL ?= http://localhost:8080
+
 ## ----------------------------------------------------------------------------
 ## Build Targets
 ## ----------------------------------------------------------------------------
-.PHONY: build build-api build-tui
-build: build-api build-tui ## Build both API and TUI binaries into bin/
+.PHONY: build build-api build-tui build-linux build-windows build-cross build-all
+build: build-api build-tui ## Build both API and host TUI binaries into bin/
 
 build-api: ## Build the Go API binary
 	@mkdir -p $(BIN_DIR)
@@ -55,27 +58,49 @@ build-api: ## Build the Go API binary
 	@go build -o $(API_BIN) ./cmd/api
 	@printf "$(GREEN)✓ API binary built successfully.$(RESET)\n"
 
-build-tui: ## Build the Go TUI binary (optionally: make build-tui API_URL=https://...)
+build-tui: ## Build host TUI binary (optionally: make build-tui API_URL=... GO_ENV=...)
 	@mkdir -p $(BIN_DIR)
-	@printf "$(YELLOW)Building TUI binary -> $(TUI_BIN)...$(RESET)\n"
-	@if [ -n "$(API_URL)" ]; then \
-		go build -ldflags "-X main.DefaultAPIURL=$(API_URL)" -o $(TUI_BIN) ./cmd/tui; \
-	else \
-		go build -o $(TUI_BIN) ./cmd/tui; \
-	fi
+	@printf "$(YELLOW)Building TUI binary -> $(TUI_BIN) (GO_ENV=$(GO_ENV))...$(RESET)\n"
+	@go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(TUI_BIN) ./cmd/tui
 	@printf "$(GREEN)✓ TUI binary built successfully.$(RESET)\n"
+
+build-linux: ## Build Linux TUI binaries (amd64, 386, arm64, arm)
+	@mkdir -p $(BIN_DIR)
+	@printf "$(YELLOW)Cross-compiling Linux TUI binaries (amd64, 386, arm64, arm)...$(RESET)\n"
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-amd64 ./cmd/tui
+	@GOOS=linux GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-386 ./cmd/tui
+	@GOOS=linux GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-arm64 ./cmd/tui
+	@GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-arm ./cmd/tui
+	@printf "$(GREEN)✓ Linux TUI binaries built in $(BIN_DIR)/ (amd64, 386, arm64, arm).$(RESET)\n"
+
+build-windows: ## Build Windows TUI binaries (amd64, 386, arm64)
+	@mkdir -p $(BIN_DIR)
+	@printf "$(YELLOW)Cross-compiling Windows TUI binaries (amd64, 386, arm64)...$(RESET)\n"
+	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-amd64.exe ./cmd/tui
+	@GOOS=windows GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-386.exe ./cmd/tui
+	@GOOS=windows GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-arm64.exe ./cmd/tui
+	@printf "$(GREEN)✓ Windows TUI binaries built in $(BIN_DIR)/ (amd64, 386, arm64).$(RESET)\n"
+
+build-cross: build-linux build-windows ## Cross-compile TUI for all Linux & Windows targets
+build-all: build build-cross ## Build host binaries and all cross-compiled targets
 
 ## ----------------------------------------------------------------------------
 ## Execute / Run Targets
 ## ----------------------------------------------------------------------------
-.PHONY: run-api run-tui dev-api seed
+.PHONY: run-api run-tui dev-api dev-user1 dev-user2 seed
 run-api: ## Run Go API server directly with go run
 	@printf "$(YELLOW)Starting Go API server...$(RESET)\n"
 	@go run ./cmd/api
 
-run-tui: ## Run Go TUI application directly with go run
-	@printf "$(YELLOW)Starting Go TUI client...$(RESET)\n"
-	@go run ./cmd/tui
+run-tui: ## Run Go TUI client directly (supports: make run-tui SESSION=alice)
+	@printf "$(YELLOW)Starting Go TUI client (GO_ENV=$(GO_ENV), SESSION=$(SESSION))...$(RESET)\n"
+	@SESSION="$(SESSION)" GO_ENV="$(GO_ENV)" API_URL="$(API_URL)" go run ./cmd/tui
+
+dev-user1: ## Run TUI as User 1 in dev mode (SESSION=alice)
+	@$(MAKE) run-tui SESSION=alice
+
+dev-user2: ## Run TUI as User 2 in dev mode (SESSION=bob)
+	@$(MAKE) run-tui SESSION=bob
 
 seed: ## Populate database with sample users, conversations, and messages
 	@printf "$(YELLOW)Populating database with seed data...$(RESET)\n"

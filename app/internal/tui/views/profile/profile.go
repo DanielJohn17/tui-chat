@@ -13,6 +13,8 @@ import (
 
 type BackToChatMsg struct{}
 
+type LogoutMsg struct{}
+
 type ProfileSavedMsg struct {
 	Profile client.Profile
 }
@@ -153,15 +155,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.updateFocus()
 					return m, nil
 				}
-				// Action buttons: Save Changes and Back to Chat (lines 25-28)
+				// Action buttons: Save Changes, Back to Chat, Logout (lines 25-28)
 				if relY >= 25+alertOffset && relY <= 28+alertOffset {
-					// Check left half (Save) vs right half (Cancel)
-					if relX < cardW/2 {
+					if relX < cardW/3 {
 						m.focusIndex = 3
 						return m.save()
+					} else if relX < (cardW*3)/4 {
+						m.focusIndex = 4
+						return m, func() tea.Msg { return BackToChatMsg{} }
+					} else {
+						m.focusIndex = 5
+						return m, func() tea.Msg { return LogoutMsg{} }
 					}
-					m.focusIndex = 4
-					return m, func() tea.Msg { return BackToChatMsg{} }
 				}
 			}
 		}
@@ -173,19 +178,25 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "esc":
 			return m, func() tea.Msg { return BackToChatMsg{} }
 
+		case "l", "ctrl+l":
+			return m, func() tea.Msg { return LogoutMsg{} }
+
 		case "tab", "down":
-			m.focusIndex = (m.focusIndex + 1) % 5
+			m.focusIndex = (m.focusIndex + 1) % 6
 			m.updateFocus()
 			return m, nil
 
 		case "shift+tab", "up":
-			m.focusIndex = (m.focusIndex - 1 + 5) % 5
+			m.focusIndex = (m.focusIndex - 1 + 6) % 6
 			m.updateFocus()
 			return m, nil
 
 		case "enter":
 			if m.focusIndex == 4 { // Cancel button
 				return m, func() tea.Msg { return BackToChatMsg{} }
+			}
+			if m.focusIndex == 5 { // Logout button
+				return m, func() tea.Msg { return LogoutMsg{} }
 			}
 			// From any field or Save button, submit
 			return m.save()
@@ -343,11 +354,27 @@ func (m Model) View() string {
 			BorderForeground(theme.ColorBorderDim)
 	}
 
-	saveBtn := saveStyle.Render("✔ Save Changes [Enter]")
-	cancelBtn := cancelStyle.Render("✖ Back to Chat [Esc]")
+	logoutStyle := lipgloss.NewStyle().
+		Bold(true).
+		Border(lipgloss.RoundedBorder()).
+		Padding(0, 1)
+	if m.focusIndex == 5 {
+		logoutStyle = logoutStyle.
+			Foreground(theme.ColorWhite).
+			Background(theme.ColorRed).
+			BorderForeground(theme.ColorRed)
+	} else {
+		logoutStyle = logoutStyle.
+			Foreground(theme.ColorRed).
+			BorderForeground(theme.ColorBorderDim)
+	}
+
+	saveBtn := saveStyle.Render("✔ Save")
+	cancelBtn := cancelStyle.Render("✖ Back [Esc]")
+	logoutBtn := logoutStyle.Render("⏻ Logout [L]")
 
 	buttonsRow := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(
-		lipgloss.JoinHorizontal(lipgloss.Center, saveBtn, "    ", cancelBtn),
+		lipgloss.JoinHorizontal(lipgloss.Center, saveBtn, "  ", cancelBtn, "  ", logoutBtn),
 	)
 
 	// Feedback Messages
@@ -369,7 +396,7 @@ func (m Model) View() string {
 	}
 
 	// Hotkey hints footer
-	hint := theme.StyleDim.Render("Tab / ↑↓: Navigate  •  Enter: Save  •  Esc: Return to Chat")
+	hint := theme.StyleDim.Render("Tab / ↑↓: Navigate  •  Enter: Select  •  L: Logout  •  Esc: Back")
 	footer := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(hint)
 
 	items := []string{
