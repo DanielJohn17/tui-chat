@@ -95,7 +95,7 @@ jobs:
             echo "Fetching latest API binary from GitHub Releases..."
             curl -sL "https://github.com/${{ github.repository }}/releases/latest/download/api-linux-amd64" -o api.new
             chmod +x api.new
-            pkill -f "/home/natchevy/apps/api/api" || true
+            pkill -x api || true
             mv api.new api
 
             if [ ! -f ./start.sh ]; then
@@ -103,8 +103,8 @@ jobs:
             #!/bin/bash
             APP_DIR="/home/natchevy/apps/api"
             cd "$APP_DIR" || exit 1
-            if ! pgrep -f "$APP_DIR/api" > /dev/null; then
-                nohup "$APP_DIR/api" >> "$APP_DIR/api.log" 2>&1 &
+            if ! pgrep -x api > /dev/null; then
+                nohup ./api >> api.log 2>&1 &
             fi
             EOF
               chmod +x ./start.sh
@@ -112,4 +112,5 @@ jobs:
 
             ./start.sh
             echo "Deployment to cPanel complete!"
+
 
