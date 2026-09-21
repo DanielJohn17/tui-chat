@@ -16,7 +16,7 @@ func RenderHelp(width, height int) string {
 
 	innerWidth := boxWidth - 6
 
-	title := theme.StyleTitle.Render("◈ TUI HELP DESK & SHORTCUTS ◈")
+	title := theme.StyleTitle.Render("◈ ") + theme.RenderLineTalkWordmark() + theme.StyleTitle.Render(" HELP DESK ◈")
 	closeHint := theme.StyleDim.Render("[ Esc / Enter / ? / Ctrl+H / q: Close ]")
 
 	renderRow := func(key, desc string) string {

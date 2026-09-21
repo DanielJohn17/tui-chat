@@ -113,3 +113,38 @@ func Truncate(s string, maxLen int) string {
 	}
 	return string(runes) + "…"
 }
+
+// RenderLineTalkWordmark returns a compact two-tone colored wordmark: LINE in Magenta, TALK in Cyan
+func RenderLineTalkWordmark() string {
+	lineStyle := lipgloss.NewStyle().Bold(true).Foreground(ColorMagenta)
+	talkStyle := lipgloss.NewStyle().Bold(true).Foreground(ColorCyan)
+	return lineStyle.Render("LINE") + talkStyle.Render("TALK")
+}
+
+// RenderLineTalkLogo renders the 3-line ASCII block wordmark centered for card headers
+func RenderLineTalkLogo(containerWidth int) string {
+	lineStyle := lipgloss.NewStyle().Bold(true).Foreground(ColorMagenta)
+	talkStyle := lipgloss.NewStyle().Bold(true).Foreground(ColorCyan)
+	dimStyle := lipgloss.NewStyle().Foreground(ColorDimText)
+
+	r1 := lineStyle.Render("█   █ █▄ █ ████") + "   " + talkStyle.Render("▀█▀ ███ █   █ █")
+	r2 := lineStyle.Render("█   █ █ ▀█ █▄▄ ") + "    " + talkStyle.Render("█  █▄█ █   ██ ")
+	r3 := lineStyle.Render("███ █ █  █ ████") + "    " + talkStyle.Render("█  █ █ ███ █ █")
+
+	center := func(s string) string {
+		if containerWidth > 0 {
+			return lipgloss.NewStyle().Width(containerWidth).Align(lipgloss.Center).Render(s)
+		}
+		return s
+	}
+
+	sub := dimStyle.Render("SECURE TERMINAL COMMUNICATION")
+
+	return lipgloss.JoinVertical(lipgloss.Center,
+		center(r1),
+		center(r2),
+		center(r3),
+		center(sub),
+	)
+}
+

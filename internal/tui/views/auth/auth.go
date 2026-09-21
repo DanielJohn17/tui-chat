@@ -142,9 +142,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			cardW := cardWidth + 6
 
-			cardH := 23
+			cardH := 25
 			if m.mode == ModeRegister {
-				cardH = 28
+				cardH = 30
 			}
 			if m.errorMessage != "" {
 				cardH += 4
@@ -163,8 +163,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			relY := msg.Y - startY
 
 			if relX >= 0 && relX < cardW {
-				// 1. Tabs row (line 5)
-				if relY >= 4 && relY <= 5 {
+				// 1. Tabs row (lines 6-7)
+				if relY >= 6 && relY <= 7 {
 					if relX < cardW/2 {
 						m.mode = ModeLogin
 					} else {
@@ -181,20 +181,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 
 				if m.mode == ModeLogin {
-					// Username field (lines 7-10 + errorOffset)
-					if relY >= 7+errorOffset && relY <= 10+errorOffset {
+					// Username field (lines 9-12 + errorOffset)
+					if relY >= 9+errorOffset && relY <= 12+errorOffset {
 						m.focusIndex = 0
 						m.updateFocus()
 						return m, nil
 					}
-					// Password field (lines 12-15 + errorOffset)
-					if relY >= 12+errorOffset && relY <= 15+errorOffset {
+					// Password field (lines 14-17 + errorOffset)
+					if relY >= 14+errorOffset && relY <= 17+errorOffset {
 						m.focusIndex = 1
 						m.updateFocus()
 						return m, nil
 					}
-					// Submit button (lines 16-18 + errorOffset)
-					if relY >= 16+errorOffset && relY <= 18+errorOffset {
+					// Submit button (lines 18-20 + errorOffset)
+					if relY >= 18+errorOffset && relY <= 20+errorOffset {
 						if !m.loading {
 							return m, m.submit()
 						}
@@ -202,26 +202,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					}
 				} else {
 					// Register mode
-					// Display Name field (lines 7-10 + errorOffset)
-					if relY >= 7+errorOffset && relY <= 10+errorOffset {
+					// Display Name field (lines 9-12 + errorOffset)
+					if relY >= 9+errorOffset && relY <= 12+errorOffset {
 						m.focusIndex = 0
 						m.updateFocus()
 						return m, nil
 					}
-					// Username field (lines 12-15 + errorOffset)
-					if relY >= 12+errorOffset && relY <= 15+errorOffset {
+					// Username field (lines 14-17 + errorOffset)
+					if relY >= 14+errorOffset && relY <= 17+errorOffset {
 						m.focusIndex = 1
 						m.updateFocus()
 						return m, nil
 					}
-					// Password field (lines 17-20 + errorOffset)
-					if relY >= 17+errorOffset && relY <= 20+errorOffset {
+					// Password field (lines 19-22 + errorOffset)
+					if relY >= 19+errorOffset && relY <= 22+errorOffset {
 						m.focusIndex = 2
 						m.updateFocus()
 						return m, nil
 					}
-					// Submit button (lines 21-23 + errorOffset)
-					if relY >= 21+errorOffset && relY <= 23+errorOffset {
+					// Submit button (lines 23-25 + errorOffset)
+					if relY >= 23+errorOffset && relY <= 25+errorOffset {
 						if !m.loading {
 							return m, m.submit()
 						}
@@ -414,12 +414,7 @@ func (m Model) View() string {
 	m.regPassword.Width = inputWidth - 2
 
 	// Title / Brand
-	title := theme.StyleTitle.Render("◈ TUI CHAT SYSTEM ◈")
-	subtitle := theme.StyleDim.Render("Secure Terminal Communication")
-	header := lipgloss.JoinVertical(lipgloss.Center,
-		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(title),
-		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(subtitle),
-	)
+	header := theme.RenderLineTalkLogo(innerWidth)
 
 	// Mode selector tabs
 	var tabLogin, tabRegister string

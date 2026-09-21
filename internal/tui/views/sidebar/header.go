@@ -6,7 +6,7 @@ import (
 )
 
 func renderHeader(contentWidth int) string {
-	headerLeft := theme.StyleTitle.Render("◈ CONVERSATIONS")
+	headerLeft := theme.StyleTitle.Render("◈ ") + theme.RenderLineTalkWordmark()
 	headerRight := theme.StyleSuccess.Render("[+n]")
 	headerSpaces := contentWidth - lipgloss.Width(headerLeft) - lipgloss.Width(headerRight)
 	if headerSpaces < 1 {

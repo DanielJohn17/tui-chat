@@ -23,7 +23,7 @@ endif
 
 BIN_DIR := bin
 API_BIN := $(BIN_DIR)/api
-TUI_BIN := $(BIN_DIR)/tui
+TUI_BIN := $(BIN_DIR)/linetalk
 MIGRATIONS_DIR := internal/api/db/migrations
 GOOSE ?= goose
 # Bubble Tea does not require code generation
@@ -54,8 +54,8 @@ API_URL ?= http://localhost:8080
 ## ----------------------------------------------------------------------------
 ## Build Targets
 ## ----------------------------------------------------------------------------
-.PHONY: build build-api build-tui build-linux build-windows build-cross build-all
-build: build-api build-tui ## Build both API and host TUI binaries into bin/
+.PHONY: build build-api build-tui build-linux build-windows build-darwin build-cross build-all
+build: build-api build-tui ## Build both API and host LineTalk binaries into bin/
 
 build-api: ## Build the Go API binary
 	@mkdir -p $(BIN_DIR)
@@ -63,30 +63,37 @@ build-api: ## Build the Go API binary
 	@go build -o $(API_BIN) ./cmd/api
 	@printf "$(GREEN)✓ API binary built successfully.$(RESET)\n"
 
-build-tui: ## Build host TUI binary (optionally: make build-tui API_URL=... GO_ENV=...)
+build-tui: ## Build host LineTalk binary (optionally: make build-tui API_URL=... GO_ENV=...)
 	@mkdir -p $(BIN_DIR)
-	@printf "$(YELLOW)Building TUI binary -> $(TUI_BIN) (GO_ENV=$(GO_ENV))...$(RESET)\n"
+	@printf "$(YELLOW)Building LineTalk binary -> $(TUI_BIN) (GO_ENV=$(GO_ENV))...$(RESET)\n"
 	@go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(TUI_BIN) ./cmd/tui
-	@printf "$(GREEN)✓ TUI binary built successfully.$(RESET)\n"
+	@printf "$(GREEN)✓ LineTalk binary built successfully.$(RESET)\n"
 
-build-linux: ## Build Linux TUI binaries (amd64, 386, arm64, arm)
+build-linux: ## Build Linux LineTalk binaries (amd64, 386, arm64, arm)
 	@mkdir -p $(BIN_DIR)
-	@printf "$(YELLOW)Cross-compiling Linux TUI binaries (amd64, 386, arm64, arm)...$(RESET)\n"
-	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-amd64 ./cmd/tui
-	@GOOS=linux GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-386 ./cmd/tui
-	@GOOS=linux GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-arm64 ./cmd/tui
-	@GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-linux-arm ./cmd/tui
-	@printf "$(GREEN)✓ Linux TUI binaries built in $(BIN_DIR)/ (amd64, 386, arm64, arm).$(RESET)\n"
+	@printf "$(YELLOW)Cross-compiling Linux LineTalk binaries (amd64, 386, arm64, arm)...$(RESET)\n"
+	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-amd64 ./cmd/tui
+	@GOOS=linux GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-386 ./cmd/tui
+	@GOOS=linux GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-arm64 ./cmd/tui
+	@GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-arm ./cmd/tui
+	@printf "$(GREEN)✓ Linux LineTalk binaries built in $(BIN_DIR)/ (amd64, 386, arm64, arm).$(RESET)\n"
 
-build-windows: ## Build Windows TUI binaries (amd64, 386, arm64)
+build-windows: ## Build Windows LineTalk binaries (amd64, 386, arm64)
 	@mkdir -p $(BIN_DIR)
-	@printf "$(YELLOW)Cross-compiling Windows TUI binaries (amd64, 386, arm64)...$(RESET)\n"
-	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-amd64.exe ./cmd/tui
-	@GOOS=windows GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-386.exe ./cmd/tui
-	@GOOS=windows GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/tui-windows-arm64.exe ./cmd/tui
-	@printf "$(GREEN)✓ Windows TUI binaries built in $(BIN_DIR)/ (amd64, 386, arm64).$(RESET)\n"
+	@printf "$(YELLOW)Cross-compiling Windows LineTalk binaries (amd64, 386, arm64)...$(RESET)\n"
+	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-amd64.exe ./cmd/tui
+	@GOOS=windows GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-386.exe ./cmd/tui
+	@GOOS=windows GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-arm64.exe ./cmd/tui
+	@printf "$(GREEN)✓ Windows LineTalk binaries built in $(BIN_DIR)/ (amd64, 386, arm64).$(RESET)\n"
 
-build-cross: build-linux build-windows ## Cross-compile TUI for all Linux & Windows targets
+build-darwin: ## Build macOS LineTalk binaries (amd64, arm64)
+	@mkdir -p $(BIN_DIR)
+	@printf "$(YELLOW)Cross-compiling macOS LineTalk binaries (amd64, arm64)...$(RESET)\n"
+	@GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-darwin-amd64 ./cmd/tui
+	@GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-darwin-arm64 ./cmd/tui
+	@printf "$(GREEN)✓ macOS LineTalk binaries built in $(BIN_DIR)/ (amd64, arm64).$(RESET)\n"
+
+build-cross: build-linux build-windows build-darwin ## Cross-compile LineTalk for Linux, Windows & macOS
 build-all: build build-cross ## Build host binaries and all cross-compiled targets
 
 ## ----------------------------------------------------------------------------

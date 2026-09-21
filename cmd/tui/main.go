@@ -17,13 +17,25 @@ import (
 var (
 	DefaultAPIURL = "http://localhost:8080"
 	DefaultGoEnv  = "development"
+	Version       = "dev"
+	Commit        = "none"
+	BuildDate     = "unknown"
 )
 
 func main() {
 	var sessionFlag string
+	var showVersion bool
+
 	flag.StringVar(&sessionFlag, "session", "", "Session profile name (e.g. alice, bob) for testing multiple users")
 	flag.StringVar(&sessionFlag, "s", "", "Shorthand for -session")
+	flag.BoolVar(&showVersion, "version", false, "Print LineTalk version and exit")
+	flag.BoolVar(&showVersion, "v", false, "Print LineTalk version and exit")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("⚡ LineTalk %s (Commit: %s, Built: %s)\n", Version, Commit, BuildDate)
+		os.Exit(0)
+	}
 
 	// Attempt to load .env from current directory or parent directories
 	_ = godotenv.Load(".env", "../../.env", "../../../.env")

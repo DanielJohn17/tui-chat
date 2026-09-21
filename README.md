@@ -96,22 +96,22 @@ Zero dependencies required. Download and run the standalone executable for your 
 
 ### Linux (x86_64 / ARM64)
 ```bash
-curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/tui-linux-amd64
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/linetalk-linux-amd64
 chmod +x linetalk
 ./linetalk
 ```
 
 ### macOS (Apple Silicon / Intel)
 ```bash
-curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/tui-darwin-arm64
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/linetalk-darwin-arm64
 chmod +x linetalk
 ./linetalk
 ```
 
 ### Windows (PowerShell / Command Prompt)
-Download **`tui-windows-amd64.exe`** from [Releases](https://github.com/DanielJohn17/tui-chat/releases) and launch:
+Download **`linetalk-windows-amd64.exe`** from [Releases](https://github.com/DanielJohn17/tui-chat/releases) and launch:
 ```powershell
-.\tui-windows-amd64.exe
+.\linetalk-windows-amd64.exe
 ```
 
 > [!TIP]
