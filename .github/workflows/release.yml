@@ -27,6 +27,8 @@ jobs:
         run: go mod download
 
       - name: Build TUI Client Binaries (Public) & Server API (Private)
+        env:
+          RELEASE_API_URL: ${{ vars.API_URL || secrets.API_URL || 'https://api-tui.natcher.me' }}
         run: |
           mkdir -p dist
           mkdir -p build
@@ -36,22 +38,26 @@ jobs:
           # -------------------------------------------------------------
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/api ./cmd/api
 
+          TUI_LDFLAGS="-s -w -X main.DefaultAPIURL=${RELEASE_API_URL} -X main.DefaultGoEnv=production"
+
+
           # -------------------------------------------------------------
           # 2. Build TUI Client Binaries (For Public GitHub Release)
           # -------------------------------------------------------------
           # Linux
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-linux-amd64 ./cmd/tui
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-linux-arm64 ./cmd/tui
-          CGO_ENABLED=0 GOOS=linux GOARCH=386   go build -ldflags="-s -w" -o dist/tui-linux-386   ./cmd/tui
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-linux-amd64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-linux-arm64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=linux GOARCH=386   go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-linux-386   ./cmd/tui
 
           # Windows
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-windows-amd64.exe ./cmd/tui
-          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-windows-arm64.exe ./cmd/tui
-          CGO_ENABLED=0 GOOS=windows GOARCH=386   go build -ldflags="-s -w" -o dist/tui-windows-386.exe   ./cmd/tui
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-windows-amd64.exe ./cmd/tui
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-windows-arm64.exe ./cmd/tui
+          CGO_ENABLED=0 GOOS=windows GOARCH=386   go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-windows-386.exe   ./cmd/tui
 
           # macOS (Darwin)
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-darwin-amd64 ./cmd/tui
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-darwin-arm64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-darwin-amd64 ./cmd/tui
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="${TUI_LDFLAGS}" -o dist/tui-darwin-arm64 ./cmd/tui
+
 
           # -------------------------------------------------------------
           # 3. Generate SHA256 Checksums for TUI Binaries

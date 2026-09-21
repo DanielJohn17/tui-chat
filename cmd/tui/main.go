@@ -16,7 +16,7 @@ import (
 //	go build -ldflags "-X main.DefaultAPIURL=https://api.yourdomain.com -X main.DefaultGoEnv=development" ./cmd/tui
 var (
 	DefaultAPIURL = "http://localhost:8080"
-	DefaultGoEnv  = "production"
+	DefaultGoEnv  = "development"
 )
 
 func main() {
