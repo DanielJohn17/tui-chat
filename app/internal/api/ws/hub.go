@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"time"
 )
 
 type DirectMessage struct {
@@ -19,9 +20,6 @@ type Hub struct {
 	// support multiple client per user
 	users map[int64]map[*Client]bool
 
-	// set active clients in conversation
-	convs map[int64]map[*Client]bool
-
 	SendDirect    chan *DirectMessage
 	BroadcastRead chan *ConversationReadPayload
 
@@ -32,7 +30,6 @@ type Hub struct {
 func NewHub() *Hub {
 	return &Hub{
 		users:         make(map[int64]map[*Client]bool),
-		convs:         make(map[int64]map[*Client]bool),
 		SendDirect:    make(chan *DirectMessage, 256),
 		BroadcastRead: make(chan *ConversationReadPayload, 256),
 		Register:      make(chan *Client, 32),
@@ -50,34 +47,13 @@ func (h *Hub) Run() {
 			}
 			h.users[client.UserID][client] = true
 
-			// Register client to convs map if convID is set
-			if client.ConvID > 0 {
-				if _, ok := h.convs[client.ConvID]; !ok {
-					h.convs[client.ConvID] = make(map[*Client]bool)
-				}
-				h.convs[client.ConvID][client] = true
-			}
-
 		case client := <-h.UnRegister:
 			// Unregister clent from users map
 			if clients, ok := h.users[client.UserID]; ok {
 				if _, exists := clients[client]; exists {
 					delete(clients, client)
-					close(client.Send)
 					if len(clients) == 0 {
 						delete(h.users, client.UserID)
-					}
-				}
-			}
-
-			// Unregister client from convs map
-			if client.ConvID > 0 {
-				if clients, ok := h.convs[client.ConvID]; ok {
-					if _, exists := clients[client]; exists {
-						delete(clients, client)
-						if len(clients) == 0 {
-							delete(h.convs, client.ConvID)
-						}
 					}
 				}
 			}
@@ -125,12 +101,12 @@ func (h *Hub) Run() {
 						select {
 						case c.Send <- chatMsgFrame:
 							// Auto-mark as read in background since recipient is actively looking
-							go c.convService.MarkAsRead(
-								context.Background(),
-								msg.Message.ID,
-								c.UserID,
-								msg.ConvID,
-							)
+							go func(msgID, userID, convID int64, service MessagePersister) {
+								ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+								defer cancel()
+
+								service.MarkAsRead(ctx, msgID, userID, convID)
+							}(msg.Message.ID, c.UserID, msg.ConvID, c.convService)
 						default:
 							h.dropClient(c)
 						}
@@ -178,7 +154,6 @@ func (h *Hub) Run() {
 				}
 			}
 		}
-
 	}
 }
 
@@ -192,14 +167,5 @@ func (h *Hub) dropClient(c *Client) {
 		}
 	}
 
-	if c.ConvID > 0 {
-		if clients, ok := h.convs[c.ConvID]; ok {
-			delete(clients, c)
-			if len(clients) == 0 {
-				delete(h.convs, c.ConvID)
-			}
-		}
-	}
-
-	close(c.Send)
+	c.closeSendChannel()
 }

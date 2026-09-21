@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"log/slog"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,11 +40,19 @@ type Client struct {
 	UserID       int64
 	Username     string
 	ActiveConvID atomic.Int64
-	ConvID       int64
 	Send         chan []byte
 	Conn         *websocket.Conn
 	Hub          *Hub
 	convService  MessagePersister
+	closeSend    sync.Once
+}
+
+func (c *Client) closeSendChannel() {
+	c.closeSend.Do(func() {
+		if c.Send != nil {
+			close(c.Send)
+		}
+	})
 }
 
 func (c *Client) readPump() {
@@ -111,7 +121,7 @@ func (c *Client) readPump() {
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
-		c.Hub.UnRegister <- c
+		ticker.Stop()
 		_ = c.Conn.Close()
 	}()
 
@@ -127,30 +137,7 @@ func (c *Client) writePump() {
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-
-			if _, err := w.Write(message); err != nil {
-				_ = w.Close()
-				return
-			}
-
-			// Add queued chat messages to the current websocket message
-			n := len(c.Send)
-			for range n {
-				if _, err := w.Write([]byte{'\n'}); err != nil {
-					_ = w.Close()
-					return
-				}
-
-				if _, err := w.Write(<-c.Send); err != nil {
-					_ = w.Close()
-					return
-				}
-			}
-			if err := w.Close(); err != nil {
+			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
 
@@ -208,10 +195,12 @@ func (c *Client) handleSendMessage(rawPayload json.RawMessage) {
 		return
 	}
 
-	convID := c.ConvID
-	if payload.ConvID > 0 {
-		convID = payload.ConvID
+	if payload.ConvID <= 0 || strings.TrimSpace(payload.Content) == "" {
+		c.sendError(payload.ConvID, payload.Content, "invalid conversation id or empty message", false)
+		return
 	}
+
+	convID := payload.ConvID
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
