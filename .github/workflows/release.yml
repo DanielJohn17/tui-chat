@@ -12,9 +12,6 @@ jobs:
   build-and-release:
     name: Build and Publish Release
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./app
 
     steps:
       - name: Checkout Code
@@ -24,7 +21,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: app/go.sum
+          cache-dependency-path: go.sum
 
       - name: Download Go dependencies
         run: go mod download
@@ -69,7 +66,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/dist/*
+            dist/*
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -99,5 +96,3 @@ jobs:
             mv api.new api
             ./start.sh
             echo "Deployment to cPanel complete!"
-
-
