@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-and-release:
-    name: Build and Publish Release
+    name: Build TUI Releases & API Binary
     runs-on: ubuntu-latest
 
     steps:
@@ -26,19 +26,18 @@ jobs:
       - name: Download Go dependencies
         run: go mod download
 
-      - name: Build Binaries for All Platforms
+      - name: Build TUI Client Binaries (Public) & Server API (Private)
         run: |
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
           mkdir -p dist
+          mkdir -p build
 
           # -------------------------------------------------------------
-          # 1. Build API Binaries (Linux amd64/arm64)
+          # 1. Build Server API Binary (For Private Deployment Only)
           # -------------------------------------------------------------
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/api-linux-amd64 ./cmd/api
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/api-linux-arm64 ./cmd/api
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/api ./cmd/api
 
           # -------------------------------------------------------------
-          # 2. Build TUI Binaries (Linux, Windows, macOS)
+          # 2. Build TUI Client Binaries (For Public GitHub Release)
           # -------------------------------------------------------------
           # Linux
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/tui-linux-amd64 ./cmd/tui
@@ -55,13 +54,20 @@ jobs:
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/tui-darwin-arm64 ./cmd/tui
 
           # -------------------------------------------------------------
-          # 3. Generate SHA256 Checksums
+          # 3. Generate SHA256 Checksums for TUI Binaries
           # -------------------------------------------------------------
           cd dist
           sha256sum * > SHA256SUMS.txt
           cd ..
 
-      - name: Create GitHub Release
+      - name: Upload Private API Binary Artifact (For cPanel Deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-binary
+          path: build/api
+          retention-days: 1
+
+      - name: Create Public GitHub Release (TUI Clients Only)
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
@@ -76,8 +82,30 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: SSH and Update API on cPanel
-        if: ${{ env.CPANEL_SSH_KEY != '' || env.CPANEL_PASSWORD != '' }}
+      - name: Download API Binary Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-binary
+          path: .
+
+      - name: Copy API Binary to cPanel Server
+        if: ${{ env.CPANEL_PASSWORD != '' || env.CPANEL_SSH_KEY != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        env:
+          CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
+          CPANEL_PASSWORD: ${{ secrets.CPANEL_PASSWORD }}
+        with:
+          host: ${{ secrets.CPANEL_HOST || '198.38.92.6' }}
+          username: ${{ secrets.CPANEL_USER || 'natchevy' }}
+          password: ${{ secrets.CPANEL_PASSWORD }}
+          key: ${{ secrets.CPANEL_SSH_KEY }}
+          passphrase: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
+          port: ${{ secrets.CPANEL_PORT || 22 }}
+          source: "api"
+          target: "/home/natchevy/apps/api"
+
+      - name: Restart API on cPanel
+        if: ${{ env.CPANEL_PASSWORD != '' || env.CPANEL_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1.0.3
         env:
           CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
@@ -90,13 +118,9 @@ jobs:
           password: ${{ secrets.CPANEL_PASSWORD }}
           port: ${{ secrets.CPANEL_PORT || 22 }}
           script: |
-            mkdir -p /home/natchevy/apps/api
             cd /home/natchevy/apps/api || exit 1
-            echo "Fetching latest API binary from GitHub Releases..."
-            curl -sL "https://github.com/${{ github.repository }}/releases/latest/download/api-linux-amd64" -o api.new
-            chmod +x api.new
+            chmod +x api
             pkill -x api || true
-            mv api.new api
 
             if [ ! -f ./start.sh ]; then
               cat << 'EOF' > ./start.sh
@@ -112,5 +136,3 @@ jobs:
 
             ./start.sh
             echo "Deployment to cPanel complete!"
-
-
