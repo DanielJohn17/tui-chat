@@ -175,7 +175,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			case "enter":
 				text := strings.TrimSpace(m.input.Value())
 				if text != "" && m.activeChatID != 0 {
-					m.client.Send(m.activeChatID, text)
+					_ = m.client.SendWS(m.activeChatID, text)
+					nowStr := "now"
+					m.client.AppendMessage(client.Message{
+						ConvID:    m.activeChatID,
+						SenderID:  m.client.Profile().ID,
+						Sender:    "You",
+						Text:      text,
+						Timestamp: nowStr,
+						Self:      true,
+					})
+					m.client.UpdateChatSnippet(m.activeChatID, text, nowStr, 0, nil)
 					m.input.Reset()
 					m.RefreshMessages()
 					m.viewport.GotoBottom()

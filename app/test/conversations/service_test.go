@@ -113,7 +113,6 @@ func (m *MockConvRepo) MarkAsRead(
 	return m.Called(ctx, messageID, userID, convID).Error(0)
 }
 
-
 // MockUserService mocks users.UserServiceInt using testify/mock.
 type MockUserService struct {
 	mock.Mock

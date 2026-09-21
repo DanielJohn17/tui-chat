@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func Render(activeChat *client.Chat, isInputFocused bool, width int) string {
+func Render(activeChat *client.Chat, isInputFocused bool, isConnected bool, width int) string {
 	contentWidth := width - 4
 	if contentWidth < 40 {
 		contentWidth = 40
@@ -46,10 +46,18 @@ func Render(activeChat *client.Chat, isInputFocused bool, width int) string {
 	shortcuts := theme.StyleDim.Render(shortcutsText)
 
 	var onlineStatus string
-	if width < 85 {
-		onlineStatus = theme.StyleSuccess.Render("●")
+	if isConnected {
+		if width < 85 {
+			onlineStatus = theme.StyleSuccess.Render("●")
+		} else {
+			onlineStatus = theme.StyleSuccess.Render("● LIVE (WS)")
+		}
 	} else {
-		onlineStatus = theme.StyleSuccess.Render("● CONNECTED")
+		if width < 85 {
+			onlineStatus = lipgloss.NewStyle().Foreground(theme.ColorRed).Render("○")
+		} else {
+			onlineStatus = lipgloss.NewStyle().Foreground(theme.ColorRed).Render("○ OFFLINE")
+		}
 	}
 
 	spaces1 := (contentWidth - lipgloss.Width(leftText) - lipgloss.Width(shortcuts) - lipgloss.Width(onlineStatus)) / 2

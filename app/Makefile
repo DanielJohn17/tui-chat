@@ -55,10 +55,14 @@ build-api: ## Build the Go API binary
 	@go build -o $(API_BIN) ./cmd/api
 	@printf "$(GREEN)✓ API binary built successfully.$(RESET)\n"
 
-build-tui: ## Build the Go TUI binary
+build-tui: ## Build the Go TUI binary (optionally: make build-tui API_URL=https://...)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(YELLOW)Building TUI binary -> $(TUI_BIN)...$(RESET)\n"
-	@go build -o $(TUI_BIN) ./cmd/tui
+	@if [ -n "$(API_URL)" ]; then \
+		go build -ldflags "-X main.DefaultAPIURL=$(API_URL)" -o $(TUI_BIN) ./cmd/tui; \
+	else \
+		go build -o $(TUI_BIN) ./cmd/tui; \
+	fi
 	@printf "$(GREEN)✓ TUI binary built successfully.$(RESET)\n"
 
 ## ----------------------------------------------------------------------------

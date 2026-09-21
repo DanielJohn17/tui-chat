@@ -74,7 +74,7 @@ func (m NewDMModel) View(width, height int) string {
 	inputBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
-		Width(innerWidth - 4).
+		Width(innerWidth-4).
 		Padding(0, 1).
 		Render(m.input.View())
 

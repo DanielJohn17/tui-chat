@@ -13,7 +13,7 @@ import (
 )
 
 func authenticatedApp() tea.Model {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
 	model, _ = model.Update(auth.AuthSuccessMsg{
@@ -51,7 +51,7 @@ func TestSidebarBottomUserInfoAndScrolling(t *testing.T) {
 	assert.Contains(t, view, "@alice")
 
 	// Verify mock contacts (at least 10+ in list)
-	c := client.NewMock()
+	c := newTestClient()
 	assert.GreaterOrEqual(t, len(c.Chats()), 10)
 
 	// Verify messages in Chat 1 is at least 20+
@@ -151,7 +151,7 @@ func TestSidebarDimensionsAndNoOverflow(t *testing.T) {
 	}
 
 	// Terminal 80x24
-	c2 := client.NewMock()
+	c2 := newTestClient()
 	m2 := tea.Model(tui.NewApp(c2))
 	m2, _ = m2.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m2, _ = m2.Update(auth.AuthSuccessMsg{Profile: c2.Profile()})
@@ -228,7 +228,7 @@ func TestSidebarAllElementsClickable(t *testing.T) {
 }
 
 func TestTelegramSidebarLayout(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
 	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
@@ -260,7 +260,7 @@ func TestTelegramSidebarLayout(t *testing.T) {
 }
 
 func TestUnseenMessageMarkRead(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	// Charlie Zhang (ID 3) has 2 unread messages initially
 	var charlieChat *client.Chat
 	for _, ch := range c.Chats() {
@@ -353,7 +353,7 @@ func TestProfilePageMouseClicks(t *testing.T) {
 }
 
 func TestDynamicConversationSortingOnSendAndNewDM(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
 	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})

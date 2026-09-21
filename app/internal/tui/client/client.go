@@ -31,18 +31,63 @@ type Message struct {
 	Self      bool   `json:"self"`
 }
 
-type Client interface {
-	Chats() []Chat
-	Messages(chatID int64) []Message
-	Profile() Profile
-	UpdateProfile(Profile)
-	Send(chatID int64, text string)
-	AddChat(name, username string) Chat
-	MarkRead(chatID int64)
+// Inbound WebSocket Event Payloads
+type WSChatMessagePayload struct {
+	ID          int64  `json:"id"`
+	SenderID    int64  `json:"sender_id"`
+	RecipientID int64  `json:"recipient_id,omitempty"`
+	ConvID      int64  `json:"conv_id"`
+	Content     string `json:"content"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
 
+type WSChatNotificationPayload struct {
+	ConvID      int64  `json:"conv_id"`
+	SenderID    int64  `json:"sender_id"`
+	SenderName  string `json:"sender_name"`
+	Content     string `json:"content"`
+	UnreadCount int    `json:"unread_count"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type WSConversationReadPayload struct {
+	ConvID    int64 `json:"conv_id"`
+	UserID    int64 `json:"user_id"`
+	MessageID int64 `json:"message_id"`
+}
+
+type WSErrorPayload struct {
+	Type      string `json:"type"`
+	ConvID    int64  `json:"conv_id"`
+	Content   string `json:"content"`
+	Error     string `json:"error"`
+	Retryable bool   `json:"retryable"`
+}
+
+type Client interface {
 	// Auth operations
 	Login(username, password string) (*Profile, error)
 	Register(name, username, password string) (*Profile, error)
 	IsAuthenticated() bool
+	Profile() Profile
 	SetProfile(Profile)
+	UpdateProfile(Profile)
+
+	// REST Data operations
+	FetchChats() ([]Chat, error)
+	Chats() []Chat
+	SetChats([]Chat)
+	FetchMessages(chatID int64) ([]Message, error)
+	Messages(chatID int64) []Message
+	AppendMessage(msg Message)
+	UpdateChatSnippet(convID int64, lastMsg, timeStr string, unreadDelta int, setExactUnread *int)
+
+	// WebSocket operations
+	ConnectWS(eventsChan chan<- any) error
+	CloseWS() error
+	SendWS(convID int64, text string) error
+	FocusConv(convID int64) error
+	MarkRead(convID int64, messageID int64) error
+	IsWSConnected() bool
 }

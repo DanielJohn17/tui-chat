@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
@@ -320,45 +321,73 @@ func (m *Model) updateFocus() {
 func (m *Model) submit() tea.Cmd {
 	if m.mode == ModeLogin {
 		username := strings.TrimSpace(m.loginUsername.Value())
+		password := strings.TrimSpace(m.loginPassword.Value())
+
 		if username == "" {
-			username = "alex"
+			m.errorMessage = "Please enter your username"
+			return nil
+		}
+		if password == "" {
+			m.errorMessage = "Please enter your password"
+			return nil
 		}
 
-		// Pass to the chat app directly without requiring an API call
-		return func() tea.Msg {
-			return AuthSuccessMsg{
-				Profile: client.Profile{
-					ID:        1,
-					Name:      username,
-					Username:  username,
-					Token:     "mock-jwt-token-authenticated",
-					CreatedAt: "Today",
-				},
-			}
-		}
-	}
+		m.loading = true
+		m.errorMessage = ""
+		c := m.client
 
-	// Register mode - pass straight to the chat app
-	name := strings.TrimSpace(m.regName.Value())
-	if name == "" {
-		name = "Alex Mercer"
-	}
-	username := strings.TrimSpace(m.regUsername.Value())
-	if username == "" {
-		username = "alexm"
-	}
-
-	return func() tea.Msg {
-		return AuthSuccessMsg{
-			Profile: client.Profile{
-				ID:        1,
-				Name:      name,
-				Username:  username,
-				Token:     "mock-jwt-token-registered",
-				CreatedAt: "Today",
+		return tea.Batch(
+			m.spinner.Tick,
+			func() tea.Msg {
+				prof, err := c.Login(username, password)
+				if err != nil {
+					return AuthErrorMsg{Err: err}
+				}
+				return AuthSuccessMsg{Profile: *prof}
 			},
-		}
+		)
 	}
+
+	// Register mode
+	name := strings.TrimSpace(m.regName.Value())
+	username := strings.TrimSpace(m.regUsername.Value())
+	password := strings.TrimSpace(m.regPassword.Value())
+
+	if name == "" {
+		m.errorMessage = "Please enter your display name"
+		return nil
+	}
+	if username == "" {
+		m.errorMessage = "Please enter a username"
+		return nil
+	}
+	if len(username) < 3 {
+		m.errorMessage = "Username must be at least 3 characters"
+		return nil
+	}
+	if password == "" {
+		m.errorMessage = "Please enter a password"
+		return nil
+	}
+	if len(password) < 6 {
+		m.errorMessage = "Password must be at least 6 characters"
+		return nil
+	}
+
+	m.loading = true
+	m.errorMessage = ""
+	c := m.client
+
+	return tea.Batch(
+		m.spinner.Tick,
+		func() tea.Msg {
+			prof, err := c.Register(name, username, password)
+			if err != nil {
+				return AuthErrorMsg{Err: err}
+			}
+			return AuthSuccessMsg{Profile: *prof}
+		},
+	)
 }
 
 func (m Model) View() string {
@@ -467,9 +496,13 @@ func (m Model) View() string {
 	}
 
 	// Submit button
-	actionText := "[ Enter: Login & Enter Chat ]"
-	if m.mode == ModeRegister {
+	var actionText string
+	if m.loading {
+		actionText = fmt.Sprintf("%s Authenticating with API server...", m.spinner.View())
+	} else if m.mode == ModeRegister {
 		actionText = "[ Enter: Create Account & Enter Chat ]"
+	} else {
+		actionText = "[ Enter: Login & Enter Chat ]"
 	}
 	submitAction := theme.StyleSuccess.Render(actionText)
 	submitActionCentered := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(submitAction)

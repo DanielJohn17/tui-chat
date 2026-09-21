@@ -4,29 +4,28 @@ import (
 	"testing"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAuthPassThrough(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	// 1. Test Enter passes straight to chat app without API call
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	require.NotNil(t, cmd, "expected command from Enter")
+	// Enter without inputs shows validation error
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Contains(t, model.View(), "Please enter your username")
 
-	// Execute cmd
-	msg := cmd()
-	newModel, _ = newModel.Update(msg)
+	// Simulate successful login
+	newModel, _ := model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
 	assert.Contains(t, newModel.View(), "CONVERSATIONS")
 }
 
 func TestAuthHelpModal(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -40,7 +39,7 @@ func TestAuthHelpModal(t *testing.T) {
 }
 
 func TestAuthEscQuits(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -50,7 +49,7 @@ func TestAuthEscQuits(t *testing.T) {
 }
 
 func TestAuthMouseClicks(t *testing.T) {
-	c := client.NewMock()
+	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -95,16 +94,4 @@ func TestAuthMouseClicks(t *testing.T) {
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
-
-	// 6. Click Submit button in Login mode (X: 49, Y: 20)
-	model, cmd := model.Update(tea.MouseMsg{
-		X:      49,
-		Y:      20,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	require.NotNil(t, cmd, "Clicking submit button must return cmd")
-	msg := cmd()
-	model, _ = model.Update(msg)
-	assert.Contains(t, model.View(), "CONVERSATIONS", "Submitting via mouse click must enter chat")
 }

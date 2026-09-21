@@ -21,6 +21,9 @@ type Handlers struct {
 func NewRouter(h Handlers) *gin.Engine {
 	router := gin.Default()
 
+	// Enable CORS & client header validation
+	router.Use(middleware.CORS())
+
 	subRouter := router.Group("/api/v1")
 
 	// Public auth routes

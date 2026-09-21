@@ -22,7 +22,15 @@ func init() {
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			return goEnv == "development"
+			if goEnv == "development" {
+				return true
+			}
+			// In production, allow connections from verified TUI client header or non-browser agents
+			if r.Header.Get("X-Client-App") == "tui-chat" {
+				return true
+			}
+			origin := r.Header.Get("Origin")
+			return origin == ""
 		},
 	}
 }

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
@@ -30,12 +31,42 @@ const (
 	ModalNewDM
 )
 
+type ChatsLoadedMsg struct {
+	Chats []client.Chat
+	Err   error
+}
+
+type MessagesLoadedMsg struct {
+	ChatID   int64
+	Messages []client.Message
+	Err      error
+}
+
+type WSIncomingMsg struct {
+	Event any
+}
+
+func fetchChatsCmd(c client.Client) tea.Cmd {
+	return func() tea.Msg {
+		chats, err := c.FetchChats()
+		return ChatsLoadedMsg{Chats: chats, Err: err}
+	}
+}
+
+func fetchMessagesCmd(c client.Client, chatID int64) tea.Cmd {
+	return func() tea.Msg {
+		msgs, err := c.FetchMessages(chatID)
+		return MessagesLoadedMsg{ChatID: chatID, Messages: msgs, Err: err}
+	}
+}
+
 type AppModel struct {
-	client client.Client
-	state  AppState
-	modal  ModalType
-	width  int
-	height int
+	client       client.Client
+	state        AppState
+	modal        ModalType
+	width        int
+	height       int
+	wsEventsChan chan any
 
 	authView    auth.Model
 	sidebarView *sidebar.Model
@@ -55,24 +86,44 @@ func NewApp(c client.Client) AppModel {
 	chatV := chat.New(c)
 	profileV := profile.New(c)
 	newDMV := modals.NewDM()
+	wsChan := make(chan any, 64)
 
 	return AppModel{
-		client:      c,
-		state:       initialState,
-		modal:       ModalNone,
-		authView:    authV,
-		sidebarView: &sidebarV,
-		chatView:    chatV,
-		profileView: profileV,
-		newDMView:   newDMV,
+		client:       c,
+		state:        initialState,
+		modal:        ModalNone,
+		wsEventsChan: wsChan,
+		authView:     authV,
+		sidebarView:  &sidebarV,
+		chatView:     chatV,
+		profileView:  profileV,
+		newDMView:    newDMV,
+	}
+}
+
+func (m AppModel) listenWSCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.wsEventsChan == nil {
+			return nil
+		}
+		evt, ok := <-m.wsEventsChan
+		if !ok {
+			return nil
+		}
+		return WSIncomingMsg{Event: evt}
 	}
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		tea.EnterAltScreen,
 		m.authView.Init(),
-	)
+	}
+	if m.client.IsAuthenticated() {
+		_ = m.client.ConnectWS(m.wsEventsChan)
+		cmds = append(cmds, fetchChatsCmd(m.client), m.listenWSCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *AppModel) handleResize(w, h int) {
@@ -113,11 +164,82 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateChat
 		m.client.SetProfile(msg.Profile)
 		m.profileView.ReloadProfile()
-		if chat := m.sidebarView.SelectedChat(); chat != nil {
-			m.client.MarkRead(chat.ID)
-			m.chatView.SetActiveChat(chat.ID)
+		_ = m.client.ConnectWS(m.wsEventsChan)
+		return m, tea.Batch(
+			fetchChatsCmd(m.client),
+			m.listenWSCmd(),
+		)
+
+	case ChatsLoadedMsg:
+		if msg.Err == nil && len(msg.Chats) > 0 {
+			m.sidebarView.SelectIndex(0)
+			if firstChat := m.sidebarView.SelectedChat(); firstChat != nil {
+				m.chatView.SetActiveChat(firstChat.ID)
+				_ = m.client.FocusConv(firstChat.ID)
+				_ = m.client.MarkRead(firstChat.ID, 0)
+				zero := 0
+				m.client.UpdateChatSnippet(firstChat.ID, "", "", 0, &zero)
+				return m, fetchMessagesCmd(m.client, firstChat.ID)
+			}
 		}
 		return m, nil
+
+	case MessagesLoadedMsg:
+		if msg.Err == nil && msg.ChatID == m.chatView.ActiveChatID() {
+			m.chatView.RefreshMessages()
+		}
+		return m, nil
+
+	case WSIncomingMsg:
+		var nextCmds []tea.Cmd
+		nextCmds = append(nextCmds, m.listenWSCmd())
+
+		switch p := msg.Event.(type) {
+		case client.WSChatMessagePayload:
+			senderName := "Recipient"
+			if sel := m.sidebarView.SelectedChat(); sel != nil && sel.ID == p.ConvID {
+				senderName = sel.Name
+				if senderName == "" {
+					senderName = sel.Username
+				}
+			}
+			isSelf := p.SenderID == m.client.Profile().ID
+			if isSelf {
+				senderName = "You"
+			}
+
+			if !isSelf {
+				m.client.AppendMessage(client.Message{
+					ID:        p.ID,
+					SenderID:  p.SenderID,
+					Sender:    senderName,
+					ConvID:    p.ConvID,
+					Text:      p.Content,
+					Timestamp: "now",
+					Self:      false,
+				})
+			}
+
+			if p.ConvID == m.chatView.ActiveChatID() {
+				m.chatView.RefreshMessages()
+				if !isSelf {
+					_ = m.client.MarkRead(p.ConvID, p.ID)
+				}
+				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, nil)
+			} else {
+				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 1, nil)
+			}
+
+		case client.WSChatNotificationPayload:
+			m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, &p.UnreadCount)
+
+		case client.WSConversationReadPayload:
+			if p.UserID == m.client.Profile().ID {
+				zero := 0
+				m.client.UpdateChatSnippet(p.ConvID, "", "", 0, &zero)
+			}
+		}
+		return m, tea.Batch(nextCmds...)
 
 	case auth.OpenHelpMsg:
 		m.modal = ModalHelp
@@ -139,7 +261,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModalHelp:
 			if mouseMsg, ok := msg.(tea.MouseMsg); ok {
 				if mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft {
-					// Clicking anywhere dismisses help
 					m.modal = ModalNone
 					return m, nil
 				}
@@ -156,7 +277,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModalNewDM:
 			if mouseMsg, ok := msg.(tea.MouseMsg); ok {
 				if mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft {
-					// Check if clicked buttons inside NewDM modal
 					boxW := 48
 					boxH := 10
 					startX := (m.width - boxW) / 2
@@ -164,22 +284,29 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					relY := mouseMsg.Y - startY
 					relX := mouseMsg.X - startX
 
-					// Connect vs Cancel buttons are around relY == 6 or 7
 					if relY >= 5 && relY <= 8 && relX >= 0 && relX < boxW {
 						if relX < boxW/2 {
-							// Connect
 							username := m.newDMView.Value()
 							if len(username) < 3 {
 								m.newDMView.SetError("Username must be at least 3 characters")
 								return m, nil
 							}
-							newChat := m.client.AddChat(username, username)
+							chats := m.client.Chats()
+							newChat := client.Chat{
+								ID:          time.Now().UnixNano(),
+								RecipientID: 0,
+								Name:        username,
+								Username:    username,
+								Time:        "now",
+								Unread:      0,
+								Online:      false,
+							}
+							m.client.SetChats(append([]client.Chat{newChat}, chats...))
 							m.sidebarView.SelectIndex(0)
 							m.chatView.SetActiveChat(newChat.ID)
 							m.modal = ModalNone
 							return m, nil
 						} else {
-							// Cancel
 							m.modal = ModalNone
 							return m, nil
 						}
@@ -197,7 +324,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.newDMView.SetError("Username must be at least 3 characters")
 						return m, nil
 					}
-					newChat := m.client.AddChat(username, username)
+					chats := m.client.Chats()
+					newChat := client.Chat{
+						ID:          time.Now().UnixNano(),
+						RecipientID: 0,
+						Name:        username,
+						Username:    username,
+						Time:        "now",
+						Unread:      0,
+						Online:      false,
+					}
+					m.client.SetChats(append([]client.Chat{newChat}, chats...))
 					m.sidebarView.SelectIndex(0)
 					m.chatView.SetActiveChat(newChat.ID)
 					m.modal = ModalNone
@@ -249,8 +386,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if mouseMsg.X < sidebarWidth {
 					m.sidebarView.MoveUp()
 					if sel := m.sidebarView.SelectedChat(); sel != nil {
-						m.client.MarkRead(sel.ID)
 						m.chatView.SetActiveChat(sel.ID)
+						_ = m.client.FocusConv(sel.ID)
+						_ = m.client.MarkRead(sel.ID, 0)
+						zero := 0
+						m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
+						return m, fetchMessagesCmd(m.client, sel.ID)
 					}
 				} else {
 					m.chatView.ScrollUp(3)
@@ -261,8 +402,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if mouseMsg.X < sidebarWidth {
 					m.sidebarView.MoveDown()
 					if sel := m.sidebarView.SelectedChat(); sel != nil {
-						m.client.MarkRead(sel.ID)
 						m.chatView.SetActiveChat(sel.ID)
+						_ = m.client.FocusConv(sel.ID)
+						_ = m.client.MarkRead(sel.ID, 0)
+						zero := 0
+						m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
+						return m, fetchMessagesCmd(m.client, sel.ID)
 					}
 				} else {
 					m.chatView.ScrollDown(3)
@@ -277,30 +422,22 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if isClick {
 				// 1. Click in status bar at bottom
 				if mouseMsg.Y >= mainHeight {
-					// Approximate sections across the status bar
-					// shortcuts: "j/k: select • i: write • n: new DM • p: profile • ?: help • q: quit"
-					// Click near right edge -> quit
 					if mouseMsg.X >= m.width-12 {
 						return m, tea.Quit
 					}
-					// Click in shortcuts area
 					normX := float64(mouseMsg.X) / float64(m.width)
 					if normX >= 0.40 && normX < 0.50 {
-						// i: write
 						m.chatView.FocusInput()
 						return m, nil
 					} else if normX >= 0.50 && normX < 0.60 {
-						// n: new DM
 						m.modal = ModalNewDM
 						m.newDMView.Reset()
 						return m, nil
 					} else if normX >= 0.60 && normX < 0.72 {
-						// p: profile
 						m.state = StateProfile
 						m.profileView.ReloadProfile()
 						return m, nil
 					} else if normX >= 0.72 && normX < 0.85 {
-						// ?: help
 						m.modal = ModalHelp
 						return m, nil
 					}
@@ -321,22 +458,23 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 					if clickedChat != nil {
-						m.client.MarkRead(clickedChat.ID)
 						m.chatView.SetActiveChat(clickedChat.ID)
 						m.chatView.BlurInput()
-						return m, nil
+						_ = m.client.FocusConv(clickedChat.ID)
+						_ = m.client.MarkRead(clickedChat.ID, 0)
+						zero := 0
+						m.client.UpdateChatSnippet(clickedChat.ID, "", "", 0, &zero)
+						return m, fetchMessagesCmd(m.client, clickedChat.ID)
 					}
 					return m, nil
 				}
 
 				// 3. Click in chat pane
 				if mouseMsg.X >= sidebarWidth && mouseMsg.Y < mainHeight {
-					// Click in bottom input area -> focus
 					if mouseMsg.Y >= mainHeight-5 {
 						m.chatView.FocusInput()
 						return m, nil
 					}
-					// Click in header -> unfocus if focused
 					if mouseMsg.Y <= 2 && m.chatView.IsInputFocused() {
 						m.chatView.BlurInput()
 						return m, nil
@@ -364,16 +502,24 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "j", "down":
 				m.sidebarView.MoveDown()
 				if sel := m.sidebarView.SelectedChat(); sel != nil {
-					m.client.MarkRead(sel.ID)
 					m.chatView.SetActiveChat(sel.ID)
+					_ = m.client.FocusConv(sel.ID)
+					_ = m.client.MarkRead(sel.ID, 0)
+					zero := 0
+					m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
+					return m, fetchMessagesCmd(m.client, sel.ID)
 				}
 				return m, nil
 
 			case "k", "up":
 				m.sidebarView.MoveUp()
 				if sel := m.sidebarView.SelectedChat(); sel != nil {
-					m.client.MarkRead(sel.ID)
 					m.chatView.SetActiveChat(sel.ID)
+					_ = m.client.FocusConv(sel.ID)
+					_ = m.client.MarkRead(sel.ID, 0)
+					zero := 0
+					m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
+					return m, fetchMessagesCmd(m.client, sel.ID)
 				}
 				return m, nil
 
@@ -435,7 +581,7 @@ func (m AppModel) View() string {
 			m.sidebarView.View(),
 			m.chatView.View(activeChat),
 		)
-		statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), m.width)
+		statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), m.client.IsWSConnected(), m.width)
 		return lipgloss.JoinVertical(lipgloss.Left, mainRow, statusBar)
 	}
 
