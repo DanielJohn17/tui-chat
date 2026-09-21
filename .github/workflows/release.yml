@@ -88,6 +88,7 @@ jobs:
           host: ${{ secrets.CPANEL_HOST || '198.38.92.6' }}
           username: ${{ secrets.CPANEL_USER || 'natchevy' }}
           key: ${{ secrets.CPANEL_SSH_KEY }}
+          passphrase: ${{ secrets.CPANEL_SSH_PASSPHRASE }}
           port: ${{ secrets.CPANEL_PORT || 22 }}
           script: |
             cd /home/natchevy/apps/api || exit 1
