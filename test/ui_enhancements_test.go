@@ -32,7 +32,7 @@ func TestProfileEditPageFlow(t *testing.T) {
 
 	// 2. Press Esc to return to Chat
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	assert.Contains(t, model.View(), "CONVERSATIONS")
+	assert.Contains(t, model.View(), "LINETALK")
 
 	// 3. Re-open Profile Edit page and Save
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
@@ -41,7 +41,7 @@ func TestProfileEditPageFlow(t *testing.T) {
 		msg := cmd()
 		model, _ = model.Update(msg)
 	}
-	assert.Contains(t, model.View(), "CONVERSATIONS")
+	assert.Contains(t, model.View(), "LINETALK")
 }
 
 func TestSidebarBottomUserInfoAndScrolling(t *testing.T) {
@@ -65,7 +65,7 @@ func TestSidebarBottomUserInfoAndScrolling(t *testing.T) {
 		Button: tea.MouseButtonWheelDown,
 		Type:   tea.MouseWheelDown,
 	})
-	assert.Contains(t, model.View(), "CONVERSATIONS")
+	assert.Contains(t, model.View(), "LINETALK")
 }
 
 func TestHelpKeybindings(t *testing.T) {
@@ -205,7 +205,7 @@ func TestSidebarAllElementsClickable(t *testing.T) {
 		Button: tea.MouseButtonLeft,
 		Action: tea.MouseActionPress,
 	})
-	assert.Contains(t, mScrollUp.View(), "CONVERSATIONS")
+	assert.Contains(t, mScrollUp.View(), "LINETALK")
 
 	// 4. Click profile card (line 29: name/handle or line 30: hint) opens profile
 	m3 := authenticatedApp()
@@ -336,7 +336,7 @@ func TestProfilePageMouseClicks(t *testing.T) {
 		msg := cmd()
 		model, _ = model.Update(msg)
 	}
-	assert.Contains(t, model.View(), "CONVERSATIONS", "Clicking Cancel must return to chat view")
+	assert.Contains(t, model.View(), "LINETALK", "Clicking Cancel must return to chat view")
 
 	// Re-open profile and click Save button (Y = 28, X = startX + 15 = 41)
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
@@ -350,7 +350,7 @@ func TestProfilePageMouseClicks(t *testing.T) {
 		msg := cmdSave()
 		model, _ = model.Update(msg)
 	}
-	assert.Contains(t, model.View(), "CONVERSATIONS", "Clicking Save must save and return to chat view")
+	assert.Contains(t, model.View(), "LINETALK", "Clicking Save must save and return to chat view")
 }
 
 func TestDynamicConversationSortingOnSendAndNewDM(t *testing.T) {

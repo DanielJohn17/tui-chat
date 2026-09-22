@@ -44,9 +44,9 @@ func TestStartupWithSavedSession(t *testing.T) {
 	model := tea.Model(app)
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	// App should immediately display chat screen (e.g. CONVERSATIONS)
+	// App should immediately display chat screen (e.g. LINETALK)
 	view := model.View()
-	assert.Contains(t, view, "CONVERSATIONS")
+	assert.Contains(t, view, "LINETALK")
 	assert.NotContains(t, view, "LOGIN")
 }
 
@@ -77,7 +77,7 @@ func TestSessionExpiryFallback(t *testing.T) {
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	// Initial view is chat because token was present
-	assert.Contains(t, model.View(), "CONVERSATIONS")
+	assert.Contains(t, model.View(), "LINETALK")
 
 	// Simulate receiving 401 Unauthorized from fetchChatsCmd
 	model, _ = model.Update(tui.ChatsLoadedMsg{

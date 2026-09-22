@@ -21,7 +21,7 @@ func TestAuthPassThrough(t *testing.T) {
 
 	// Simulate successful login
 	newModel, _ := model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
-	assert.Contains(t, newModel.View(), "CONVERSATIONS")
+	assert.Contains(t, newModel.View(), "LINETALK")
 }
 
 func TestAuthHelpModal(t *testing.T) {
