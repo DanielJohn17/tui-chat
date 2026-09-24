@@ -75,3 +75,18 @@ func TestStatusBarRetryCountdownAndLoadingAnimation(t *testing.T) {
 	viewSpinner := model.View()
 	assert.Contains(t, viewSpinner, "RETRYING")
 }
+
+func TestSpinnerStopsTickingWhenConnected(t *testing.T) {
+	c := newTestClient()
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	// Successful connect result sets StatusConnected
+	c.SetWSConnected(true)
+	model, _ = model.Update(tui.WSConnectResultMsg{Err: nil})
+
+	// When connected, handling SpinnerTickMsg must return nil Cmd (stops the ticker loop)
+	model, cmd := model.Update(tui.SpinnerTickMsg{})
+	assert.Nil(t, cmd, "SpinnerTickMsg must not schedule another tick command once connected")
+}

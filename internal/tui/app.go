@@ -107,6 +107,7 @@ type AppModel struct {
 	reconnectDelay   time.Duration
 	retrySecondsLeft int
 	spinnerIdx       int
+	spinnerActive    bool
 
 	notificationText string
 	notificationID   int64
@@ -121,9 +122,11 @@ type AppModel struct {
 func NewApp(c client.Client) AppModel {
 	initialState := StateAuth
 	connStatus := statusbar.StatusOffline
+	spinnerActive := false
 	if c.IsAuthenticated() {
 		initialState = StateChat
 		connStatus = statusbar.StatusConnecting
+		spinnerActive = true
 	}
 
 	authV := auth.New(c)
@@ -142,6 +145,7 @@ func NewApp(c client.Client) AppModel {
 		reconnectDelay:   time.Second,
 		retrySecondsLeft: 0,
 		spinnerIdx:       0,
+		spinnerActive:    spinnerActive,
 		notificationText: "",
 		notificationID:   0,
 		authView:         authV,
@@ -172,6 +176,7 @@ func (m AppModel) Init() tea.Cmd {
 	}
 	if m.client.IsAuthenticated() {
 		m.connStatus = statusbar.StatusConnecting
+		m.spinnerActive = true
 		cmds = append(cmds,
 			fetchChatsCmd(m.client),
 			connectWSCmd(m.client, m.wsEventsChan),
@@ -221,6 +226,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.connStatus = statusbar.StatusConnecting
 		m.reconnectDelay = time.Second
 		m.retrySecondsLeft = 0
+		m.spinnerActive = true
 		return m, tea.Batch(
 			fetchChatsCmd(m.client),
 			connectWSCmd(m.client, m.wsEventsChan),

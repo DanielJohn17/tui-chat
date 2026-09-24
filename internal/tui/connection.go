@@ -30,14 +30,18 @@ func (m *AppModel) handleWSConnectResult(msg WSConnectResultMsg) (tea.Model, tea
 		if m.retrySecondsLeft <= 0 {
 			m.retrySecondsLeft = 1
 		}
-		return *m, tea.Batch(
-			tea.Tick(time.Second, func(t time.Time) tea.Msg { return RetryCountdownTickMsg{} }),
-			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
-		)
+		var cmds []tea.Cmd
+		cmds = append(cmds, tea.Tick(time.Second, func(t time.Time) tea.Msg { return RetryCountdownTickMsg{} }))
+		if !m.spinnerActive {
+			m.spinnerActive = true
+			cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }))
+		}
+		return *m, tea.Batch(cmds...)
 	}
 
 	wasReconnecting := m.connStatus == statusbar.StatusReconnecting
 	m.connStatus = statusbar.StatusConnected
+	m.spinnerActive = false
 	m.reconnectDelay = time.Second
 	m.retrySecondsLeft = 0
 
@@ -61,15 +65,22 @@ func (m *AppModel) handleRetryCountdownTick() (tea.Model, tea.Cmd) {
 			return *m, tea.Tick(time.Second, func(t time.Time) tea.Msg { return RetryCountdownTickMsg{} })
 		}
 		m.connStatus = statusbar.StatusConnecting
-		return *m, tea.Batch(
-			connectWSCmd(m.client, m.wsEventsChan),
-			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
-		)
+		var cmds []tea.Cmd
+		cmds = append(cmds, connectWSCmd(m.client, m.wsEventsChan))
+		if !m.spinnerActive {
+			m.spinnerActive = true
+			cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }))
+		}
+		return *m, tea.Batch(cmds...)
 	}
 	return *m, nil
 }
 
 func (m *AppModel) handleSpinnerTick() (tea.Model, tea.Cmd) {
+	if m.connStatus != statusbar.StatusConnecting && m.connStatus != statusbar.StatusReconnecting {
+		m.spinnerActive = false
+		return *m, nil
+	}
 	m.spinnerIdx = (m.spinnerIdx + 1) % len(spinnerFrames)
 	m.chatView.SetSpinnerFrame(spinnerFrames[m.spinnerIdx])
 	return *m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} })
@@ -79,9 +90,16 @@ func (m *AppModel) handleReconnectTick() (tea.Model, tea.Cmd) {
 	if m.state == StateChat && m.client.IsAuthenticated() {
 		if !m.client.IsWSConnected() {
 			m.connStatus = statusbar.StatusConnecting
-			return *m, connectWSCmd(m.client, m.wsEventsChan)
+			var cmds []tea.Cmd
+			cmds = append(cmds, connectWSCmd(m.client, m.wsEventsChan))
+			if !m.spinnerActive {
+				m.spinnerActive = true
+				cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }))
+			}
+			return *m, tea.Batch(cmds...)
 		}
 		m.connStatus = statusbar.StatusConnected
+		m.spinnerActive = false
 	}
 	return *m, nil
 }
@@ -91,10 +109,13 @@ func (m *AppModel) triggerManualReconnect() (tea.Model, tea.Cmd) {
 		m.connStatus = statusbar.StatusConnecting
 		m.reconnectDelay = time.Second
 		m.retrySecondsLeft = 0
-		return *m, tea.Batch(
-			connectWSCmd(m.client, m.wsEventsChan),
-			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
-		)
+		var cmds []tea.Cmd
+		cmds = append(cmds, connectWSCmd(m.client, m.wsEventsChan))
+		if !m.spinnerActive {
+			m.spinnerActive = true
+			cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }))
+		}
+		return *m, tea.Batch(cmds...)
 	}
 	return *m, nil
 }
@@ -113,8 +134,11 @@ func (m *AppModel) scheduleDisconnectRetry() tea.Cmd {
 	if m.retrySecondsLeft <= 0 {
 		m.retrySecondsLeft = 1
 	}
-	return tea.Batch(
-		tea.Tick(time.Second, func(t time.Time) tea.Msg { return RetryCountdownTickMsg{} }),
-		tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
-	)
+	var cmds []tea.Cmd
+	cmds = append(cmds, tea.Tick(time.Second, func(t time.Time) tea.Msg { return RetryCountdownTickMsg{} }))
+	if !m.spinnerActive {
+		m.spinnerActive = true
+		cmds = append(cmds, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }))
+	}
+	return tea.Batch(cmds...)
 }
