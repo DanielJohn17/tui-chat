@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type DirectMessage struct {
 }
 
 type Hub struct {
+	mu sync.RWMutex
 	// support multiple client per user
 	users map[int64]map[*Client]bool
 
@@ -37,18 +39,32 @@ func NewHub() *Hub {
 	}
 }
 
+func (h *Hub) GetOnlineStatus(ctx context.Context, userIDs []int64) (map[int64]bool, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	result := make(map[int64]bool, len(userIDs))
+	for _, uid := range userIDs {
+		result[uid] = len(h.users[uid]) > 0
+	}
+	return result, nil
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
 			// Register client to users map
+			h.mu.Lock()
 			if _, ok := h.users[client.UserID]; !ok {
 				h.users[client.UserID] = make(map[*Client]bool)
 			}
 			h.users[client.UserID][client] = true
+			h.mu.Unlock()
 
 		case client := <-h.UnRegister:
 			// Unregister clent from users map
+			h.mu.Lock()
 			if clients, ok := h.users[client.UserID]; ok {
 				if _, exists := clients[client]; exists {
 					delete(clients, client)
@@ -57,6 +73,7 @@ func (h *Hub) Run() {
 					}
 				}
 			}
+			h.mu.Unlock()
 
 		case msg := <-h.SendDirect:
 			// Deliver direct message to recipient
@@ -153,11 +170,13 @@ func (h *Hub) Run() {
 					}
 				}
 			}
+
 		}
 	}
 }
 
 func (h *Hub) dropClient(c *Client) {
+	h.mu.Lock()
 	if clients, ok := h.users[c.UserID]; ok {
 		if _, exists := clients[c]; exists {
 			delete(clients, c)
@@ -166,6 +185,7 @@ func (h *Hub) dropClient(c *Client) {
 			}
 		}
 	}
+	h.mu.Unlock()
 
 	c.closeSendChannel()
 }

@@ -259,3 +259,48 @@ func TestConversationMessageLoadingFailureAndRetry(t *testing.T) {
 	assert.NotNil(t, clickRetryCmd, "Clicking chat pane on error should return retry command")
 	assert.Contains(t, model.View(), "Loading conversation messages...")
 }
+
+func TestRealtimeUserPresenceUpdates(t *testing.T) {
+	c := newTestClient()
+	// Initialize with user 102 (Bob) online, user 103 (Sarah) offline
+	c.SetChats([]client.Chat{
+		{ID: 1, RecipientID: 102, Name: "Bob Martin", Username: "bob", Online: true},
+		{ID: 2, RecipientID: 103, Name: "Sarah Connor", Username: "sarah", Online: false},
+	})
+
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+	model, _ = model.Update(tui.ChatsLoadedMsg{Chats: c.Chats()})
+
+	// 1. Initial State: Bob is online
+	assert.True(t, c.Chats()[0].Online)
+	assert.False(t, c.Chats()[1].Online)
+
+	// 2. Inbound event: Bob goes offline
+	model, _ = model.Update(tui.WSIncomingMsg{
+		Event: client.WSUserPresencePayload{
+			UserID: 102,
+			Online: false,
+		},
+	})
+	assert.False(t, c.Chats()[0].Online, "Bob should now be offline")
+
+	// 3. Inbound event: Sarah comes online
+	model, _ = model.Update(tui.WSIncomingMsg{
+		Event: client.WSUserPresencePayload{
+			UserID: 103,
+			Online: true,
+		},
+	})
+	assert.True(t, c.Chats()[1].Online, "Sarah should now be online")
+
+	// 4. Inbound event: Presence snapshot with both users online
+	model, _ = model.Update(tui.WSIncomingMsg{
+		Event: client.WSPresenceSnapshotPayload{
+			OnlineUserIDs: []int64{102, 103},
+		},
+	})
+	assert.True(t, c.Chats()[0].Online, "Bob should be online from snapshot")
+	assert.True(t, c.Chats()[1].Online, "Sarah should be online from snapshot")
+}

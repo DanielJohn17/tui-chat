@@ -253,6 +253,24 @@ func (m *TestClient) SetChats(chats []client.Chat) {
 	m.chats = chats
 }
 
+func (m *TestClient) SetUserOnline(userID int64, online bool) {
+	for i := range m.chats {
+		if m.chats[i].RecipientID == userID {
+			m.chats[i].Online = online
+		}
+	}
+}
+
+func (m *TestClient) SetOnlineUsers(userIDs []int64) {
+	onlineMap := make(map[int64]bool, len(userIDs))
+	for _, id := range userIDs {
+		onlineMap[id] = true
+	}
+	for i := range m.chats {
+		m.chats[i].Online = onlineMap[m.chats[i].RecipientID]
+	}
+}
+
 func (m *TestClient) FetchMessages(chatID int64) ([]client.Message, error) {
 	return m.Messages(chatID), nil
 }

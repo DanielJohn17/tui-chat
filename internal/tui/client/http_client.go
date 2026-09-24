@@ -77,6 +77,7 @@ type convParticipantData struct {
 	LastMessage     string `json:"last_message"`
 	LastMessageTime string `json:"last_message_time"`
 	UnreadCount     int    `json:"unread_count"`
+	Online          bool   `json:"online"`
 }
 
 type convChatData struct {
@@ -332,7 +333,7 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 			LastMessage: c.LastMessage,
 			Time:        timeStr,
 			Unread:      c.UnreadCount,
-			Online:      false,
+			Online:      c.Online,
 		}
 	}
 
@@ -355,6 +356,28 @@ func (h *HTTPClient) SetChats(chats []Chat) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.chats = chats
+}
+
+func (h *HTTPClient) SetUserOnline(userID int64, online bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for i := range h.chats {
+		if h.chats[i].RecipientID == userID {
+			h.chats[i].Online = online
+		}
+	}
+}
+
+func (h *HTTPClient) SetOnlineUsers(userIDs []int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	onlineMap := make(map[int64]bool, len(userIDs))
+	for _, id := range userIDs {
+		onlineMap[id] = true
+	}
+	for i := range h.chats {
+		h.chats[i].Online = onlineMap[h.chats[i].RecipientID]
+	}
 }
 
 func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
@@ -655,6 +678,16 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 				}
 			case "conversation_read":
 				var p WSConversationReadPayload
+				if err := json.Unmarshal(env.Payload, &p); err == nil {
+					eventsChan <- p
+				}
+			case "user_presence":
+				var p WSUserPresencePayload
+				if err := json.Unmarshal(env.Payload, &p); err == nil {
+					eventsChan <- p
+				}
+			case "presence_snapshot":
+				var p WSPresenceSnapshotPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
 					eventsChan <- p
 				}

@@ -21,25 +21,28 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 		onlineDot = theme.StyleDim.Render("○")
 	}
 
-	// Line 1: Indicator + Name (left) and Time (right)
-	var indicator string
+	// Line 1: Selection Indicator + Online Dot + Name (left) and Time (right)
+	var selectIndicator string
 	var nameStyle lipgloss.Style
 	if isSelected {
-		indicator = theme.StyleTitle.Render("▶ ")
+		selectIndicator = theme.StyleTitle.Render("▶")
 		nameStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan)
 	} else {
-		indicator = onlineDot + " "
+		selectIndicator = " "
 		nameStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorWhite)
 	}
 
 	timeText := theme.StyleDim.Render(ch.Time)
 	timeW := lipgloss.Width(timeText)
 
-	availNameW := innerWidth - timeW - lipgloss.Width(indicator) - 1
+	prefixStr := selectIndicator + " " + onlineDot + " "
+	prefixW := lipgloss.Width(prefixStr)
+
+	availNameW := innerWidth - timeW - prefixW - 1
 	if availNameW < 4 {
 		availNameW = 4
 	}
-	leftPart1 := indicator + nameStyle.Render(theme.Truncate(ch.Name, availNameW))
+	leftPart1 := prefixStr + nameStyle.Render(theme.Truncate(ch.Name, availNameW))
 	spaces1 := innerWidth - lipgloss.Width(leftPart1) - timeW
 	if spaces1 < 1 {
 		spaces1 = 1

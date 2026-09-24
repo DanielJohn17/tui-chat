@@ -10,6 +10,7 @@ type GetConvParticipantType struct {
 	UserID          int64  `json:"user_id"`
 	Name            string `json:"name"`
 	Username        string `json:"username"`
+	Online          bool   `json:"online"`
 	LastMessage     string `json:"last_message,omitempty"`
 	LastMessageTime string `json:"last_message_time,omitempty"`
 	UnreadCount     int    `json:"unread_count"`

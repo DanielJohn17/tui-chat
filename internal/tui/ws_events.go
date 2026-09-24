@@ -27,6 +27,12 @@ func (m *AppModel) handleWSIncoming(msg WSIncomingMsg) (tea.Model, tea.Cmd) {
 	case client.WSConversationReadPayload:
 		m.handleWSConversationRead(p)
 
+	case client.WSUserPresencePayload:
+		m.client.SetUserOnline(p.UserID, p.Online)
+
+	case client.WSPresenceSnapshotPayload:
+		m.client.SetOnlineUsers(p.OnlineUserIDs)
+
 	case client.WSErrorPayload:
 		model, cmd := m.handleWSError(p)
 		if cmd != nil {

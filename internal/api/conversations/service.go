@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"runtime/debug"
-	"sync"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/errors"
@@ -84,29 +83,13 @@ func (s *ConvService) GetOrCreateDirectConversation(
 	ctx context.Context,
 	input GetOrCreateDirectConvType,
 ) ([]GetConvParticipantType, error) {
-	errChan := make(chan error, 2)
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		_, err := s.u.GetUserByID(ctx, input.UserIDOne)
-		errChan <- err
-	}()
-
-	go func() {
-		defer wg.Done()
-		_, err := s.u.GetUserByID(ctx, input.UserIDTwo)
-		errChan <- err
-	}()
-
-	wg.Wait()
-	close(errChan)
-
-	for err := range errChan {
-		if err != nil {
-			return nil, errors.NewNotFoundError(err.Error())
-		}
+	// Check User 1
+	if _, err := s.u.GetUserByID(ctx, input.UserIDOne); err != nil {
+		return nil, errors.NewNotFoundError("user one not found: " + err.Error())
+	}
+	// Check User 2
+	if _, err := s.u.GetUserByID(ctx, input.UserIDTwo); err != nil {
+		return nil, errors.NewNotFoundError("user two not found: " + err.Error())
 	}
 
 	participants, err := s.r.GetOrCreateDirectConversation(ctx, input)

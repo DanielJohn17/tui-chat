@@ -57,6 +57,15 @@ type WSConversationReadPayload struct {
 	MessageID int64 `json:"message_id"`
 }
 
+type WSUserPresencePayload struct {
+	UserID int64 `json:"user_id"`
+	Online bool  `json:"online"`
+}
+
+type WSPresenceSnapshotPayload struct {
+	OnlineUserIDs []int64 `json:"online_user_ids"`
+}
+
 type WSErrorPayload struct {
 	Type      string `json:"type"`
 	ConvID    int64  `json:"conv_id"`
@@ -81,6 +90,8 @@ type Client interface {
 	FetchChats() ([]Chat, error)
 	Chats() []Chat
 	SetChats([]Chat)
+	SetUserOnline(userID int64, online bool)
+	SetOnlineUsers(userIDs []int64)
 	FetchMessages(chatID int64) ([]Message, error)
 	FetchBulkMessages() (map[int64][]Message, error)
 	Messages(chatID int64) []Message
