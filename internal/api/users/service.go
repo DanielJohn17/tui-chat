@@ -3,7 +3,7 @@ package users
 import (
 	"context"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/errors"
 )
 
 type UserServiceInt interface {

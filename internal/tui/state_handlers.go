@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/chat"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -74,7 +75,10 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_ = m.client.MarkRead(sel.ID, 0)
 				zero := 0
 				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				return *m, fetchMessagesCmd(m.client, sel.ID)
+				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
+					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
+					return *m, fetchMessagesCmd(m.client, sel.ID)
+				}
 			}
 			return *m, nil
 
@@ -86,11 +90,18 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_ = m.client.MarkRead(sel.ID, 0)
 				zero := 0
 				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				return *m, fetchMessagesCmd(m.client, sel.ID)
+				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
+					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
+					return *m, fetchMessagesCmd(m.client, sel.ID)
+				}
 			}
 			return *m, nil
 
 		case "r":
+			if activeID := m.chatView.ActiveChatID(); activeID != 0 && m.chatView.FetchStatus(activeID) == chat.StatusFailed {
+				m.chatView.SetFetchStatus(activeID, chat.StatusLoading)
+				return *m, fetchMessagesCmd(m.client, activeID)
+			}
 			return m.triggerManualReconnect()
 
 		case "i", "enter":

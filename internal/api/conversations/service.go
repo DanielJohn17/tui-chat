@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
+	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/users"
 )
 
 type ConvServiceInt interface {
@@ -19,6 +19,8 @@ type ConvServiceInt interface {
 	) ([]GetConvParticipantType, error)
 
 	GetConvsByUserID(ctx context.Context, input int64) ([]GetConvParticipantType, error)
+
+	GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error)
 
 	GetConvChats(
 		ctx context.Context,
@@ -129,6 +131,15 @@ func (s *ConvService) GetConvsByUserID(
 	return participants, nil
 }
 
+func (s *ConvService) GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error) {
+	chats, err := s.r.GetBulkChatsByUserID(ctx, userID, limit)
+	if err != nil {
+		return nil, errors.NewInternalServerError(err.Error(), err)
+	}
+
+	return chats, nil
+}
+
 func (s *ConvService) GetConvChats(
 	ctx context.Context,
 	convID int64,
@@ -188,7 +199,8 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 		// batch delete
 		for {
 			if err := bgCtx.Err(); err != nil {
-				slog.WarnContext(bgCtx, "conversation wipeout aborted: context expired",
+				slog.WarnContext(
+					bgCtx, "conversation wipeout aborted: context expired",
 					"conv_id", convID,
 					"error", err,
 				)
@@ -197,7 +209,8 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 
 			rowsDeleted, err := s.r.DeleteMessagesAsBatch(bgCtx, convID, s.batchSize)
 			if err != nil {
-				slog.ErrorContext(bgCtx, "failed to delete message batch during wipeout",
+				slog.ErrorContext(
+					bgCtx, "failed to delete message batch during wipeout",
 					"conv_id", convID,
 					"batch_size", s.batchSize,
 					"error", err,
@@ -217,17 +230,18 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 		}
 
 		if err := s.r.DeleteConvByID(bgCtx, convID); err != nil {
-			slog.ErrorContext(bgCtx, "failed to delete conversation row after messages purged",
+			slog.ErrorContext(
+				bgCtx, "failed to delete conversation row after messages purged",
 				"conv_id", convID,
 				"error", err,
 			)
 			return
 		}
 
-		slog.InfoContext(bgCtx, "conversation wipeout completed successfully",
+		slog.InfoContext(
+			bgCtx, "conversation wipeout completed successfully",
 			"conv_id", convID,
 		)
-
 	}()
 
 	return nil

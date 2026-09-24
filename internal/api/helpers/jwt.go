@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 

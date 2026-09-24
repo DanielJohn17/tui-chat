@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/chat"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/modals"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/profile"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/sidebar"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/statusbar"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/auth"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/chat"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/modals"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/profile"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/sidebar"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/statusbar"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -61,6 +61,18 @@ type ClearNotificationMsg struct {
 }
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+type BulkMessagesLoadedMsg struct {
+	MessagesByConv map[int64][]client.Message
+	Err            error
+}
+
+func fetchBulkMessagesCmd(c client.Client) tea.Cmd {
+	return func() tea.Msg {
+		res, err := c.FetchBulkMessages()
+		return BulkMessagesLoadedMsg{MessagesByConv: res, Err: err}
+	}
+}
 
 func fetchChatsCmd(c client.Client) tea.Cmd {
 	return func() tea.Msg {
@@ -233,6 +245,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MessagesLoadedMsg:
 		return m.handleMessagesLoaded(msg)
+
+	case BulkMessagesLoadedMsg:
+		return m.handleBulkMessagesLoaded(msg)
 
 	case WSIncomingMsg:
 		return m.handleWSIncoming(msg)

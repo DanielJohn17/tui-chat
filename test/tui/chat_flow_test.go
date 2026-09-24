@@ -3,9 +3,9 @@ package test
 import (
 	"testing"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
+	"github.com/DanielJohn17/tui-chat/internal/tui"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/auth"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 )
@@ -171,4 +171,91 @@ func TestChatNotificationNewConversation(t *testing.T) {
 	assert.Len(t, msgs, 1)
 	assert.Equal(t, "Compilers are working!", msgs[0].Text)
 	assert.Equal(t, "Grace Hopper", msgs[0].Sender)
+}
+
+func TestBackgroundMessagesLoadingAndLoadingState(t *testing.T) {
+	c := newTestClient()
+	// Clear messages for chat 2 initially to test loading state
+	c.messages[2] = nil
+	c.SetChats([]client.Chat{
+		{ID: 1, Name: "Bob", Username: "bob"},
+		{ID: 2, Name: "Sarah", Username: "sarah"},
+	})
+
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	// Dispatch ChatsLoadedMsg with chats
+	model, cmd := model.Update(tui.ChatsLoadedMsg{
+		Chats: []client.Chat{
+			{ID: 1, Name: "Bob", Username: "bob"},
+			{ID: 2, Name: "Sarah", Username: "sarah"},
+		},
+	})
+	assert.NotNil(t, cmd, "ChatsLoadedMsg should batch-dispatch background prefetch commands")
+
+	// Switch to conversation 2 while messages are loading
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	viewLoading := model.View()
+	assert.Contains(t, viewLoading, "Loading conversation messages...")
+
+	// Deliver bulk messages loaded
+	c.messages[2] = []client.Message{
+		{ID: 501, ConvID: 2, SenderID: 103, Sender: "Sarah", Text: "Hey there from Sarah!", Timestamp: "12:00"},
+	}
+	model, _ = model.Update(tui.BulkMessagesLoadedMsg{
+		MessagesByConv: map[int64][]client.Message{
+			2: c.messages[2],
+		},
+	})
+
+	viewLoaded := model.View()
+	assert.Contains(t, viewLoaded, "Hey there from Sarah!")
+}
+
+func TestConversationMessageLoadingFailureAndRetry(t *testing.T) {
+	c := newTestClient()
+	c.messages = make(map[int64][]client.Message)
+
+	model := tea.Model(tui.NewApp(c))
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+
+	model, _ = model.Update(tui.ChatsLoadedMsg{
+		Chats: []client.Chat{
+			{ID: 1, Name: "Bob", Username: "bob"},
+		},
+	})
+
+	// Simulate failure loading messages for chat 1
+	model, _ = model.Update(tui.MessagesLoadedMsg{
+		ChatID: 1,
+		Err:    assert.AnError,
+	})
+
+	viewFailed := model.View()
+	assert.Contains(t, viewFailed, "Failed to load messages")
+	assert.Contains(t, viewFailed, "Press [ r ] to retry")
+
+	// 1. Press 'r' to retry
+	model, retryCmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	assert.NotNil(t, retryCmd, "Pressing 'r' should return a command to re-fetch messages")
+	assert.Contains(t, model.View(), "Loading conversation messages...")
+
+	// Simulate failure again
+	model, _ = model.Update(tui.MessagesLoadedMsg{
+		ChatID: 1,
+		Err:    assert.AnError,
+	})
+
+	// 2. Click on chat pane (X: 50, Y: 10) to retry
+	model, clickRetryCmd := model.Update(tea.MouseMsg{
+		X:      50,
+		Y:      10,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	assert.NotNil(t, clickRetryCmd, "Clicking chat pane on error should return retry command")
+	assert.Contains(t, model.View(), "Loading conversation messages...")
 }

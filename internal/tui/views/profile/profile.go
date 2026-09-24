@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

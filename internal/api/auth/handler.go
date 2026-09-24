@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/gin-gonic/gin"
 )
 

@@ -128,6 +128,100 @@ func (q *Queries) DeleteMessagesAsBatch(ctx context.Context, arg DeleteMessagesA
 	return result.RowsAffected(), nil
 }
 
+const getBulkChatsByUserID = `-- name: GetBulkChatsByUserID :many
+WITH
+  user_convs AS (
+    SELECT
+      p.conv_id
+    FROM
+      participants p
+      JOIN conversations c ON c.id = p.conv_id
+    WHERE
+      p.user_id = $2
+      AND c.is_deleting = FALSE
+  )
+SELECT
+  m.id,
+  m.conv_id,
+  m.sender_id,
+  m.content,
+  m.created_at,
+  m.updated_at
+FROM
+  (
+    SELECT
+      id,
+      conv_id,
+      sender_id,
+      content,
+      created_at,
+      updated_at,
+      row_number() OVER (
+        PARTITION BY
+          conv_id
+        ORDER BY
+          created_at DESC,
+          id DESC
+      ) AS row_n
+    FROM
+      messages
+    WHERE
+      conv_id = ANY (
+        SELECT
+          conv_id
+        FROM
+          user_convs
+      )
+  ) m
+WHERE
+  m.row_n <= $1::int
+ORDER BY
+  m.conv_id,
+  m.created_at DESC,
+  m.id DESC
+`
+
+type GetBulkChatsByUserIDParams struct {
+	MsgLimit int32
+	UserID   int64
+}
+
+type GetBulkChatsByUserIDRow struct {
+	ID        int64
+	ConvID    int64
+	SenderID  int64
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetBulkChatsByUserID(ctx context.Context, arg GetBulkChatsByUserIDParams) ([]GetBulkChatsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, getBulkChatsByUserID, arg.MsgLimit, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetBulkChatsByUserIDRow
+	for rows.Next() {
+		var i GetBulkChatsByUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConvID,
+			&i.SenderID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConvChats = `-- name: GetConvChats :many
 SELECT
     id,
@@ -530,9 +624,9 @@ WHERE
 `
 
 type MarkConversationReadParams struct {
-	MessageID int64
-	ConvID    int64
-	UserID    int64
+	MessageID pgtype.Int8
+	ConvID    pgtype.Int8
+	UserID    pgtype.Int8
 }
 
 func (q *Queries) MarkConversationRead(ctx context.Context, arg MarkConversationReadParams) error {

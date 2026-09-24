@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/database"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,6 +19,8 @@ type ConvRepositoryInt interface {
 	) ([]GetConvParticipantType, error)
 
 	GetConvsByUserID(ctx context.Context, input int64) []GetConvParticipantType
+
+	GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error)
 
 	GetConvChats(
 		ctx context.Context,
@@ -64,6 +66,11 @@ type ConvQuerier interface {
 		ctx context.Context,
 		userID int64,
 	) ([]database.GetConversationsByUserIdRow, error)
+
+	GetBulkChatsByUserID(
+		ctx context.Context,
+		arg database.GetBulkChatsByUserIDParams,
+	) ([]database.GetBulkChatsByUserIDRow, error)
 
 	GetConvChats(
 		ctx context.Context,
@@ -113,7 +120,6 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 	ctx context.Context,
 	params GetOrCreateDirectConvType,
 ) ([]GetConvParticipantType, error) {
-
 	convParams := database.GetOrCreateDirectConversationParams{
 		UserID:   params.UserIDOne,
 		UserID_2: params.UserIDTwo,
@@ -164,6 +170,32 @@ func (r *ConvRepository) GetConvsByUserID(
 	return convParticipants
 }
 
+func (r *ConvRepository) GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error) {
+	params := database.GetBulkChatsByUserIDParams{
+		UserID:   userID,
+		MsgLimit: int32(limit),
+	}
+	chats, err := r.q.GetBulkChatsByUserID(ctx, params)
+	if err != nil {
+		log.Printf("===>GetBulkChatsByUserID: %v", err)
+		return nil, fmt.Errorf("error getting messages")
+	}
+
+	convChats := make([]BulkChatsResponseType, len(chats))
+	for i, chat := range chats {
+		convChats[i] = BulkChatsResponseType{
+			ID:        chat.ID,
+			SenderID:  chat.SenderID,
+			ConvID:    chat.ConvID,
+			Content:   chat.Content,
+			CreatedAt: chat.CreatedAt.Time.Format(time.RFC3339),
+			UpdatedAt: chat.UpdatedAt.Time.Format(time.RFC3339),
+		}
+	}
+
+	return convChats, nil
+}
+
 func (r *ConvRepository) GetConvChats(
 	ctx context.Context,
 	convID int64,
@@ -181,7 +213,7 @@ func (r *ConvRepository) GetConvChats(
 
 	chats, err := r.q.GetConvChats(ctx, convParams)
 	if err != nil {
-		log.Printf("===? GetConvChatsPaginated: %v\n", err)
+		log.Printf("===> GetConvChatsPaginated: %v\n", err)
 		return []GetConvChatResponseType{}
 	}
 
@@ -272,7 +304,6 @@ func (r *ConvRepository) CreateMessage(
 		CreatedAt:   chat.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:   chat.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
-
 }
 
 func (r *ConvRepository) IsUserInConversation(
@@ -293,7 +324,6 @@ func (r *ConvRepository) IsUserInConversation(
 }
 
 func (r *ConvRepository) MarkConvForDeleting(ctx context.Context, convID int64) error {
-
 	if err := r.q.MarkConversationDeleting(ctx, convID); err != nil {
 		return fmt.Errorf("error marking conversation for delete")
 	}
@@ -342,11 +372,12 @@ func (r *ConvRepository) GetUnreadCount(
 
 	return int(unreadCount), nil
 }
+
 func (r *ConvRepository) MarkAsRead(ctx context.Context, messageID, userID, convID int64) error {
 	params := database.MarkConversationReadParams{
-		MessageID: messageID,
-		ConvID:    convID,
-		UserID:    userID,
+		MessageID: pgtype.Int8{Int64: messageID},
+		ConvID:    pgtype.Int8{Int64: convID},
+		UserID:    pgtype.Int8{Int64: userID},
 	}
 
 	if err := r.q.MarkConversationRead(ctx, params); err != nil {

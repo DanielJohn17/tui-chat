@@ -2,13 +2,13 @@
 package router
 
 import (
-	"github.com/DanielJohn17/tui-chat/app/internal/api/auth"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/middleware"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/ws"
+	"github.com/DanielJohn17/tui-chat/internal/api/auth"
+	"github.com/DanielJohn17/tui-chat/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
+	"github.com/DanielJohn17/tui-chat/internal/api/middleware"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/users"
+	"github.com/DanielJohn17/tui-chat/internal/api/ws"
 	"github.com/gin-gonic/gin"
 )
 
@@ -49,6 +49,7 @@ func NewRouter(h Handlers) *gin.Engine {
 		// implement cursor pagination later
 		// implement chat history order by latest message update later
 		subRouter.GET("/conversations", h.Conv.GetConvsByUserID)
+		subRouter.GET("/conversations/bulk", h.Conv.GetBulkChatsByUserID)
 		subRouter.GET(
 			"/conversations/:id/chats",
 			middleware.ValidateURIParams[types.URLParamInt](),

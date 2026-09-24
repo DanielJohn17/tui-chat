@@ -3,7 +3,7 @@ package test
 import (
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 )
 
 type TestClient struct {
@@ -255,6 +255,16 @@ func (m *TestClient) SetChats(chats []client.Chat) {
 
 func (m *TestClient) FetchMessages(chatID int64) ([]client.Message, error) {
 	return m.Messages(chatID), nil
+}
+
+func (m *TestClient) FetchBulkMessages() (map[int64][]client.Message, error) {
+	out := make(map[int64][]client.Message)
+	for convID, msgs := range m.messages {
+		msgsCopy := make([]client.Message, len(msgs))
+		copy(msgsCopy, msgs)
+		out[convID] = msgsCopy
+	}
+	return out, nil
 }
 
 func (m *TestClient) Messages(chatID int64) []client.Message {

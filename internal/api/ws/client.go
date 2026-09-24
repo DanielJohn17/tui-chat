@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
+	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
 	"github.com/gorilla/websocket"
 )
 

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/chat"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -15,7 +16,10 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 				_ = m.client.MarkRead(sel.ID, 0)
 				zero := 0
 				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				return *m, fetchMessagesCmd(m.client, sel.ID), true
+				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
+					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
+					return *m, fetchMessagesCmd(m.client, sel.ID), true
+				}
 			}
 		} else {
 			m.chatView.ScrollUp(3)
@@ -32,7 +36,10 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 				_ = m.client.MarkRead(sel.ID, 0)
 				zero := 0
 				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				return *m, fetchMessagesCmd(m.client, sel.ID), true
+				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
+					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
+					return *m, fetchMessagesCmd(m.client, sel.ID), true
+				}
 			}
 		} else {
 			m.chatView.ScrollDown(3)
@@ -92,13 +99,21 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 			_ = m.client.MarkRead(clickedChat.ID, 0)
 			zero := 0
 			m.client.UpdateChatSnippet(clickedChat.ID, "", "", 0, &zero)
-			return *m, fetchMessagesCmd(m.client, clickedChat.ID), true
+			if len(m.client.Messages(clickedChat.ID)) == 0 && m.chatView.FetchStatus(clickedChat.ID) != chat.StatusLoading {
+				m.chatView.SetFetchStatus(clickedChat.ID, chat.StatusLoading)
+				return *m, fetchMessagesCmd(m.client, clickedChat.ID), true
+			}
 		}
 		return *m, nil, true
 	}
 
 	// Click in chat pane
 	if mouseMsg.X >= sidebarWidth && mouseMsg.Y < mainHeight {
+		activeID := m.chatView.ActiveChatID()
+		if activeID != 0 && m.chatView.FetchStatus(activeID) == chat.StatusFailed {
+			m.chatView.SetFetchStatus(activeID, chat.StatusLoading)
+			return *m, fetchMessagesCmd(m.client, activeID), true
+		}
 		if mouseMsg.Y >= mainHeight-5 {
 			m.chatView.FocusInput()
 			return *m, nil, true

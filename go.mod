@@ -1,4 +1,4 @@
-module github.com/DanielJohn17/tui-chat/app
+module github.com/DanielJohn17/tui-chat
 
 go 1.27.0
 

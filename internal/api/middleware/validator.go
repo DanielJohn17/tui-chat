@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/gin-gonic/gin"
 )
 

@@ -3,15 +3,16 @@ package conversations
 import (
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/gin-gonic/gin"
 )
 
 type ConvHandlerInt interface {
 	GetOrCreateDirectConversation(c *gin.Context)
 	GetConvsByUserID(c *gin.Context)
+	GetBulkChatsByUserID(c *gin.Context)
 	GetConvChats(c *gin.Context)
 	WipeConversation(c *gin.Context)
 }
@@ -65,6 +66,31 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 	}
 
 	helpers.WriteJSONWithMeta(c, http.StatusOK, conversations, meta)
+}
+
+func (h *ConvHandler) GetBulkChatsByUserID(c *gin.Context) {
+	userIDParam, exists := c.Get("userId")
+	if !exists {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
+	userID, ok := userIDParam.(int64)
+	if !ok {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
+	ctx := c.Request.Context()
+	var limit int64 = 50
+
+	chats, err := h.s.GetBulkChatsByUserID(ctx, userID, limit)
+	if err != nil {
+		helpers.WriteError(c, err)
+		return
+	}
+
+	helpers.WriteJSON(c, http.StatusOK, chats)
 }
 
 func (h *ConvHandler) GetConvChats(c *gin.Context) {

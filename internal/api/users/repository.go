@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/database"
+	"github.com/DanielJohn17/tui-chat/internal/api/database"
 )
 
 type UserRepositoryInt interface {

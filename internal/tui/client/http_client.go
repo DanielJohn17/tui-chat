@@ -433,6 +433,91 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	return messages, nil
 }
 
+type bulkChatData struct {
+	ID        int64  `json:"id"`
+	SenderID  int64  `json:"sender_id"`
+	ConvID    int64  `json:"conv_id"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
+	h.mu.RLock()
+	currentUserID := h.profile.ID
+	chatsMap := make(map[int64]string)
+	for _, ch := range h.chats {
+		name := ch.Name
+		if name == "" {
+			name = ch.Username
+		}
+		chatsMap[ch.ID] = name
+	}
+	h.mu.RUnlock()
+
+	path := "/api/v1/conversations/bulk"
+	req, err := h.newRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return nil, h.formatNetworkError(err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.New("Failed to read server response")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp apiResponse[any]
+		if json.Unmarshal(bodyBytes, &errResp) == nil && errResp.Error != "" {
+			return nil, errors.New(errResp.Error)
+		}
+		return nil, fmt.Errorf("Failed to fetch bulk messages (HTTP %d)", resp.StatusCode)
+	}
+
+	var res apiResponse[[]bulkChatData]
+	if err := json.Unmarshal(bodyBytes, &res); err != nil {
+		return nil, errors.New("Invalid server response format")
+	}
+
+	grouped := make(map[int64][]Message)
+	for _, c := range res.Data {
+		isSelf := c.SenderID == currentUserID
+		senderName := chatsMap[c.ConvID]
+		if senderName == "" {
+			senderName = "Recipient"
+		}
+		if isSelf {
+			senderName = "You"
+		}
+
+		msg := Message{
+			ID:        c.ID,
+			SenderID:  c.SenderID,
+			Sender:    senderName,
+			ConvID:    c.ConvID,
+			Text:      c.Content,
+			Timestamp: formatFriendlyTime(c.CreatedAt),
+			Self:      isSelf,
+		}
+		// prepend to reverse chronological API order to oldest-first
+		grouped[c.ConvID] = append([]Message{msg}, grouped[c.ConvID]...)
+	}
+
+	h.mu.Lock()
+	for convID, msgs := range grouped {
+		h.messages[convID] = msgs
+	}
+	h.mu.Unlock()
+
+	return grouped, nil
+}
+
 func (h *HTTPClient) Messages(chatID int64) []Message {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

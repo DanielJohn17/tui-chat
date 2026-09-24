@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/joho/godotenv"
 )

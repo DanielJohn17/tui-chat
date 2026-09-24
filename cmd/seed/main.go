@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )

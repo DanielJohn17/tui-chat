@@ -3,10 +3,10 @@ package ws
 import (
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/errors"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/helpers"
+	"github.com/DanielJohn17/tui-chat/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
+	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )

@@ -124,6 +124,58 @@ ORDER BY
   COALESCE(lm.created_at, tc.created_at) DESC,
   tc.conv_id DESC;
 
+-- name: GetBulkChatsByUserID :many
+WITH
+  user_convs AS (
+    SELECT
+      p.conv_id
+    FROM
+      participants p
+      JOIN conversations c ON c.id = p.conv_id
+    WHERE
+      p.user_id = sqlc.arg(user_id)
+      AND c.is_deleting = FALSE
+  )
+SELECT
+  m.id,
+  m.conv_id,
+  m.sender_id,
+  m.content,
+  m.created_at,
+  m.updated_at
+FROM
+  (
+    SELECT
+      id,
+      conv_id,
+      sender_id,
+      content,
+      created_at,
+      updated_at,
+      row_number() OVER (
+        PARTITION BY
+          conv_id
+        ORDER BY
+          created_at DESC,
+          id DESC
+      ) AS row_n
+    FROM
+      messages
+    WHERE
+      conv_id = ANY (
+        SELECT
+          conv_id
+        FROM
+          user_convs
+      )
+  ) m
+WHERE
+  m.row_n <= sqlc.arg(msg_limit)::int
+ORDER BY
+  m.conv_id,
+  m.created_at DESC,
+  m.id DESC;
+
 -- name: GetConvChats :many
 SELECT
     id,

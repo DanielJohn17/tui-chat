@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/profile"
+	"github.com/DanielJohn17/tui-chat/internal/tui"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/profile"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

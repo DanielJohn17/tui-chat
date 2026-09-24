@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

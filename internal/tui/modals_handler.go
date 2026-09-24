@@ -3,7 +3,7 @@ package tui
 import (
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

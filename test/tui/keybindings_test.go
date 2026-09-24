@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"

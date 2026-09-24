@@ -4,12 +4,21 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/theme"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+)
+
+type FetchStatus int
+
+const (
+	StatusIdle FetchStatus = iota
+	StatusLoading
+	StatusSuccess
+	StatusFailed
 )
 
 type Model struct {
@@ -20,6 +29,10 @@ type Model struct {
 	isFocused    bool
 	width        int
 	height       int
+
+	convStatus   map[int64]FetchStatus
+	convErrors   map[int64]string
+	spinnerFrame string
 }
 
 func New(c client.Client) Model {
@@ -34,12 +47,62 @@ func New(c client.Client) Model {
 	ti.CharLimit = 500
 
 	return Model{
-		client:    c,
-		viewport:  vp,
-		input:     ti,
-		isFocused: false,
-		width:     60,
-		height:    24,
+		client:       c,
+		viewport:     vp,
+		input:        ti,
+		isFocused:    false,
+		width:        60,
+		height:       24,
+		convStatus:   make(map[int64]FetchStatus),
+		convErrors:   make(map[int64]string),
+		spinnerFrame: "⠋",
+	}
+}
+
+func (m *Model) SetFetchStatus(chatID int64, status FetchStatus) {
+	if m.convStatus == nil {
+		m.convStatus = make(map[int64]FetchStatus)
+	}
+	m.convStatus[chatID] = status
+	if status != StatusFailed && m.convErrors != nil {
+		delete(m.convErrors, chatID)
+	}
+	m.RefreshMessages()
+}
+
+func (m *Model) SetFetchError(chatID int64, err string) {
+	if m.convStatus == nil {
+		m.convStatus = make(map[int64]FetchStatus)
+	}
+	if m.convErrors == nil {
+		m.convErrors = make(map[int64]string)
+	}
+	m.convStatus[chatID] = StatusFailed
+	m.convErrors[chatID] = err
+	m.RefreshMessages()
+}
+
+func (m Model) FetchStatus(chatID int64) FetchStatus {
+	if m.convStatus == nil {
+		return StatusIdle
+	}
+	return m.convStatus[chatID]
+}
+
+func (m Model) FetchError(chatID int64) string {
+	if m.convErrors == nil {
+		return ""
+	}
+	return m.convErrors[chatID]
+}
+
+func (m *Model) SetSpinnerFrame(frame string) {
+	m.spinnerFrame = frame
+	if m.activeChatID != 0 && m.convStatus != nil && m.convStatus[m.activeChatID] == StatusLoading {
+		messages := m.client.Messages(m.activeChatID)
+		if len(messages) == 0 {
+			m.RefreshMessages()
+		}
 	}
 }
 
@@ -95,7 +158,46 @@ func (m *Model) RefreshMessages() {
 		return
 	}
 
+	status := StatusIdle
+	if m.convStatus != nil {
+		status = m.convStatus[m.activeChatID]
+	}
+
 	messages := m.client.Messages(m.activeChatID)
+
+	// Loading state when messages are not yet in memory
+	if status == StatusLoading && len(messages) == 0 {
+		sp := m.spinnerFrame
+		if sp == "" {
+			sp = "⠋"
+		}
+		loadingText := lipgloss.JoinHorizontal(lipgloss.Center,
+			lipgloss.NewStyle().Foreground(theme.ColorYellow).Bold(true).Render(sp),
+			" ",
+			theme.StyleDim.Render("Loading conversation messages..."),
+		)
+		m.viewport.SetContent("\n\n  " + loadingText)
+		return
+	}
+
+	// Error / Failure state when fetching failed
+	if status == StatusFailed && len(messages) == 0 {
+		errDetail := m.convErrors[m.activeChatID]
+		errMsg := "Failed to load messages"
+		if errDetail != "" {
+			errMsg = fmt.Sprintf("Failed to load messages: %s", errDetail)
+		}
+		errTitle := lipgloss.NewStyle().Foreground(theme.ColorRed).Bold(true).Render("✖ " + errMsg)
+		retryHint := theme.StyleDim.Render("Press [ r ] to retry  •  Click to reload")
+		errBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.ColorRed).
+			Padding(1, 2).
+			Render(lipgloss.JoinVertical(lipgloss.Center, errTitle, "", retryHint))
+		m.viewport.SetContent("\n  " + errBox)
+		return
+	}
+
 	if len(messages) == 0 {
 		m.viewport.SetContent(theme.StyleDim.Render("\n  No messages yet. Send a message to break the ice!"))
 		return

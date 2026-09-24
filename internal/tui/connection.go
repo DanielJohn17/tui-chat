@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/statusbar"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/statusbar"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -36,15 +36,20 @@ func (m *AppModel) handleWSConnectResult(msg WSConnectResultMsg) (tea.Model, tea
 		)
 	}
 
+	wasReconnecting := m.connStatus == statusbar.StatusReconnecting
 	m.connStatus = statusbar.StatusConnected
 	m.reconnectDelay = time.Second
 	m.retrySecondsLeft = 0
 
 	var postConnectCmds []tea.Cmd
-	postConnectCmds = append(postConnectCmds, fetchChatsCmd(m.client))
+	if wasReconnecting || len(m.client.Chats()) == 0 {
+		postConnectCmds = append(postConnectCmds, fetchChatsCmd(m.client))
+	}
 	if activeID := m.chatView.ActiveChatID(); activeID != 0 {
 		_ = m.client.FocusConv(activeID)
-		postConnectCmds = append(postConnectCmds, fetchMessagesCmd(m.client, activeID))
+		if wasReconnecting {
+			postConnectCmds = append(postConnectCmds, fetchMessagesCmd(m.client, activeID))
+		}
 	}
 	return *m, tea.Batch(postConnectCmds...)
 }
@@ -65,11 +70,9 @@ func (m *AppModel) handleRetryCountdownTick() (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleSpinnerTick() (tea.Model, tea.Cmd) {
-	if m.connStatus == statusbar.StatusConnecting || m.connStatus == statusbar.StatusReconnecting {
-		m.spinnerIdx = (m.spinnerIdx + 1) % len(spinnerFrames)
-		return *m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} })
-	}
-	return *m, nil
+	m.spinnerIdx = (m.spinnerIdx + 1) % len(spinnerFrames)
+	m.chatView.SetSpinnerFrame(spinnerFrames[m.spinnerIdx])
+	return *m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} })
 }
 
 func (m *AppModel) handleReconnectTick() (tea.Model, tea.Cmd) {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	apierrors "github.com/DanielJohn17/tui-chat/app/internal/api/errors"
+	apierrors "github.com/DanielJohn17/tui-chat/internal/api/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )

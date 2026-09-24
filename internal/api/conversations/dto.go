@@ -37,3 +37,12 @@ type CreateMessageResponseType struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
+
+type BulkChatsResponseType struct {
+	ID        int64  `json:"id"`
+	SenderID  int64  `json:"sender_id"`
+	ConvID    int64  `json:"conv_id"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}

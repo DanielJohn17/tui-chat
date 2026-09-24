@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/config"
+	"github.com/DanielJohn17/tui-chat/internal/api/config"
 )
 
 type APIError struct {

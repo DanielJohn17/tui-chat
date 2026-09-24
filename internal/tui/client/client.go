@@ -82,6 +82,7 @@ type Client interface {
 	Chats() []Chat
 	SetChats([]Chat)
 	FetchMessages(chatID int64) ([]Message, error)
+	FetchBulkMessages() (map[int64][]Message, error)
 	Messages(chatID int64) []Message
 	AppendMessage(msg Message)
 	UpdateChatSnippet(convID int64, lastMsg, timeStr string, unreadDelta int, setExactUnread *int)

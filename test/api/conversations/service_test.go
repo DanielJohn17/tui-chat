@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/api/conversations"
-	apierrors "github.com/DanielJohn17/tui-chat/app/internal/api/errors"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/types"
-	"github.com/DanielJohn17/tui-chat/app/internal/api/users"
+	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
+	apierrors "github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/types"
+	"github.com/DanielJohn17/tui-chat/internal/api/users"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -60,6 +60,17 @@ func (m *MockConvRepo) GetConvsByUserID(
 		return res.([]conversations.GetConvParticipantType)
 	}
 	return nil
+}
+
+func (m *MockConvRepo) GetBulkChatsByUserID(
+	ctx context.Context,
+	userID, limit int64,
+) ([]conversations.BulkChatsResponseType, error) {
+	args := m.Called(ctx, userID, limit)
+	if res := args.Get(0); res != nil {
+		return res.([]conversations.BulkChatsResponseType), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 func (m *MockConvRepo) GetConvChats(
@@ -416,4 +427,36 @@ func TestCreateMessage(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, expected, msg)
+}
+
+func TestGetBulkChatsByUserID_Success(t *testing.T) {
+	expected := []conversations.BulkChatsResponseType{
+		{
+			ID:        1,
+			SenderID:  10,
+			ConvID:    100,
+			Content:   "Hello in bulk",
+			CreatedAt: "2026-09-24T12:00:00Z",
+			UpdatedAt: "2026-09-24T12:00:00Z",
+		},
+	}
+	repo := new(MockConvRepo)
+	repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(expected, nil)
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, chats)
+}
+
+func TestGetBulkChatsByUserID_Error(t *testing.T) {
+	repo := new(MockConvRepo)
+	repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(nil, errors.New("db error"))
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
+
+	require.Error(t, err)
+	assert.Nil(t, chats)
 }

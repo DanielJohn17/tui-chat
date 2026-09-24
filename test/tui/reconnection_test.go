@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DanielJohn17/tui-chat/app/internal/tui"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/app/internal/tui/views/auth"
+	"github.com/DanielJohn17/tui-chat/internal/tui"
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/views/auth"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 )
