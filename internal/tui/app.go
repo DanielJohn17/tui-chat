@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/app/internal/tui/client"
@@ -47,6 +46,22 @@ type WSIncomingMsg struct {
 	Event any
 }
 
+type WSConnectResultMsg struct {
+	Err error
+}
+
+type ReconnectTickMsg struct{}
+
+type RetryCountdownTickMsg struct{}
+
+type SpinnerTickMsg struct{}
+
+type ClearNotificationMsg struct {
+	ID int64
+}
+
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
 func fetchChatsCmd(c client.Client) tea.Cmd {
 	return func() tea.Msg {
 		chats, err := c.FetchChats()
@@ -61,6 +76,13 @@ func fetchMessagesCmd(c client.Client, chatID int64) tea.Cmd {
 	}
 }
 
+func connectWSCmd(c client.Client, eventsChan chan any) tea.Cmd {
+	return func() tea.Msg {
+		err := c.ConnectWS(eventsChan)
+		return WSConnectResultMsg{Err: err}
+	}
+}
+
 type AppModel struct {
 	client       client.Client
 	state        AppState
@@ -68,6 +90,14 @@ type AppModel struct {
 	width        int
 	height       int
 	wsEventsChan chan any
+
+	connStatus       statusbar.ConnectionStatus
+	reconnectDelay   time.Duration
+	retrySecondsLeft int
+	spinnerIdx       int
+
+	notificationText string
+	notificationID   int64
 
 	authView    auth.Model
 	sidebarView *sidebar.Model
@@ -78,8 +108,10 @@ type AppModel struct {
 
 func NewApp(c client.Client) AppModel {
 	initialState := StateAuth
+	connStatus := statusbar.StatusOffline
 	if c.IsAuthenticated() {
 		initialState = StateChat
+		connStatus = statusbar.StatusConnecting
 	}
 
 	authV := auth.New(c)
@@ -90,15 +122,21 @@ func NewApp(c client.Client) AppModel {
 	wsChan := make(chan any, 64)
 
 	return AppModel{
-		client:       c,
-		state:        initialState,
-		modal:        ModalNone,
-		wsEventsChan: wsChan,
-		authView:     authV,
-		sidebarView:  &sidebarV,
-		chatView:     chatV,
-		profileView:  profileV,
-		newDMView:    newDMV,
+		client:           c,
+		state:            initialState,
+		modal:            ModalNone,
+		wsEventsChan:     wsChan,
+		connStatus:       connStatus,
+		reconnectDelay:   time.Second,
+		retrySecondsLeft: 0,
+		spinnerIdx:       0,
+		notificationText: "",
+		notificationID:   0,
+		authView:         authV,
+		sidebarView:      &sidebarV,
+		chatView:         chatV,
+		profileView:      profileV,
+		newDMView:        newDMV,
 	}
 }
 
@@ -121,8 +159,13 @@ func (m AppModel) Init() tea.Cmd {
 		m.authView.Init(),
 	}
 	if m.client.IsAuthenticated() {
-		_ = m.client.ConnectWS(m.wsEventsChan)
-		cmds = append(cmds, fetchChatsCmd(m.client), m.listenWSCmd())
+		m.connStatus = statusbar.StatusConnecting
+		cmds = append(cmds,
+			fetchChatsCmd(m.client),
+			connectWSCmd(m.client, m.wsEventsChan),
+			m.listenWSCmd(),
+			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
+		)
 	}
 	return tea.Batch(cmds...)
 }
@@ -154,8 +197,6 @@ func (m *AppModel) handleResize(w, h int) {
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.handleResize(msg.Width, msg.Height)
@@ -165,118 +206,42 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateChat
 		m.client.SetProfile(msg.Profile)
 		m.profileView.ReloadProfile()
-		_ = m.client.ConnectWS(m.wsEventsChan)
+		m.connStatus = statusbar.StatusConnecting
+		m.reconnectDelay = time.Second
+		m.retrySecondsLeft = 0
 		return m, tea.Batch(
 			fetchChatsCmd(m.client),
+			connectWSCmd(m.client, m.wsEventsChan),
 			m.listenWSCmd(),
+			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return SpinnerTickMsg{} }),
 		)
 
+	case WSConnectResultMsg:
+		return m.handleWSConnectResult(msg)
+
+	case RetryCountdownTickMsg:
+		return m.handleRetryCountdownTick()
+
+	case SpinnerTickMsg:
+		return m.handleSpinnerTick()
+
+	case ReconnectTickMsg:
+		return m.handleReconnectTick()
+
 	case ChatsLoadedMsg:
-		if msg.Err != nil {
-			errStr := strings.ToLower(msg.Err.Error())
-			if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "invalid token") || strings.Contains(errStr, "401") || strings.Contains(errStr, "unauthenticated") {
-				_ = m.client.Logout()
-				m.state = StateAuth
-				m.authView.SetErrorMessage("Session expired. Please log in again.")
-				return m, nil
-			}
-		}
-		if msg.Err == nil && len(msg.Chats) > 0 {
-			m.sidebarView.SelectIndex(0)
-			if firstChat := m.sidebarView.SelectedChat(); firstChat != nil {
-				m.chatView.SetActiveChat(firstChat.ID)
-				_ = m.client.FocusConv(firstChat.ID)
-				_ = m.client.MarkRead(firstChat.ID, 0)
-				zero := 0
-				m.client.UpdateChatSnippet(firstChat.ID, "", "", 0, &zero)
-				return m, fetchMessagesCmd(m.client, firstChat.ID)
-			}
-		}
-		return m, nil
+		return m.handleChatsLoaded(msg)
 
 	case MessagesLoadedMsg:
-		if msg.Err == nil && msg.ChatID == m.chatView.ActiveChatID() {
-			m.chatView.RefreshMessages()
-			msgs := m.client.Messages(msg.ChatID)
-			if len(msgs) > 0 {
-				lastMsg := msgs[len(msgs)-1]
-				_ = m.client.MarkRead(msg.ChatID, lastMsg.ID)
-			}
-		}
-		return m, nil
+		return m.handleMessagesLoaded(msg)
 
 	case WSIncomingMsg:
-		var nextCmds []tea.Cmd
-		nextCmds = append(nextCmds, m.listenWSCmd())
+		return m.handleWSIncoming(msg)
 
-		switch p := msg.Event.(type) {
-		case client.WSChatMessagePayload:
-			senderName := "Recipient"
-			if sel := m.sidebarView.SelectedChat(); sel != nil && sel.ID == p.ConvID {
-				senderName = sel.Name
-				if senderName == "" {
-					senderName = sel.Username
-				}
-			}
-			isSelf := p.SenderID == m.client.Profile().ID
-			if isSelf {
-				senderName = "You"
-			}
-
-			// Check if message is already stored in client memory (avoids duplication on sender window)
-			existing := m.client.Messages(p.ConvID)
-			alreadyExists := false
-			for _, ex := range existing {
-				if (p.ID > 0 && ex.ID == p.ID) || (isSelf && ex.ID == 0 && ex.Text == p.Content) {
-					alreadyExists = true
-					break
-				}
-			}
-
-			if !alreadyExists {
-				m.client.AppendMessage(client.Message{
-					ID:        p.ID,
-					SenderID:  p.SenderID,
-					Sender:    senderName,
-					ConvID:    p.ConvID,
-					Text:      p.Content,
-					Timestamp: "now",
-					Self:      isSelf,
-				})
-			}
-
-			if p.ConvID == m.chatView.ActiveChatID() {
-				m.chatView.RefreshMessages()
-				if !isSelf {
-					_ = m.client.MarkRead(p.ConvID, p.ID)
-				}
-				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, nil)
-			} else {
-				unreadDelta := 1
-				if isSelf {
-					unreadDelta = 0
-				}
-				m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", unreadDelta, nil)
-			}
-
-		case client.WSChatNotificationPayload:
-			m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, &p.UnreadCount)
-
-		case client.WSConversationReadPayload:
-			if p.UserID == m.client.Profile().ID {
-				zero := 0
-				m.client.UpdateChatSnippet(p.ConvID, "", "", 0, &zero)
-			}
-
-		case client.WSErrorPayload:
-			if strings.Contains(strings.ToLower(p.Error), "unauthorized") {
-				_ = m.client.Logout()
-				m.state = StateAuth
-				m.authView.SetErrorMessage("Session expired. Please log in again.")
-				return m, nil
-			}
+	case ClearNotificationMsg:
+		if msg.ID == m.notificationID {
+			m.notificationText = ""
 		}
-		return m, tea.Batch(nextCmds...)
+		return m, nil
 
 	case auth.OpenHelpMsg:
 		m.modal = ModalHelp
@@ -298,301 +263,24 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// 1. If a modal is open, modal captures input
-	if m.modal != ModalNone {
-		switch m.modal {
-		case ModalHelp:
-			if mouseMsg, ok := msg.(tea.MouseMsg); ok {
-				if mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft {
-					m.modal = ModalNone
-					return m, nil
-				}
-			}
-			if keyMsg, ok := msg.(tea.KeyMsg); ok {
-				switch keyMsg.String() {
-				case "esc", "enter", "?", "q", "f1", "ctrl+h":
-					m.modal = ModalNone
-					return m, nil
-				}
-			}
-			return m, nil
-
-		case ModalNewDM:
-			if mouseMsg, ok := msg.(tea.MouseMsg); ok {
-				if mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft {
-					boxW := 48
-					boxH := 10
-					startX := (m.width - boxW) / 2
-					startY := (m.height - boxH) / 2
-					relY := mouseMsg.Y - startY
-					relX := mouseMsg.X - startX
-
-					if relY >= 5 && relY <= 8 && relX >= 0 && relX < boxW {
-						if relX < boxW/2 {
-							username := m.newDMView.Value()
-							if len(username) < 3 {
-								m.newDMView.SetError("Username must be at least 3 characters")
-								return m, nil
-							}
-							chats := m.client.Chats()
-							newChat := client.Chat{
-								ID:          time.Now().UnixNano(),
-								RecipientID: 0,
-								Name:        username,
-								Username:    username,
-								Time:        "now",
-								Unread:      0,
-								Online:      false,
-							}
-							m.client.SetChats(append([]client.Chat{newChat}, chats...))
-							m.sidebarView.SelectIndex(0)
-							m.chatView.SetActiveChat(newChat.ID)
-							m.modal = ModalNone
-							return m, nil
-						} else {
-							m.modal = ModalNone
-							return m, nil
-						}
-					}
-				}
-			}
-			if keyMsg, ok := msg.(tea.KeyMsg); ok {
-				switch keyMsg.String() {
-				case "esc":
-					m.modal = ModalNone
-					return m, nil
-				case "enter":
-					username := m.newDMView.Value()
-					if len(username) < 3 {
-						m.newDMView.SetError("Username must be at least 3 characters")
-						return m, nil
-					}
-					chats := m.client.Chats()
-					newChat := client.Chat{
-						ID:          time.Now().UnixNano(),
-						RecipientID: 0,
-						Name:        username,
-						Username:    username,
-						Time:        "now",
-						Unread:      0,
-						Online:      false,
-					}
-					m.client.SetChats(append([]client.Chat{newChat}, chats...))
-					m.sidebarView.SelectIndex(0)
-					m.chatView.SetActiveChat(newChat.ID)
-					m.modal = ModalNone
-					return m, nil
-				}
-			}
-			var cmd tea.Cmd
-			m.newDMView, cmd = m.newDMView.Update(msg)
-			return m, cmd
-		}
+	// 1. Modals capture input when open
+	if model, cmd, handled := m.handleModalUpdate(msg); handled {
+		return model, cmd
 	}
 
 	// 2. State-specific updates
 	switch m.state {
 	case StateAuth:
-		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			switch keyMsg.String() {
-			case "esc", "ctrl+c":
-				return m, tea.Quit
-			case "f1", "ctrl+h", "?":
-				m.modal = ModalHelp
-				return m, nil
-			}
-		}
-		var cmd tea.Cmd
-		m.authView, cmd = m.authView.Update(msg)
-		return m, cmd
+		return m.handleAuthState(msg)
 
 	case StateProfile:
-		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "esc" {
-			m.state = StateChat
-			return m, nil
-		}
-		var cmd tea.Cmd
-		m.profileView, cmd = m.profileView.Update(msg)
-		return m, cmd
+		return m.handleProfileState(msg)
 
 	case StateChat:
-		sidebarWidth := 38
-		if m.width < 100 {
-			sidebarWidth = 30
-		}
-		mainHeight := m.height - 3
-
-		// Mouse event handling across chat, sidebar, and statusbar
-		if mouseMsg, ok := msg.(tea.MouseMsg); ok {
-			// Mouse Wheel handling
-			if mouseMsg.Button == tea.MouseButtonWheelUp || mouseMsg.Type == tea.MouseWheelUp {
-				if mouseMsg.X < sidebarWidth {
-					m.sidebarView.MoveUp()
-					if sel := m.sidebarView.SelectedChat(); sel != nil {
-						m.chatView.SetActiveChat(sel.ID)
-						_ = m.client.FocusConv(sel.ID)
-						_ = m.client.MarkRead(sel.ID, 0)
-						zero := 0
-						m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-						return m, fetchMessagesCmd(m.client, sel.ID)
-					}
-				} else {
-					m.chatView.ScrollUp(3)
-				}
-				return m, nil
-			}
-			if mouseMsg.Button == tea.MouseButtonWheelDown || mouseMsg.Type == tea.MouseWheelDown {
-				if mouseMsg.X < sidebarWidth {
-					m.sidebarView.MoveDown()
-					if sel := m.sidebarView.SelectedChat(); sel != nil {
-						m.chatView.SetActiveChat(sel.ID)
-						_ = m.client.FocusConv(sel.ID)
-						_ = m.client.MarkRead(sel.ID, 0)
-						zero := 0
-						m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-						return m, fetchMessagesCmd(m.client, sel.ID)
-					}
-				} else {
-					m.chatView.ScrollDown(3)
-				}
-				return m, nil
-			}
-
-			// Mouse Left Click handling
-			isClick := (mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft) ||
-				(mouseMsg.Type == tea.MouseLeft && mouseMsg.Action != tea.MouseActionMotion)
-
-			if isClick {
-				// 1. Click in status bar at bottom
-				if mouseMsg.Y >= mainHeight {
-					if mouseMsg.X >= m.width-12 {
-						return m, tea.Quit
-					}
-					normX := float64(mouseMsg.X) / float64(m.width)
-					if normX >= 0.40 && normX < 0.50 {
-						m.chatView.FocusInput()
-						return m, nil
-					} else if normX >= 0.50 && normX < 0.60 {
-						m.modal = ModalNewDM
-						m.newDMView.Reset()
-						return m, nil
-					} else if normX >= 0.60 && normX < 0.72 {
-						m.state = StateProfile
-						m.profileView.ReloadProfile()
-						return m, nil
-					} else if normX >= 0.72 && normX < 0.85 {
-						m.modal = ModalHelp
-						return m, nil
-					}
-					return m, nil
-				}
-
-				// 2. Click in sidebar
-				if mouseMsg.X < sidebarWidth && mouseMsg.Y < mainHeight {
-					clickedChat, clickedNewDM, clickedProfile := m.sidebarView.HandleClick(mouseMsg.X, mouseMsg.Y)
-					if clickedNewDM {
-						m.modal = ModalNewDM
-						m.newDMView.Reset()
-						return m, nil
-					}
-					if clickedProfile {
-						m.state = StateProfile
-						m.profileView.ReloadProfile()
-						return m, nil
-					}
-					if clickedChat != nil {
-						m.chatView.SetActiveChat(clickedChat.ID)
-						m.chatView.BlurInput()
-						_ = m.client.FocusConv(clickedChat.ID)
-						_ = m.client.MarkRead(clickedChat.ID, 0)
-						zero := 0
-						m.client.UpdateChatSnippet(clickedChat.ID, "", "", 0, &zero)
-						return m, fetchMessagesCmd(m.client, clickedChat.ID)
-					}
-					return m, nil
-				}
-
-				// 3. Click in chat pane
-				if mouseMsg.X >= sidebarWidth && mouseMsg.Y < mainHeight {
-					if mouseMsg.Y >= mainHeight-5 {
-						m.chatView.FocusInput()
-						return m, nil
-					}
-					if mouseMsg.Y <= 2 && m.chatView.IsInputFocused() {
-						m.chatView.BlurInput()
-						return m, nil
-					}
-				}
-			}
-		}
-
-		// When input is focused, route keystrokes directly to chatView
-		if m.chatView.IsInputFocused() {
-			var cmd tea.Cmd
-			m.chatView, cmd = m.chatView.Update(msg)
-			if m.chatView.ActiveChatID() != 0 {
-				m.sidebarView.SelectChatByID(m.chatView.ActiveChatID())
-			}
-			return m, cmd
-		}
-
-		// When input is NOT focused, top-level navigation keys apply
-		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			switch keyMsg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-
-			case "j", "down":
-				m.sidebarView.MoveDown()
-				if sel := m.sidebarView.SelectedChat(); sel != nil {
-					m.chatView.SetActiveChat(sel.ID)
-					_ = m.client.FocusConv(sel.ID)
-					_ = m.client.MarkRead(sel.ID, 0)
-					zero := 0
-					m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-					return m, fetchMessagesCmd(m.client, sel.ID)
-				}
-				return m, nil
-
-			case "k", "up":
-				m.sidebarView.MoveUp()
-				if sel := m.sidebarView.SelectedChat(); sel != nil {
-					m.chatView.SetActiveChat(sel.ID)
-					_ = m.client.FocusConv(sel.ID)
-					_ = m.client.MarkRead(sel.ID, 0)
-					zero := 0
-					m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-					return m, fetchMessagesCmd(m.client, sel.ID)
-				}
-				return m, nil
-
-			case "i", "enter":
-				m.chatView.FocusInput()
-				return m, nil
-
-			case "n":
-				m.modal = ModalNewDM
-				m.newDMView.Reset()
-				return m, nil
-
-			case "p":
-				m.state = StateProfile
-				m.profileView.ReloadProfile()
-				return m, nil
-
-			case "?", "ctrl+h", "f1":
-				m.modal = ModalHelp
-				return m, nil
-
-			case "pgup", "pgdown":
-				var cmd tea.Cmd
-				m.chatView, cmd = m.chatView.Update(msg)
-				return m, cmd
-			}
-		}
+		return m.handleChatState(msg)
 	}
 
-	return m, tea.Batch(cmds...)
+	return m, nil
 }
 
 func (m AppModel) View() string {
@@ -624,7 +312,14 @@ func (m AppModel) View() string {
 			m.sidebarView.View(),
 			m.chatView.View(activeChat),
 		)
-		statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), m.client.IsWSConnected(), m.width)
+		currentConnStatus := m.connStatus
+		if m.client.IsWSConnected() {
+			currentConnStatus = statusbar.StatusConnected
+		} else if currentConnStatus == statusbar.StatusConnected {
+			currentConnStatus = statusbar.StatusOffline
+		}
+		spinnerFrame := spinnerFrames[m.spinnerIdx%len(spinnerFrames)]
+		statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), currentConnStatus, m.retrySecondsLeft, spinnerFrame, m.notificationText, m.width)
 		return lipgloss.JoinVertical(lipgloss.Left, mainRow, statusBar)
 	}
 

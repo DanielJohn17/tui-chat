@@ -8,6 +8,7 @@ import (
 
 type Model struct {
 	client        client.Client
+	selectedID    int64
 	selectedIndex int
 	scrollOffset  int
 	width         int
@@ -22,6 +23,7 @@ type Model struct {
 func New(c client.Client) Model {
 	return Model{
 		client:        c,
+		selectedID:    0,
 		selectedIndex: 0,
 		scrollOffset:  0,
 		width:         32,
@@ -39,8 +41,40 @@ func (m *Model) SetSize(w, h int) {
 func (m *Model) ensureVisible() {
 	chats := m.client.Chats()
 	if len(chats) == 0 {
+		m.selectedID = 0
+		m.selectedIndex = 0
+		m.scrollOffset = 0
 		return
 	}
+
+	// Synchronize selectedIndex with selectedID if set
+	if m.selectedID != 0 {
+		found := false
+		for i, ch := range chats {
+			if ch.ID == m.selectedID {
+				m.selectedIndex = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			if m.selectedIndex >= len(chats) {
+				m.selectedIndex = len(chats) - 1
+			}
+			if m.selectedIndex >= 0 && m.selectedIndex < len(chats) {
+				m.selectedID = chats[m.selectedIndex].ID
+			}
+		}
+	} else {
+		if m.selectedIndex < 0 {
+			m.selectedIndex = 0
+		}
+		if m.selectedIndex >= len(chats) {
+			m.selectedIndex = len(chats) - 1
+		}
+		m.selectedID = chats[m.selectedIndex].ID
+	}
+
 	if m.selectedIndex < 0 {
 		m.selectedIndex = 0
 	}
@@ -89,6 +123,7 @@ func (m *Model) MoveUp() {
 	}
 	if m.selectedIndex > 0 {
 		m.selectedIndex--
+		m.selectedID = chats[m.selectedIndex].ID
 		m.ensureVisible()
 	}
 }
@@ -100,6 +135,7 @@ func (m *Model) MoveDown() {
 	}
 	if m.selectedIndex < len(chats)-1 {
 		m.selectedIndex++
+		m.selectedID = chats[m.selectedIndex].ID
 		m.ensureVisible()
 	}
 }
@@ -108,11 +144,13 @@ func (m *Model) SelectIndex(idx int) {
 	chats := m.client.Chats()
 	if idx >= 0 && idx < len(chats) {
 		m.selectedIndex = idx
+		m.selectedID = chats[idx].ID
 		m.ensureVisible()
 	}
 }
 
 func (m *Model) SelectChatByID(id int64) {
+	m.selectedID = id
 	chats := m.client.Chats()
 	for i, ch := range chats {
 		if ch.ID == id {
@@ -123,11 +161,13 @@ func (m *Model) SelectChatByID(id int64) {
 	}
 }
 
-func (m Model) SelectedIndex() int {
+func (m *Model) SelectedIndex() int {
+	m.ensureVisible()
 	return m.selectedIndex
 }
 
-func (m Model) SelectedChat() *client.Chat {
+func (m *Model) SelectedChat() *client.Chat {
+	m.ensureVisible()
 	chats := m.client.Chats()
 	if len(chats) == 0 || m.selectedIndex < 0 || m.selectedIndex >= len(chats) {
 		return nil

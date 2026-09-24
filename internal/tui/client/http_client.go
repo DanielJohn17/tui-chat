@@ -486,6 +486,10 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 	if h.wsConnected.Load() && h.wsConn != nil {
 		return nil
 	}
+	if h.wsConn != nil {
+		_ = h.wsConn.Close()
+		h.wsConn = nil
+	}
 
 	h.mu.RLock()
 	token := h.profile.Token
@@ -529,7 +533,12 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 	// Launch reader pump
 	go func() {
 		defer func() {
-			h.wsConnected.Store(false)
+			h.wsMu.Lock()
+			if h.wsConn == conn {
+				h.wsConnected.Store(false)
+				h.wsConn = nil
+			}
+			h.wsMu.Unlock()
 			_ = conn.Close()
 			eventsChan <- WSErrorPayload{
 				Type:  "disconnected",

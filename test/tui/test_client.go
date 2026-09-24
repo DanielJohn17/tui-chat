@@ -12,6 +12,7 @@ type TestClient struct {
 	chats       []client.Chat
 	messages    map[int64][]client.Message
 	msgID       int64
+	wsConnected bool
 }
 
 func newTestClient() *TestClient {
@@ -189,9 +190,10 @@ func newTestClient() *TestClient {
 			Token:     "",
 			CreatedAt: "2026-09-01",
 		},
-		chats:    chats,
-		messages: messages,
-		msgID:    6000,
+		chats:       chats,
+		messages:    messages,
+		msgID:       6000,
+		wsConnected: true,
 	}
 }
 
@@ -291,11 +293,17 @@ func (m *TestClient) UpdateChatSnippet(convID int64, lastMsg, timeStr string, un
 }
 
 func (m *TestClient) ConnectWS(eventsChan chan<- any) error {
+	m.wsConnected = true
 	return nil
 }
 
 func (m *TestClient) CloseWS() error {
+	m.wsConnected = false
 	return nil
+}
+
+func (m *TestClient) SetWSConnected(connected bool) {
+	m.wsConnected = connected
 }
 
 func (m *TestClient) SendWS(convID int64, text string) error {
@@ -324,5 +332,5 @@ func (m *TestClient) MarkRead(convID int64, messageID int64) error {
 }
 
 func (m *TestClient) IsWSConnected() bool {
-	return true
+	return m.wsConnected
 }

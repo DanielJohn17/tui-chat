@@ -147,4 +147,3 @@ func RenderLineTalkLogo(containerWidth int) string {
 		center(sub),
 	)
 }
-

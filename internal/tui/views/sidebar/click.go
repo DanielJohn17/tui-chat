@@ -55,6 +55,7 @@ func (m *Model) HandleClick(relX, relY int) (*client.Chat, bool, bool) {
 		if relY >= item.StartY && relY <= item.EndY {
 			if item.ChatIndex >= 0 && item.ChatIndex < len(chats) {
 				m.selectedIndex = item.ChatIndex
+				m.selectedID = chats[item.ChatIndex].ID
 				m.ensureVisible()
 				return &chats[item.ChatIndex], false, false
 			}
