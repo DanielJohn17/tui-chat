@@ -29,6 +29,7 @@ type HTTPClient struct {
 	sessionPath string
 	mu          sync.RWMutex
 	chats       []Chat
+	onlineUsers map[int64]bool
 	messages    map[int64][]Message
 	wsConn      *websocket.Conn
 	wsConnected atomic.Bool
@@ -49,7 +50,8 @@ func NewHTTPClient(baseURL string) Client {
 		httpClient: &http.Client{
 			Timeout: 8 * time.Second,
 		},
-		messages: make(map[int64][]Message),
+		onlineUsers: make(map[int64]bool),
+		messages:    make(map[int64][]Message),
 	}
 }
 
@@ -77,7 +79,6 @@ type convParticipantData struct {
 	LastMessage     string `json:"last_message"`
 	LastMessageTime string `json:"last_message_time"`
 	UnreadCount     int    `json:"unread_count"`
-	Online          bool   `json:"online"`
 }
 
 type convChatData struct {
@@ -323,6 +324,7 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 	}
 
 	chats := make([]Chat, len(res.Data))
+	h.mu.Lock()
 	for i, c := range res.Data {
 		timeStr := formatFriendlyTime(c.LastMessageTime)
 		chats[i] = Chat{
@@ -333,11 +335,9 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 			LastMessage: c.LastMessage,
 			Time:        timeStr,
 			Unread:      c.UnreadCount,
-			Online:      c.Online,
+			Online:      h.onlineUsers[c.UserID],
 		}
 	}
-
-	h.mu.Lock()
 	h.chats = chats
 	h.mu.Unlock()
 
@@ -355,12 +355,21 @@ func (h *HTTPClient) Chats() []Chat {
 func (h *HTTPClient) SetChats(chats []Chat) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	for i := range chats {
+		if isOnline, ok := h.onlineUsers[chats[i].RecipientID]; ok {
+			chats[i].Online = isOnline
+		}
+	}
 	h.chats = chats
 }
 
 func (h *HTTPClient) SetUserOnline(userID int64, online bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.onlineUsers == nil {
+		h.onlineUsers = make(map[int64]bool)
+	}
+	h.onlineUsers[userID] = online
 	for i := range h.chats {
 		if h.chats[i].RecipientID == userID {
 			h.chats[i].Online = online
@@ -371,12 +380,12 @@ func (h *HTTPClient) SetUserOnline(userID int64, online bool) {
 func (h *HTTPClient) SetOnlineUsers(userIDs []int64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	onlineMap := make(map[int64]bool, len(userIDs))
+	h.onlineUsers = make(map[int64]bool, len(userIDs))
 	for _, id := range userIDs {
-		onlineMap[id] = true
+		h.onlineUsers[id] = true
 	}
 	for i := range h.chats {
-		h.chats[i].Online = onlineMap[h.chats[i].RecipientID]
+		h.chats[i].Online = h.onlineUsers[h.chats[i].RecipientID]
 	}
 }
 
