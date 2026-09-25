@@ -54,6 +54,8 @@ type ConvRepositoryInt interface {
 	) (int, error)
 
 	MarkAsRead(ctx context.Context, messageID, userID, convID int64) error
+
+	GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error)
 }
 
 type ConvQuerier interface {
@@ -104,6 +106,8 @@ type ConvQuerier interface {
 	) (int32, error)
 
 	MarkConversationRead(ctx context.Context, arg database.MarkConversationReadParams) error
+
+	GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error)
 }
 
 type ConvRepository struct {
@@ -375,9 +379,9 @@ func (r *ConvRepository) GetUnreadCount(
 
 func (r *ConvRepository) MarkAsRead(ctx context.Context, messageID, userID, convID int64) error {
 	params := database.MarkConversationReadParams{
-		MessageID: pgtype.Int8{Int64: messageID},
-		ConvID:    pgtype.Int8{Int64: convID},
-		UserID:    pgtype.Int8{Int64: userID},
+		MessageID: pgtype.Int8{Int64: messageID, Valid: true},
+		ConvID:    pgtype.Int8{Int64: convID, Valid: true},
+		UserID:    pgtype.Int8{Int64: userID, Valid: true},
 	}
 
 	if err := r.q.MarkConversationRead(ctx, params); err != nil {
@@ -385,4 +389,13 @@ func (r *ConvRepository) MarkAsRead(ctx context.Context, messageID, userID, conv
 	}
 
 	return nil
+}
+
+func (r *ConvRepository) GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error) {
+	peerIDs, err := r.q.GetContactUserIDs(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return peerIDs, nil
 }

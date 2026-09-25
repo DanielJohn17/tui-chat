@@ -124,6 +124,17 @@ func (m *MockConvRepo) MarkAsRead(
 	return m.Called(ctx, messageID, userID, convID).Error(0)
 }
 
+func (m *MockConvRepo) GetContactUserIDs(
+	ctx context.Context,
+	userID int64,
+) ([]int64, error) {
+	args := m.Called(ctx, userID)
+	if res := args.Get(0); res != nil {
+		return res.([]int64), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // MockUserService mocks users.UserServiceInt using testify/mock.
 type MockUserService struct {
 	mock.Mock
@@ -459,4 +470,36 @@ func TestGetBulkChatsByUserID_Error(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, chats)
+}
+
+func TestGetUnreadCount_Success(t *testing.T) {
+	repo := new(MockConvRepo)
+	repo.On("GetUnreadCount", mock.Anything, int64(10), int64(20)).Return(3, nil)
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	count, err := s.GetUnreadCount(context.Background(), 10, 20)
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+}
+
+func TestGetUnreadCount_Error(t *testing.T) {
+	repo := new(MockConvRepo)
+	repo.On("GetUnreadCount", mock.Anything, int64(10), int64(20)).Return(0, errors.New("db error"))
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	count, err := s.GetUnreadCount(context.Background(), 10, 20)
+
+	require.Error(t, err)
+	assert.Equal(t, 0, count)
+}
+
+func TestMarkAsRead(t *testing.T) {
+	repo := new(MockConvRepo)
+	repo.On("MarkAsRead", mock.Anything, int64(100), int64(10), int64(20)).Return(nil)
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	s.MarkAsRead(context.Background(), 100, 10, 20)
+
+	repo.AssertExpectations(t)
 }
