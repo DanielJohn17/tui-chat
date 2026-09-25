@@ -1,0 +1,54 @@
+# Air configuration for live-reloading the API server
+root = "."
+tmp_dir = "tmp"
+testdata_dir = "testdata"
+
+[build]
+  # Build command for the API binary
+  cmd = "go build -o ./tmp/api ./cmd/api"
+  bin = "./tmp/api"
+  full_bin = ""
+  
+  # File extensions to watch for changes
+  include_ext = ["go", "sql", "env"]
+  
+  # Directories to watch
+  include_dir = ["cmd/api", "internal/api"]
+  
+  # Directories to ignore
+  exclude_dir = ["bin", "tmp", "test", "internal/tui", ".agents", ".gemini", "docs"]
+  
+  # Exclude specific files/regex
+  exclude_regex = ["_test\\.go$"]
+  exclude_unchanged = true
+  
+  # Debounce delay in milliseconds
+  delay = 500
+  
+  # Stop running the old binary when build errors occur
+  stop_on_error = true
+  
+  # Log build output
+  log = "air.log"
+  
+  # Send kill signal before rebuilding
+  send_interrupt = true
+  kill_delay = 500 # ms
+
+[log]
+  time = false
+  main_only = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  # Delete tmp directory on exit
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = true
+  keep_scroll = true
