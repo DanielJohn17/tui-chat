@@ -55,11 +55,11 @@ func main() {
 	convService := conversations.NewConvService(convRepo, userService)
 
 	// websocket conn for conversations
-	hub := ws.NewHub()
+	hub := ws.NewHub(convService)
 	go hub.Run()
 	wsHander := ws.NewWSHanler(hub, convService)
 
-	convHandler := conversations.NewConvHandler(convService, hub)
+	convHandler := conversations.NewConvHandler(convService)
 	// router
 	handlers := router.Handlers{
 		User: userHandler,

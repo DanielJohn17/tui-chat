@@ -40,6 +40,8 @@ type ConvServiceInt interface {
 	) (int, error)
 
 	MarkAsRead(ctx context.Context, messageID, userID, convID int64)
+
+	GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error)
 }
 
 type ConvService struct {
@@ -268,4 +270,13 @@ func (s *ConvService) MarkAsRead(ctx context.Context, messageID, userID, convID 
 			err,
 		)
 	}
+}
+
+func (s *ConvService) GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error) {
+	peerIDs, err := s.r.GetContactUserIDs(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return peerIDs, nil
 }

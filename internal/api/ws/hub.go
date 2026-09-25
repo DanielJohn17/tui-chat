@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+type ConvServiceInt interface {
+	GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error)
+}
+
 type DirectMessage struct {
 	SenderID       int64
 	SenderUsername string
@@ -27,15 +31,18 @@ type Hub struct {
 
 	Register   chan *Client
 	UnRegister chan *Client
+
+	convService ConvServiceInt
 }
 
-func NewHub() *Hub {
+func NewHub(convService ConvServiceInt) *Hub {
 	return &Hub{
 		users:         make(map[int64]map[*Client]bool),
 		SendDirect:    make(chan *DirectMessage, 256),
 		BroadcastRead: make(chan *ConversationReadPayload, 256),
 		Register:      make(chan *Client, 32),
 		UnRegister:    make(chan *Client, 32),
+		convService:   convService,
 	}
 }
 
@@ -56,24 +63,60 @@ func (h *Hub) Run() {
 		case client := <-h.Register:
 			// Register client to users map
 			h.mu.Lock()
+			wasOnline := len(h.users[client.UserID]) > 0
 			if _, ok := h.users[client.UserID]; !ok {
 				h.users[client.UserID] = make(map[*Client]bool)
 			}
 			h.users[client.UserID][client] = true
 			h.mu.Unlock()
 
+			// Fetch conversation peer IDs in background
+			go func(c *Client, isNewOnline bool) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				peerIDs, err := h.convService.GetContactUserIDs(ctx, c.UserID)
+				if err != nil {
+					slog.WarnContext(ctx, "failed to get contact user IDs on register", "UserID", c.UserID, "error", err)
+					return
+				}
+
+				h.sendPresenceSnapshot(c, peerIDs)
+
+				if isNewOnline {
+					h.notifyPeers(peerIDs, c.UserID, true)
+				}
+			}(client, !wasOnline)
+
 		case client := <-h.UnRegister:
 			// Unregister clent from users map
 			h.mu.Lock()
+			becameOffline := false
 			if clients, ok := h.users[client.UserID]; ok {
 				if _, exists := clients[client]; exists {
 					delete(clients, client)
 					if len(clients) == 0 {
 						delete(h.users, client.UserID)
+						becameOffline = true
 					}
 				}
 			}
 			h.mu.Unlock()
+
+			if becameOffline {
+				go func(userID int64) {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+
+					peerIDs, err := h.convService.GetContactUserIDs(ctx, userID)
+					if err != nil {
+						slog.WarnContext(ctx, err.Error(), "UserID", userID, "error", err)
+						return
+					}
+
+					h.notifyPeers(peerIDs, userID, false)
+				}(client.UserID)
+			}
 
 		case msg := <-h.SendDirect:
 			// Deliver direct message to recipient
@@ -175,17 +218,98 @@ func (h *Hub) Run() {
 	}
 }
 
+func (h *Hub) sendPresenceSnapshot(c *Client, peerIDs []int64) {
+	h.mu.RLock()
+	var onlinePeerIDs []int64
+	for _, peerID := range peerIDs {
+		if len(h.users[peerID]) > 0 {
+			onlinePeerIDs = append(onlinePeerIDs, peerID)
+		}
+	}
+	h.mu.RUnlock()
+
+	frame, err := json.Marshal(WSNotification{
+		Type: TypePresenceSnapshot,
+		Payload: PresenceSnapshotPayload{
+			OnlineUserIDs: onlinePeerIDs,
+		},
+	})
+	if err != nil {
+		slog.Error("failed to create presence snapshot frame to be sent", "error", err)
+		return
+	}
+
+	select {
+	case c.Send <- frame:
+	default:
+		h.dropClient(c)
+	}
+}
+
+func (h *Hub) notifyPeers(peerIDs []int64, userID int64, online bool) {
+	payload := UserPresencePayload{
+		UserID: userID,
+		Online: online,
+	}
+	frame, err := json.Marshal(WSNotification{
+		Type:    TypeUserPresence,
+		Payload: payload,
+	})
+	if err != nil {
+		slog.Error("failed to create user presence frame to be sent", "error", err)
+		return
+	}
+
+	h.mu.RLock()
+	var targetClients []*Client
+	for _, peerID := range peerIDs {
+		// Fast map lookup O(1) per conversation partner
+		if clients, isOnline := h.users[peerID]; isOnline {
+			for c := range clients {
+				targetClients = append(targetClients, c)
+			}
+		}
+	}
+	h.mu.RUnlock()
+
+	// Non-blocking dispatch
+	for _, c := range targetClients {
+		select {
+		case c.Send <- frame:
+		default:
+			h.dropClient(c)
+		}
+	}
+}
+
 func (h *Hub) dropClient(c *Client) {
 	h.mu.Lock()
+	becameOffline := false
 	if clients, ok := h.users[c.UserID]; ok {
 		if _, exists := clients[c]; exists {
 			delete(clients, c)
 			if len(clients) == 0 {
 				delete(h.users, c.UserID)
+				becameOffline = true
 			}
 		}
 	}
 	h.mu.Unlock()
 
 	c.closeSendChannel()
+
+	if becameOffline {
+		go func(userID int64) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			peerIDs, err := h.convService.GetContactUserIDs(ctx, userID)
+			if err != nil {
+				slog.WarnContext(ctx, err.Error(), "UserID", userID, "error", err)
+				return
+			}
+
+			h.notifyPeers(peerIDs, userID, false)
+		}(c.UserID)
+	}
 }

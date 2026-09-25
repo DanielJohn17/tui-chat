@@ -3,8 +3,10 @@ package ws
 
 import "encoding/json"
 
-type ActionType string
-type WSNotificationType string
+type (
+	ActionType         string
+	WSNotificationType string
+)
 
 const (
 	ActionSendMessage ActionType = "send_message"
@@ -16,6 +18,8 @@ const (
 	TypeChatMessage      WSNotificationType = "chat_message"      // Recipient is actively viewing this conv
 	TypeChatNotification WSNotificationType = "chat_notification" // Recipient is in another conv or idle
 	TypeConversationRead WSNotificationType = "conversation_read" // Synced read status
+	TypeUserPresence     WSNotificationType = "user_presence"     // check user presence
+	TypePresenceSnapshot WSNotificationType = "presence_snapshot" // Initial snapshot of all online users
 )
 
 type WSMessage struct {
@@ -75,3 +79,13 @@ type ConversationReadPayload struct {
 	UserID    int64 `json:"user_id"`    // The user who read the chat
 	MessageID int64 `json:"message_id"` // Read up to this message ID
 }
+
+type UserPresencePayload struct {
+	UserID int64 `json:"user_id"`
+	Online bool  `json:"online"`
+}
+
+type PresenceSnapshotPayload struct {
+	OnlineUserIDs []int64 `json:"online_user_ids"`
+}
+

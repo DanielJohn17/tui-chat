@@ -1,10 +1,7 @@
 package conversations
 
 import (
-	"context"
-	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
@@ -20,17 +17,12 @@ type ConvHandlerInt interface {
 	WipeConversation(c *gin.Context)
 }
 
-type PresenceChecker interface {
-	GetOnlineStatus(ctx context.Context, userIDs []int64) (map[int64]bool, error)
-}
-
 type ConvHandler struct {
-	s        ConvServiceInt
-	presence PresenceChecker
+	s ConvServiceInt
 }
 
-func NewConvHandler(s ConvServiceInt, presence PresenceChecker) *ConvHandler {
-	return &ConvHandler{s: s, presence: presence}
+func NewConvHandler(s ConvServiceInt) *ConvHandler {
+	return &ConvHandler{s: s}
 }
 
 var _ ConvHandlerInt = (*ConvHandler)(nil)
@@ -67,27 +59,6 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 	if err != nil {
 		helpers.WriteError(c, err)
 		return
-	}
-
-	if h.presence != nil && len(conversations) > 0 {
-		userIDs := make([]int64, len(conversations))
-		for i, conv := range conversations {
-			userIDs[i] = conv.UserID
-		}
-
-		// Ask Hub over channel for online status
-		presenceCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		defer cancel()
-
-		onlineMap, err := h.presence.GetOnlineStatus(presenceCtx, userIDs)
-		if err != nil {
-			slog.WarnContext(ctx, "failed to fetch live online presence", "error", err)
-		} else {
-			// Attach online status to each conversation in response
-			for i := range conversations {
-				conversations[i].Online = onlineMap[conversations[i].UserID]
-			}
-		}
 	}
 
 	meta := &types.Meta{

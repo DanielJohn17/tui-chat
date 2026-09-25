@@ -319,3 +319,13 @@ WHERE
   m.conv_id = sqlc.arg (conv_id)
   AND m.id > p.last_read_message_id
   AND m.sender_id <> sqlc.arg (user_id);
+
+-- name: GetContactUserIDs :many
+SELECT DISTINCT
+  p2.user_id
+FROM
+  participants p1
+  JOIN participants p2 ON p2.conv_id = p1.conv_id
+  AND p2.user_id <> sqlc.arg(user_id)
+WHERE
+  p1.user_id = sqlc.arg(user_id);

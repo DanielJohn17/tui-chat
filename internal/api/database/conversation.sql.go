@@ -222,6 +222,37 @@ func (q *Queries) GetBulkChatsByUserID(ctx context.Context, arg GetBulkChatsByUs
 	return items, nil
 }
 
+const getContactUserIDs = `-- name: GetContactUserIDs :many
+SELECT DISTINCT
+  p2.user_id
+FROM
+  participants p1
+  JOIN participants p2 ON p2.conv_id = p1.conv_id
+  AND p2.user_id <> $1
+WHERE
+  p1.user_id = $1
+`
+
+func (q *Queries) GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getContactUserIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConvChats = `-- name: GetConvChats :many
 SELECT
     id,
