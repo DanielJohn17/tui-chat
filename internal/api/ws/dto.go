@@ -88,4 +88,3 @@ type UserPresencePayload struct {
 type PresenceSnapshotPayload struct {
 	OnlineUserIDs []int64 `json:"online_user_ids"`
 }
-

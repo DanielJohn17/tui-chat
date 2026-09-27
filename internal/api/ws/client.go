@@ -44,21 +44,50 @@ type Client struct {
 	Conn         *websocket.Conn
 	Hub          *Hub
 	convService  MessagePersister
-	closeSend    sync.Once
+	sendMu       sync.RWMutex
+	closed       bool
 }
 
-func (c *Client) closeSendChannel() {
-	c.closeSend.Do(func() {
-		if c.Send != nil {
-			close(c.Send)
-		}
-	})
+// TrySend attempts to non-blockingly deliver a frame to the client's send channel.
+// It returns true if delivered, or false if the channel buffer is full or the client is closed.
+// It guarantees that sends will never panic on a closed channel.
+func (c *Client) TrySend(msg []byte) bool {
+	c.sendMu.RLock()
+	defer c.sendMu.RUnlock()
+
+	if c.closed || c.Send == nil {
+		return false
+	}
+
+	select {
+	case c.Send <- msg:
+		return true
+	default:
+		return false
+	}
+}
+
+// Close marks the client as closed and safely closes the Send channel exactly once.
+// Concurrent calls to Close are idempotent and thread-safe.
+func (c *Client) Close() {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+
+	if c.closed {
+		return
+	}
+	c.closed = true
+	if c.Send != nil {
+		close(c.Send)
+	}
 }
 
 func (c *Client) readPump() {
 	defer func() {
 		c.Hub.UnRegister <- c
-		_ = c.Conn.Close()
+		if c.Conn != nil {
+			_ = c.Conn.Close()
+		}
 	}()
 
 	c.Conn.SetReadLimit(maxMessageSize)
@@ -171,9 +200,7 @@ func (c *Client) sendError(convID int64, content, errMsg string, retryable bool)
 		return
 	}
 
-	select {
-	case c.Send <- errPayload:
-	default:
+	if !c.TrySend(errPayload) {
 		log.Printf("ws send buffer full for user %d, dropped error frame", c.UserID)
 	}
 }

@@ -417,13 +417,19 @@ func TestGetConvChats_PaginationBranches(t *testing.T) {
 	emptyQuery := types.URLQueryParams{}
 	cursorQuery := types.URLQueryParams{CursorID: 1, CursorTime: time.Now()}
 
+	repo.On("IsUserInConversation", mock.Anything, int64(1), int64(1)).Return(true)
 	repo.On("GetConvChats", mock.Anything, int64(1), emptyQuery).Return(unpaginatedResp)
 	repo.On("GetConvChatsPaginated", mock.Anything, int64(1), cursorQuery).Return(paginatedResp)
 
 	s := conversations.NewConvService(repo, new(MockUserService))
 
-	assert.Equal(t, unpaginatedResp, s.GetConvChats(context.Background(), 1, emptyQuery))
-	assert.Equal(t, paginatedResp, s.GetConvChats(context.Background(), 1, cursorQuery))
+	res1, err1 := s.GetConvChats(context.Background(), 1, 1, emptyQuery)
+	assert.NoError(t, err1)
+	assert.Equal(t, unpaginatedResp, res1)
+
+	res2, err2 := s.GetConvChats(context.Background(), 1, 1, cursorQuery)
+	assert.NoError(t, err2)
+	assert.Equal(t, paginatedResp, res2)
 }
 
 func TestCreateMessage(t *testing.T) {

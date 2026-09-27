@@ -57,6 +57,22 @@ func (h *Hub) GetOnlineStatus(ctx context.Context, userIDs []int64) (map[int64]b
 	return result, nil
 }
 
+func (h *Hub) getClientsForUser(userID int64) []*Client {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clientsMap, ok := h.users[userID]
+	if !ok || len(clientsMap) == 0 {
+		return nil
+	}
+
+	result := make([]*Client, 0, len(clientsMap))
+	for c := range clientsMap {
+		result = append(result, c)
+	}
+	return result
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
@@ -89,7 +105,7 @@ func (h *Hub) Run() {
 			}(client, !wasOnline)
 
 		case client := <-h.UnRegister:
-			// Unregister clent from users map
+			// Unregister client from users map
 			h.mu.Lock()
 			becameOffline := false
 			if clients, ok := h.users[client.UserID]; ok {
@@ -102,6 +118,8 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
+
+			client.Close()
 
 			if becameOffline {
 				go func(userID int64) {
@@ -147,50 +165,42 @@ func (h *Hub) Run() {
 				continue
 			}
 
-			if recipientClients, isOnline := h.users[msg.RecipientID]; isOnline {
-				for c := range recipientClients {
-					activeConv := c.ActiveConvID.Load()
+			recipientClients := h.getClientsForUser(msg.RecipientID)
+			for _, c := range recipientClients {
+				activeConv := c.ActiveConvID.Load()
 
-					if activeConv < 0 {
-						h.dropClient(c)
-						continue
-					}
+				if activeConv < 0 {
+					h.dropClient(c)
+					continue
+				}
 
-					if activeConv == msg.ConvID {
-						// User is in the current looking conversation
-						select {
-						case c.Send <- chatMsgFrame:
-							// Auto-mark as read in background since recipient is actively looking
-							go func(msgID, userID, convID int64, service MessagePersister) {
-								ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-								defer cancel()
+				if activeConv == msg.ConvID {
+					// User is in the current looking conversation
+					if c.TrySend(chatMsgFrame) {
+						// Auto-mark as read in background since recipient is actively looking
+						go func(msgID, userID, convID int64, service MessagePersister) {
+							ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+							defer cancel()
 
-								service.MarkAsRead(ctx, msgID, userID, convID)
-							}(msg.Message.ID, c.UserID, msg.ConvID, c.convService)
-						default:
-							h.dropClient(c)
-						}
+							service.MarkAsRead(ctx, msgID, userID, convID)
+						}(msg.Message.ID, c.UserID, msg.ConvID, c.convService)
 					} else {
-						// Recipient is in another conversation or in the sidebar
-						select {
-						case c.Send <- notificationFrame:
-						default:
-							h.dropClient(c)
-						}
+						h.dropClient(c)
 					}
-
+				} else {
+					// Recipient is in another conversation or in the sidebar
+					if !c.TrySend(notificationFrame) {
+						h.dropClient(c)
+					}
 				}
 			}
 
 			// Echo back to the sender's client(s) for delivery confirmation
 			if msg.SenderID != msg.RecipientID {
-				if senderClients, ok := h.users[msg.SenderID]; ok {
-					for c := range senderClients {
-						select {
-						case c.Send <- chatMsgFrame:
-						default:
-							h.dropClient(c)
-						}
+				senderClients := h.getClientsForUser(msg.SenderID)
+				for _, c := range senderClients {
+					if !c.TrySend(chatMsgFrame) {
+						h.dropClient(c)
 					}
 				}
 			}
@@ -204,13 +214,10 @@ func (h *Hub) Run() {
 				continue
 			}
 
-			if readClients, ok := h.users[readEvt.UserID]; ok {
-				for c := range readClients {
-					select {
-					case c.Send <- frame:
-					default:
-						h.dropClient(c)
-					}
+			readClients := h.getClientsForUser(readEvt.UserID)
+			for _, c := range readClients {
+				if !c.TrySend(frame) {
+					h.dropClient(c)
 				}
 			}
 
@@ -239,9 +246,7 @@ func (h *Hub) sendPresenceSnapshot(c *Client, peerIDs []int64) {
 		return
 	}
 
-	select {
-	case c.Send <- frame:
-	default:
+	if !c.TrySend(frame) {
 		h.dropClient(c)
 	}
 }
@@ -274,9 +279,7 @@ func (h *Hub) notifyPeers(peerIDs []int64, userID int64, online bool) {
 
 	// Non-blocking dispatch
 	for _, c := range targetClients {
-		select {
-		case c.Send <- frame:
-		default:
+		if !c.TrySend(frame) {
 			h.dropClient(c)
 		}
 	}
@@ -296,7 +299,10 @@ func (h *Hub) dropClient(c *Client) {
 	}
 	h.mu.Unlock()
 
-	c.closeSendChannel()
+	c.Close()
+	if c.Conn != nil {
+		_ = c.Conn.Close()
+	}
 
 	if becameOffline {
 		go func(userID int64) {

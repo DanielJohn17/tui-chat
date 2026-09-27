@@ -23,9 +23,10 @@ type ConvServiceInt interface {
 
 	GetConvChats(
 		ctx context.Context,
-		convID int64,
+		convID,
+		userID int64,
 		query types.URLQueryParams,
-	) []GetConvChatResponseType
+	) ([]GetConvChatResponseType, error)
 
 	CreateMessage(
 		ctx context.Context,
@@ -127,17 +128,22 @@ func (s *ConvService) GetBulkChatsByUserID(ctx context.Context, userID, limit in
 
 func (s *ConvService) GetConvChats(
 	ctx context.Context,
-	convID int64,
+	convID,
+	userID int64,
 	query types.URLQueryParams,
-) []GetConvChatResponseType {
+) ([]GetConvChatResponseType, error) {
+	if isParticipant := s.r.IsUserInConversation(ctx, convID, userID); !isParticipant {
+		return nil, errors.NewForbiddenError("forbidden")
+	}
+
 	if query.CursorTime.IsZero() || query.CursorID == 0 {
 		chats := s.r.GetConvChats(ctx, convID, query)
-		return chats
+		return chats, nil
 	}
 
 	chats := s.r.GetConvChatsPaginated(ctx, convID, query)
 
-	return chats
+	return chats, nil
 }
 
 func (s *ConvService) CreateMessage(

@@ -43,9 +43,12 @@ func (m *MockConvService) GetBulkChatsByUserID(ctx context.Context, userID, limi
 	return args.Get(0).([]conversations.BulkChatsResponseType), args.Error(1)
 }
 
-func (m *MockConvService) GetConvChats(ctx context.Context, convID int64, query types.URLQueryParams) []conversations.GetConvChatResponseType {
-	args := m.Called(ctx, convID, query)
-	return args.Get(0).([]conversations.GetConvChatResponseType)
+func (m *MockConvService) GetConvChats(ctx context.Context, convID, userID int64, query types.URLQueryParams) ([]conversations.GetConvChatResponseType, error) {
+	args := m.Called(ctx, convID, userID, query)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]conversations.GetConvChatResponseType), args.Error(1)
 }
 
 func (m *MockConvService) CreateMessage(ctx context.Context, convID, senderID int64, content string) (*conversations.CreateMessageResponseType, error) {

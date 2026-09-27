@@ -99,6 +99,13 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
 		return
 	}
+
+	userIDParam, exists := c.Get("userId")
+	if !exists {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
 	var queries types.URLQueryParams
 	if q, exists := c.Get("queries"); exists {
 		if qParams, ok := q.(types.URLQueryParams); ok {
@@ -108,8 +115,17 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	convID := params.(types.URLParamInt).ID
+	userID, ok := userIDParam.(int64)
+	if !ok {
+		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		return
+	}
 
-	chats := h.s.GetConvChats(ctx, int64(convID), queries)
+	chats, err := h.s.GetConvChats(ctx, int64(convID), userID, queries)
+	if err != nil {
+		helpers.WriteError(c, err)
+		return
+	}
 
 	var meta *types.Meta
 	if len(chats) > 0 {

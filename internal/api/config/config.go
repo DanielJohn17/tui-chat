@@ -2,6 +2,8 @@
 package config
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -62,6 +64,23 @@ func initConfig() *Config {
 		}
 	}
 
+	goEnv := GetEnv("GO_ENV", "production")
+	jwtSecret := GetEnv("JWT_SECRET_KEY", "")
+
+	// In test environments, if no secret is provided, provide a development fallback so tests pass cleanly
+	if jwtSecret == "" && isTestEnv() {
+		jwtSecret = DevDefaultSecretKey
+	}
+
+	if err := ValidateJWTSecret(jwtSecret, goEnv); err != nil {
+		fmt.Fprintf(os.Stderr, "FATAL CONFIG ERROR: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jwtSecret == "" {
+		jwtSecret = DevDefaultSecretKey
+	}
+
 	return &Config{
 		DBUser:                 dbUser,
 		DBPassword:             dbPassword,
@@ -70,11 +89,35 @@ func initConfig() *Config {
 		DBName:                 dbName,
 		DBSSLMode:              dbSSLMode,
 		DatabaseURL:            rawDBURL,
-		JWTSecretKey:           GetEnv("JWT_SECRET_KEY", "your-default-secret-key-change-in-production"),
+		JWTSecretKey:           jwtSecret,
 		JWTExpirationInSeconds: GetEnvAsInt("JWT_EXP", 259200),
-		GoEnv:                  GetEnv("GO_ENV", "production"),
+		GoEnv:                  goEnv,
 		Port:                   GetEnv("PORT", "8080"),
 	}
+}
+
+const (
+	DefaultInsecureSecretKey = "your-default-secret-key-change-in-production"
+	DevDefaultSecretKey      = "dev-insecure-jwt-secret-key-min-32-characters-long"
+	MinJWTSecretLength       = 32
+)
+
+// ValidateJWTSecret validates that the JWT secret is sufficiently secure.
+// In production, an explicit, non-default secret of at least 32 characters is strictly required.
+func ValidateJWTSecret(secret, goEnv string) error {
+	if goEnv == "production" {
+		if secret == "" || secret == DefaultInsecureSecretKey {
+			return errors.New("JWT_SECRET_KEY environment variable is required in production and cannot use default fallback")
+		}
+		if len(secret) < MinJWTSecretLength {
+			return fmt.Errorf("JWT_SECRET_KEY in production must be at least %d characters long for security", MinJWTSecretLength)
+		}
+	}
+	return nil
+}
+
+func isTestEnv() bool {
+	return strings.HasSuffix(os.Args[0], ".test") || flag.Lookup("test.v") != nil
 }
 
 func (c *Config) GetDBURL() string {
