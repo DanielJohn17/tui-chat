@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/DanielJohn17/tui-chat/internal/tui/views/auth"
 	"github.com/DanielJohn17/tui-chat/internal/tui/views/chat"
 	"github.com/DanielJohn17/tui-chat/internal/tui/views/modals"
@@ -309,40 +310,45 @@ func (m AppModel) View() string {
 		return "Initializing terminal..."
 	}
 
+	var content string
+
 	// Active modal overlays (renders over either Auth or Chat state)
 	if m.modal != ModalNone {
 		switch m.modal {
 		case ModalHelp:
-			return modals.RenderHelp(m.width, m.height)
+			content = modals.RenderHelp(m.width, m.height)
 		case ModalNewDM:
-			return m.newDMView.View(m.width, m.height)
+			content = m.newDMView.View(m.width, m.height)
+		}
+	} else {
+		// State views
+		switch m.state {
+		case StateAuth:
+			content = m.authView.View()
+
+		case StateProfile:
+			content = m.profileView.View()
+
+		case StateChat:
+			activeChat := m.sidebarView.SelectedChat()
+			mainRow := lipgloss.JoinHorizontal(lipgloss.Top,
+				m.sidebarView.View(),
+				m.chatView.View(activeChat),
+			)
+			currentConnStatus := m.connStatus
+			if m.client.IsWSConnected() {
+				currentConnStatus = statusbar.StatusConnected
+			} else if currentConnStatus == statusbar.StatusConnected {
+				currentConnStatus = statusbar.StatusOffline
+			}
+			spinnerFrame := spinnerFrames[m.spinnerIdx%len(spinnerFrames)]
+			statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), currentConnStatus, m.retrySecondsLeft, spinnerFrame, m.notificationText, m.width)
+			content = lipgloss.JoinVertical(lipgloss.Left, mainRow, statusBar)
+
+		default:
+			content = fmt.Sprintf("Unknown state: %d", m.state)
 		}
 	}
 
-	// State views
-	switch m.state {
-	case StateAuth:
-		return m.authView.View()
-
-	case StateProfile:
-		return m.profileView.View()
-
-	case StateChat:
-		activeChat := m.sidebarView.SelectedChat()
-		mainRow := lipgloss.JoinHorizontal(lipgloss.Top,
-			m.sidebarView.View(),
-			m.chatView.View(activeChat),
-		)
-		currentConnStatus := m.connStatus
-		if m.client.IsWSConnected() {
-			currentConnStatus = statusbar.StatusConnected
-		} else if currentConnStatus == statusbar.StatusConnected {
-			currentConnStatus = statusbar.StatusOffline
-		}
-		spinnerFrame := spinnerFrames[m.spinnerIdx%len(spinnerFrames)]
-		statusBar := statusbar.Render(activeChat, m.chatView.IsInputFocused(), currentConnStatus, m.retrySecondsLeft, spinnerFrame, m.notificationText, m.width)
-		return lipgloss.JoinVertical(lipgloss.Left, mainRow, statusBar)
-	}
-
-	return fmt.Sprintf("Unknown state: %d", m.state)
+	return theme.EnforceDefaultBackground(content, m.width, m.height)
 }

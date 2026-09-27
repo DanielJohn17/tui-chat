@@ -2,6 +2,7 @@ package statusbar
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
@@ -94,12 +95,29 @@ func Render(activeChat *client.Chat, isInputFocused bool, status ConnectionStatu
 		if availNotifW < 12 {
 			availNotifW = 12
 		}
-		middleText = lipgloss.NewStyle().
+
+		msg := strings.TrimPrefix(notificationText, "🔔 ")
+		badge := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(theme.ColorBlack).
+			Background(theme.ColorGreen).
+			Padding(0, 1).
+			Render("🔔")
+
+		badgeW := lipgloss.Width(badge)
+		msgW := availNotifW - badgeW
+		if msgW < 6 {
+			msgW = 6
+		}
+
+		banner := lipgloss.NewStyle().
 			Bold(true).
 			Foreground(theme.ColorBlack).
 			Background(theme.ColorYellow).
 			Padding(0, 1).
-			Render(theme.Truncate(notificationText, availNotifW))
+			Render(theme.Truncate(msg, msgW))
+
+		middleText = lipgloss.JoinHorizontal(lipgloss.Center, badge, banner)
 	} else {
 		var shortcutsText string
 		if width < 85 {

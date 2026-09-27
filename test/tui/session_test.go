@@ -1,35 +1,36 @@
-package client
+package test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestResolveSessionPath(t *testing.T) {
 	// Test default production path
-	prodPath := ResolveSessionPath("production", "")
+	prodPath := client.ResolveSessionPath("production", "")
 	assert.Contains(t, prodPath, "session.json")
 	assert.NotContains(t, prodPath, "dev_session")
 
 	// Test production with named session
-	prodNamedPath := ResolveSessionPath("production", "user1")
+	prodNamedPath := client.ResolveSessionPath("production", "user1")
 	assert.Contains(t, prodNamedPath, "session_user1.json")
 
 	// Test development default path
-	devPath := ResolveSessionPath("development", "")
+	devPath := client.ResolveSessionPath("development", "")
 	assert.Contains(t, devPath, "dev_session.json")
 
 	// Test development with named session
-	devAlicePath := ResolveSessionPath("development", "alice")
+	devAlicePath := client.ResolveSessionPath("development", "alice")
 	assert.Contains(t, devAlicePath, "dev_session_alice.json")
 
 	// Test environment variable override
 	t.Setenv("TUI_CHAT_SESSION_FILE", "/tmp/custom_session.json")
-	customPath := ResolveSessionPath("production", "")
+	customPath := client.ResolveSessionPath("production", "")
 	assert.Equal(t, "/tmp/custom_session.json", customPath)
 }
 
@@ -41,23 +42,23 @@ func TestSessionSaveLoadClear(t *testing.T) {
 	sessionPath := filepath.Join(tempDir, "test_session.json")
 
 	// 1. Loading non-existent session returns error
-	prof, err := LoadSession(sessionPath)
+	prof, err := client.LoadSession(sessionPath)
 	assert.Error(t, err)
 	assert.Nil(t, prof)
 
 	// 2. Saving session with empty token returns error
-	err = SaveSession(sessionPath, Profile{ID: 1, Name: "Test"})
+	err = client.SaveSession(sessionPath, client.Profile{ID: 1, Name: "Test"})
 	assert.Error(t, err)
 
 	// 3. Saving valid session
-	origProf := Profile{
+	origProf := client.Profile{
 		ID:        42,
 		Name:      "Alice Walker",
 		Username:  "alice",
 		Token:     "jwt-token-12345",
 		CreatedAt: "2026-09-21T12:00:00Z",
 	}
-	err = SaveSession(sessionPath, origProf)
+	err = client.SaveSession(sessionPath, origProf)
 	require.NoError(t, err)
 
 	// Verify file permissions (0600)
@@ -66,7 +67,7 @@ func TestSessionSaveLoadClear(t *testing.T) {
 	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 
 	// 4. Loading saved session
-	loadedProf, err := LoadSession(sessionPath)
+	loadedProf, err := client.LoadSession(sessionPath)
 	require.NoError(t, err)
 	require.NotNil(t, loadedProf)
 	assert.Equal(t, origProf.ID, loadedProf.ID)
@@ -76,15 +77,15 @@ func TestSessionSaveLoadClear(t *testing.T) {
 
 	// 5. Updating / overwriting session
 	origProf.Name = "Alice In Wonderland"
-	err = SaveSession(sessionPath, origProf)
+	err = client.SaveSession(sessionPath, origProf)
 	require.NoError(t, err)
 
-	reloadedProf, err := LoadSession(sessionPath)
+	reloadedProf, err := client.LoadSession(sessionPath)
 	require.NoError(t, err)
 	assert.Equal(t, "Alice In Wonderland", reloadedProf.Name)
 
 	// 6. Clearing session
-	err = ClearSession(sessionPath)
+	err = client.ClearSession(sessionPath)
 	require.NoError(t, err)
 
 	// Verify file is gone
@@ -92,7 +93,7 @@ func TestSessionSaveLoadClear(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 
 	// Clearing already removed file should not error
-	err = ClearSession(sessionPath)
+	err = client.ClearSession(sessionPath)
 	assert.NoError(t, err)
 }
 
@@ -105,7 +106,7 @@ func TestCorruptedSession(t *testing.T) {
 	err = os.WriteFile(sessionPath, []byte("{invalid json"), 0600)
 	require.NoError(t, err)
 
-	prof, err := LoadSession(sessionPath)
+	prof, err := client.LoadSession(sessionPath)
 	assert.Error(t, err)
 	assert.Nil(t, prof)
 }

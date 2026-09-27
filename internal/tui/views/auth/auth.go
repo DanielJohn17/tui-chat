@@ -105,7 +105,7 @@ func (m *Model) SetSize(width, height int) {
 }
 
 func (m *Model) SetErrorMessage(msg string) {
-	m.errorMessage = msg
+	m.errorMessage = CleanAuthErrorString(msg)
 	m.loading = false
 }
 
@@ -128,7 +128,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case AuthErrorMsg:
 		m.loading = false
-		m.errorMessage = msg.Err.Error()
+		m.errorMessage = CleanAuthError(msg.Err)
 		return m, nil
 
 	case tea.MouseMsg:
@@ -144,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 			cardH := 25
 			if m.mode == ModeRegister {
-				cardH = 30
+				cardH = 33
 			}
 			if m.errorMessage != "" {
 				cardH += 4
@@ -220,8 +220,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						m.updateFocus()
 						return m, nil
 					}
-					// Submit button (lines 23-25 + errorOffset)
-					if relY >= 23+errorOffset && relY <= 25+errorOffset {
+					// Submit button (lines 25-28 + errorOffset)
+					if relY >= 25+errorOffset && relY <= 28+errorOffset {
 						if !m.loading {
 							return m, m.submit()
 						}
@@ -332,6 +332,14 @@ func (m *Model) submit() tea.Cmd {
 			m.errorMessage = "Please enter your username"
 			return nil
 		}
+		if len(username) < 3 {
+			m.errorMessage = "Username must be at least 3 characters"
+			return nil
+		}
+		if len(username) > 20 {
+			m.errorMessage = "Username must not exceed 20 characters"
+			return nil
+		}
 		if password == "" {
 			m.errorMessage = "Please enter your password"
 			return nil
@@ -362,6 +370,14 @@ func (m *Model) submit() tea.Cmd {
 		m.errorMessage = "Please enter your display name"
 		return nil
 	}
+	if len(name) < 3 {
+		m.errorMessage = "Display name must be at least 3 characters"
+		return nil
+	}
+	if len(name) > 50 {
+		m.errorMessage = "Display name must not exceed 50 characters"
+		return nil
+	}
 	if username == "" {
 		m.errorMessage = "Please enter a username"
 		return nil
@@ -370,12 +386,24 @@ func (m *Model) submit() tea.Cmd {
 		m.errorMessage = "Username must be at least 3 characters"
 		return nil
 	}
+	if len(username) > 20 {
+		m.errorMessage = "Username must not exceed 20 characters"
+		return nil
+	}
 	if password == "" {
 		m.errorMessage = "Please enter a password"
 		return nil
 	}
 	if len(password) < 6 {
 		m.errorMessage = "Password must be at least 6 characters"
+		return nil
+	}
+	if !strings.ContainsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		m.errorMessage = "Password must contain at least one capital letter (A-Z)"
+		return nil
+	}
+	if !strings.ContainsAny(password, "0123456789") {
+		m.errorMessage = "Password must contain at least one number (0-9)"
 		return nil
 	}
 
@@ -478,7 +506,32 @@ func (m Model) View() string {
 		nBox := renderField("Display Name", m.regName.View(), m.focusIndex == 0)
 		uBox := renderField("Username", m.regUsername.View(), m.focusIndex == 1)
 		pBox := renderField("Password", m.regPassword.View(), m.focusIndex == 2)
-		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox)
+
+		regPwd := m.regPassword.Value()
+		hasUpper := strings.ContainsAny(regPwd, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+		hasNum := strings.ContainsAny(regPwd, "0123456789")
+		hasMinLen := len(regPwd) >= 6
+
+		renderHint := func(met bool, label string) string {
+			if met {
+				chk := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorGreen).Render("[✔]")
+				txt := lipgloss.NewStyle().Foreground(theme.ColorGreen).Render(" " + label)
+				return chk + txt
+			}
+			chk := lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ ]")
+			txt := lipgloss.NewStyle().Foreground(theme.ColorDimText).Render(" " + label)
+			return chk + txt
+		}
+
+		hintRow1 := lipgloss.JoinHorizontal(lipgloss.Left,
+			renderHint(hasUpper, "Uppercase (A-Z)"),
+			"   ",
+			renderHint(hasNum, "Number (0-9)"),
+		)
+		hintRow2 := renderHint(hasMinLen, "Minimum 6 characters")
+		checklist := lipgloss.JoinVertical(lipgloss.Left, hintRow1, hintRow2)
+
+		formContent = lipgloss.JoinVertical(lipgloss.Left, nBox, "", uBox, "", pBox, "", checklist)
 	}
 
 	// Error banner if any
@@ -538,12 +591,95 @@ func (m Model) View() string {
 	card := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorCyan).
+		Background(theme.ColorDarkBg).
 		Padding(1, 2).
 		Width(cardWidth).
 		Render(cardContent)
 
 	if m.width > 0 && m.height > 0 {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, card, lipgloss.WithWhitespaceBackground(theme.ColorDarkBg))
 	}
 	return card
+}
+
+// CleanAuthError translates backend validator and server errors into human-friendly, actionable messages.
+func CleanAuthError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return CleanAuthErrorString(err.Error())
+}
+
+// CleanAuthErrorString cleans raw error message strings.
+func CleanAuthErrorString(msg string) string {
+	trimmed := strings.TrimSpace(msg)
+	if trimmed == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(trimmed)
+
+	// Specific backend auth service errors
+	if strings.Contains(lower, "incorrect username or password") {
+		return "Incorrect username or password. Please try again."
+	}
+	if strings.Contains(lower, "user already exists") {
+		return "Username is already taken. Please choose another username."
+	}
+
+	// Go validator/v10 tag errors
+	if strings.Contains(trimmed, "containsany") {
+		return "Password must contain at least one uppercase letter (A-Z) and one number (0-9)."
+	}
+	if strings.Contains(trimmed, "validation error") {
+		if strings.Contains(trimmed, "Password") {
+			return "Password must be at least 6 characters and contain uppercase letters and numbers."
+		}
+		if strings.Contains(trimmed, "Username") {
+			return "Username must be between 3 and 20 characters."
+		}
+		if strings.Contains(trimmed, "Name") {
+			return "Display name must be between 3 and 50 characters."
+		}
+		return "Please verify that all fields are filled out correctly."
+	}
+	if strings.Contains(trimmed, "failed on the 'min' tag") {
+		if strings.Contains(trimmed, "Username") {
+			return "Username must be at least 3 characters."
+		}
+		if strings.Contains(trimmed, "Name") {
+			return "Display name must be at least 3 characters."
+		}
+		if strings.Contains(trimmed, "Password") {
+			return "Password must be at least 6 characters."
+		}
+		return "One or more fields do not meet the minimum length requirement."
+	}
+	if strings.Contains(trimmed, "failed on the 'max' tag") {
+		return "One or more fields exceed the maximum length."
+	}
+	if strings.Contains(trimmed, "failed on the 'required' tag") {
+		return "Please fill in all required fields."
+	}
+
+	// Server / network issues
+	if strings.Contains(lower, "offline") || strings.Contains(lower, "unreachable") || strings.Contains(lower, "connection refused") {
+		return "Chat server is currently offline or unreachable."
+	}
+	if strings.Contains(lower, "timeout") || strings.Contains(lower, "timed out") {
+		return "Request timed out. Please try again."
+	}
+	if strings.Contains(lower, "http 500") || strings.Contains(lower, "internal server error") {
+		return "Server error occurred. Please try again later."
+	}
+	if strings.Contains(lower, "http 401") || strings.Contains(lower, "unauthorized") {
+		return "Invalid credentials. Please verify your username and password."
+	}
+
+	// Check if this looks like an internal Go or SQL error
+	if strings.Contains(trimmed, "Key:") || strings.Contains(trimmed, "Error:") || strings.Contains(lower, "sql") || strings.Contains(lower, "syntax") {
+		return "Invalid input provided. Please verify your information and try again."
+	}
+
+	return trimmed
 }

@@ -158,11 +158,11 @@ test: ## Run all tests across the project
 
 test-api: ## Run API unit and integration tests
 	@printf "$(YELLOW)Running API tests...$(RESET)\n"
-	@go test -v ./internal/api/... ./test/...
+	@go test -v ./test/api/...
 
 test-tui: ## Run TUI tests
 	@printf "$(YELLOW)Running TUI tests...$(RESET)\n"
-	@go test -v ./internal/tui/...
+	@go test -v ./test/tui/...
 
 test-cover: ## Run all tests and report coverage
 	@printf "$(YELLOW)Running tests with coverage...$(RESET)\n"
