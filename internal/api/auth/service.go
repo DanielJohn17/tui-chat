@@ -4,7 +4,7 @@ package auth
 import (
 	"context"
 
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/internal/api/users"
 	"golang.org/x/crypto/bcrypt"
@@ -37,7 +37,7 @@ func (s *AuthService) Register(ctx context.Context,
 ) (*UserResponseType, error) {
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
-		return nil, errors.NewInternalServerError("password error, try again", err)
+		return nil, apierrs.NewInternalServerError("password error, try again", err)
 	}
 
 	createUser := users.CreateUserType{
@@ -55,7 +55,7 @@ func (s *AuthService) Register(ctx context.Context,
 		helpers.UserToken{ID: userRegisterd.ID, Username: userRegisterd.Username},
 	)
 	if err != nil {
-		return nil, errors.NewInternalServerError("error creating token", err)
+		return nil, apierrs.NewInternalServerError("error creating token", err)
 	}
 
 	newData := &UserResponseType{
@@ -75,19 +75,19 @@ func (s *AuthService) Login(
 ) (*UserResponseType, error) {
 	user, err := s.u.GetUserByUsername(ctx, input.Username)
 	if err != nil {
-		return nil, errors.NewNotFoundError("incorrect username or password")
+		return nil, apierrs.NewNotFoundError("incorrect username or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(user.Password),
 		[]byte(input.Password),
 	); err != nil {
-		return nil, errors.NewNotFoundError("incorrect username or password")
+		return nil, apierrs.NewNotFoundError("incorrect username or password")
 	}
 
 	token, err := helpers.CreateToken(helpers.UserToken{ID: user.ID, Username: user.Username})
 	if err != nil {
-		return nil, errors.NewInternalServerError("error creating token", err)
+		return nil, apierrs.NewInternalServerError("error creating token", err)
 	}
 
 	userLogin := &UserResponseType{

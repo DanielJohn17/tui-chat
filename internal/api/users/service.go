@@ -3,7 +3,7 @@ package users
 import (
 	"context"
 
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 )
 
 type UserServiceInt interface {
@@ -44,12 +44,12 @@ func (s *UserService) CreateUser(
 ) (*CreateUserResponseType, error) {
 	_, err := s.r.GetUserByUsername(ctx, input.Username)
 	if err == nil {
-		return nil, errors.NewConflictError("user already exists")
+		return nil, apierrs.NewConflictError("user already exists")
 	}
 
 	createdUser, err := s.r.CreateUser(ctx, input)
 	if err != nil {
-		return nil, errors.NewInternalServerError(err.Error(), err)
+		return nil, apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	return createdUser, nil
@@ -61,7 +61,7 @@ func (s *UserService) GetUserByUsername(
 ) (*GetUserResponseType, error) {
 	user, err := s.r.GetUserByUsername(ctx, input)
 	if err != nil {
-		return nil, errors.NewNotFoundError(err.Error())
+		return nil, apierrs.NewNotFoundError(err.Error())
 	}
 
 	userResp := &GetUserResponseType{
@@ -80,7 +80,7 @@ func (s *UserService) GetUserByID(
 ) (*GetUserResponseType, error) {
 	user, err := s.r.GetUserByID(ctx, input)
 	if err != nil {
-		return nil, errors.NewNotFoundError(err.Error())
+		return nil, apierrs.NewNotFoundError(err.Error())
 	}
 
 	return user, nil
@@ -92,12 +92,12 @@ func (s *UserService) DeleteUser(
 ) (*DeleteUserResponseType, error) {
 	user, err := s.r.GetUserByID(ctx, input)
 	if err != nil {
-		return nil, errors.NewNotFoundError(err.Error())
+		return nil, apierrs.NewNotFoundError(err.Error())
 	}
 
 	deletedUser, err := s.r.DeleteUser(ctx, user.ID)
 	if err != nil {
-		return nil, errors.NewInternalServerError(err.Error(), err)
+		return nil, apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	return deletedUser, nil

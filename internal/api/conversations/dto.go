@@ -1,7 +1,7 @@
 package conversations
 
 type GetOrCreateDirectConvType struct {
-	UserIDOne int64 `json:"user_id_one" validate:"required,gte=1"`
+	UserIDOne int64 `json:"-"`
 	UserIDTwo int64 `json:"user_id_two" validate:"required,gte=1"`
 }
 

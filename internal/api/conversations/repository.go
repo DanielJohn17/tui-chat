@@ -3,12 +3,15 @@ package conversations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/database"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -125,8 +128,8 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 	params GetOrCreateDirectConvType,
 ) ([]GetConvParticipantType, error) {
 	convParams := database.GetOrCreateDirectConversationParams{
-		UserID:   params.UserIDOne,
-		UserID_2: params.UserIDTwo,
+		UserID:  params.UserIDOne,
+		UserID2: params.UserIDTwo,
 	}
 
 	convParticipants, err := r.q.GetOrCreateDirectConversation(ctx, convParams)
@@ -283,18 +286,17 @@ func (r *ConvRepository) CreateMessage(
 	senderID int64,
 	content string,
 ) (*CreateMessageResponseType, error) {
-	pgConvID := pgtype.Int8{Int64: convID, Valid: true}
-	pgSenderID := pgtype.Int8{Int64: senderID, Valid: true}
-	pgContent := pgtype.Text{String: content, Valid: true}
-
 	messageParam := database.CreateMessageAndGetRecipientParams{
-		SenderID: pgSenderID,
-		ConvID:   pgConvID,
-		Content:  pgContent,
+		SenderID: senderID,
+		ConvID:   convID,
+		Content:  content,
 	}
 
 	chat, err := r.q.CreateMessageAndGetRecipient(ctx, messageParam)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierrs.NewConflictError("conversation does not exist or is currently being deleted")
+		}
 		log.Printf("==> CreateMessage: %v", err)
 		return nil, fmt.Errorf("error saving message")
 	}

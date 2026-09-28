@@ -2,11 +2,12 @@ package conversations
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"runtime/debug"
 	"time"
 
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/internal/api/users"
 )
@@ -86,18 +87,22 @@ func (s *ConvService) GetOrCreateDirectConversation(
 	ctx context.Context,
 	input GetOrCreateDirectConvType,
 ) ([]GetConvParticipantType, error) {
+	if input.UserIDOne == input.UserIDTwo {
+		return nil, apierrs.NewBadRequestError("cannot create direct conversation with yourself")
+	}
+
 	// Check User 1
 	if _, err := s.u.GetUserByID(ctx, input.UserIDOne); err != nil {
-		return nil, errors.NewNotFoundError("user one not found: " + err.Error())
+		return nil, apierrs.NewNotFoundError("user one not found: " + err.Error())
 	}
 	// Check User 2
 	if _, err := s.u.GetUserByID(ctx, input.UserIDTwo); err != nil {
-		return nil, errors.NewNotFoundError("user two not found: " + err.Error())
+		return nil, apierrs.NewNotFoundError("user two not found: " + err.Error())
 	}
 
 	participants, err := s.r.GetOrCreateDirectConversation(ctx, input)
 	if err != nil {
-		return nil, errors.NewInternalServerError(err.Error(), err)
+		return nil, apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	return participants, nil
@@ -120,7 +125,7 @@ func (s *ConvService) GetConvsByUserID(
 func (s *ConvService) GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error) {
 	chats, err := s.r.GetBulkChatsByUserID(ctx, userID, limit)
 	if err != nil {
-		return nil, errors.NewInternalServerError(err.Error(), err)
+		return nil, apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	return chats, nil
@@ -133,7 +138,7 @@ func (s *ConvService) GetConvChats(
 	query types.URLQueryParams,
 ) ([]GetConvChatResponseType, error) {
 	if isParticipant := s.r.IsUserInConversation(ctx, convID, userID); !isParticipant {
-		return nil, errors.NewForbiddenError("forbidden")
+		return nil, apierrs.NewForbiddenError("forbidden")
 	}
 
 	if query.CursorTime.IsZero() || query.CursorID == 0 {
@@ -152,7 +157,11 @@ func (s *ConvService) CreateMessage(
 ) (*CreateMessageResponseType, error) {
 	chat, err := s.r.CreateMessage(ctx, convID, senderID, content)
 	if err != nil {
-		return nil, errors.NewInternalServerError(err.Error(), err)
+		var apiErr *apierrs.APIError
+		if errors.As(err, &apiErr) {
+			return nil, apiErr
+		}
+		return nil, apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	return chat, nil
@@ -160,11 +169,11 @@ func (s *ConvService) CreateMessage(
 
 func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64) error {
 	if found := s.r.IsUserInConversation(ctx, convID, userID); !found {
-		return errors.NewForbiddenError("forbidden")
+		return apierrs.NewForbiddenError("forbidden")
 	}
 
 	if err := s.r.MarkConvForDeleting(ctx, convID); err != nil {
-		return errors.NewInternalServerError(err.Error(), err)
+		return apierrs.NewInternalServerError(err.Error(), err)
 	}
 
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Minute)

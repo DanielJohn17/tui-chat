@@ -1,5 +1,5 @@
-// Package errors
-package errors
+// Package apierrs
+package apierrs
 
 import (
 	"fmt"
@@ -14,9 +14,7 @@ type APIError struct {
 	Err     error  `json:"-"`
 }
 
-var (
-	goEnv string
-)
+var goEnv string
 
 func init() {
 	goEnv = config.ENV.GoEnv

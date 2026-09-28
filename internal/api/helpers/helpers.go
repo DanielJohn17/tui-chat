@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	apierrors "github.com/DanielJohn17/tui-chat/internal/api/errors"
+	apierrs "github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
@@ -21,15 +21,15 @@ func ParseJSON[K comparable](c *gin.Context, payload *K) error {
 	validate := validator.New()
 
 	if c.Request.Body == nil {
-		return apierrors.NewBadRequestError("missing request body")
+		return apierrs.NewBadRequestError("missing request body")
 	}
 
 	if err := json.NewDecoder(c.Request.Body).Decode(payload); err != nil {
-		return apierrors.NewBadRequestError(fmt.Sprintf("error decoding payload: %v", err))
+		return apierrs.NewBadRequestError(fmt.Sprintf("error decoding payload: %v", err))
 	}
 
 	if err := validate.Struct(payload); err != nil {
-		return apierrors.NewBadRequestError(
+		return apierrs.NewBadRequestError(
 			fmt.Sprintf("validation error: %v", err),
 		)
 	}
@@ -59,8 +59,7 @@ func WriteJSONWithMeta[T any](c *gin.Context, code int, data T, meta any) {
 
 // WriteError writes error JSON response
 func WriteError(c *gin.Context, err error) {
-
-	if apiErr, ok := errors.AsType[*apierrors.APIError](err); ok {
+	if apiErr, ok := errors.AsType[*apierrs.APIError](err); ok {
 		c.AbortWithStatusJSON(apiErr.Code, gin.H{
 			"success": false,
 			"error":   apiErr.Message,
@@ -68,7 +67,7 @@ func WriteError(c *gin.Context, err error) {
 		return
 	}
 
-	// Fallback for unhandled raw errors
+	// Fallback for unhandled raw apierrs
 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 		"success": false,
 		"error":   "internal server error",

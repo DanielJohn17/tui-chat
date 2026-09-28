@@ -3,7 +3,7 @@ package users
 import (
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/gin-gonic/gin"
@@ -29,13 +29,13 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 	ctx := c.Request.Context()
 	params, exists := c.Get("params")
 	if !exists {
-		helpers.WriteError(c, errors.NewBadRequestError("invalid parameters"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("invalid parameters"))
 		return
 	}
 	req := params.(types.URLParamString)
 
 	if req.Str == "" {
-		helpers.WriteError(c, errors.NewBadRequestError("username is not present"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("username is not present"))
 		return
 	}
 
@@ -52,13 +52,13 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	params, exists := c.Get("params")
 	if !exists {
-		helpers.WriteError(c, errors.NewBadRequestError("invalid parameters"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("invalid parameters"))
 		return
 	}
 	req := params.(types.URLParamInt)
 
 	if req.ID == 0 {
-		helpers.WriteError(c, errors.NewBadRequestError("id is not present"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("id is not present"))
 		return
 	}
 

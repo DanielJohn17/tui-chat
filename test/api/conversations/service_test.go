@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
-	apierrors "github.com/DanielJohn17/tui-chat/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/internal/api/users"
 	"github.com/stretchr/testify/assert"
@@ -187,7 +187,7 @@ func TestWipeConversation_UserNotParticipant(t *testing.T) {
 	s := conversations.NewConvService(repo, new(MockUserService))
 	err := s.WipeConversation(context.Background(), 10, 99)
 
-	var apiErr *apierrors.APIError
+	var apiErr *apierrs.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 403, apiErr.Code)
 	repo.AssertNotCalled(t, "DeleteMessagesAsBatch", mock.Anything, mock.Anything, mock.Anything)
@@ -202,7 +202,7 @@ func TestWipeConversation_MarkDeletingFailure(t *testing.T) {
 	s := conversations.NewConvService(repo, new(MockUserService))
 	err := s.WipeConversation(context.Background(), 10, 99)
 
-	var apiErr *apierrors.APIError
+	var apiErr *apierrs.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 500, apiErr.Code)
 	repo.AssertNotCalled(t, "DeleteMessagesAsBatch", mock.Anything, mock.Anything, mock.Anything)
@@ -386,7 +386,7 @@ func TestGetOrCreateDirectConversation_UserNotFound(t *testing.T) {
 		},
 	)
 
-	var apiErr *apierrors.APIError
+	var apiErr *apierrs.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 404, apiErr.Code)
 }
@@ -444,6 +444,22 @@ func TestCreateMessage(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, expected, msg)
+}
+
+func TestCreateMessage_ConversationDeletingOrNotFound(t *testing.T) {
+	repo := new(MockConvRepo)
+	conflictErr := apierrs.NewConflictError("conversation does not exist or is currently being deleted")
+	repo.On("CreateMessage", mock.Anything, int64(1), int64(2), "hello world").Return((*conversations.CreateMessageResponseType)(nil), conflictErr)
+
+	s := conversations.NewConvService(repo, new(MockUserService))
+	msg, err := s.CreateMessage(context.Background(), 1, 2, "hello world")
+
+	require.Error(t, err)
+	assert.Nil(t, msg)
+	var apiErr *apierrs.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 409, apiErr.Code)
+	assert.Equal(t, "conversation does not exist or is currently being deleted", apiErr.Message)
 }
 
 func TestGetBulkChatsByUserID_Success(t *testing.T) {

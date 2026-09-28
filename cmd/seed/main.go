@@ -155,7 +155,11 @@ func main() {
 		`, danielID, uid).Scan(&convID)
 
 		if err != nil {
-			err = conn.QueryRow(ctx, "INSERT INTO conversations (created_at) VALUES (NOW()) RETURNING id").Scan(&convID)
+			minID, maxID := danielID, uid
+			if minID > maxID {
+				minID, maxID = maxID, minID
+			}
+			err = conn.QueryRow(ctx, "INSERT INTO conversations (user_min_id, user_max_id, created_at) VALUES ($1, $2, NOW()) RETURNING id", minID, maxID).Scan(&convID)
 			if err != nil {
 				log.Printf("Failed to create conversation between %d and %d: %v", danielID, uid, err)
 				continue

@@ -3,7 +3,7 @@ package conversations
 import (
 	"net/http"
 
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/gin-gonic/gin"
@@ -30,11 +30,23 @@ var _ ConvHandlerInt = (*ConvHandler)(nil)
 func (h *ConvHandler) GetOrCreateDirectConversation(c *gin.Context) {
 	var params GetOrCreateDirectConvType
 	ctx := c.Request.Context()
+	userIDParam, exists := c.Get("userId")
+	if !exists {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
+		return
+	}
+	authUserID, ok := userIDParam.(int64)
+	if !ok {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
+		return
+	}
 
 	if err := helpers.ParseJSON(c, &params); err != nil {
 		helpers.WriteError(c, err)
 		return
 	}
+
+	params.UserIDOne = authUserID
 
 	participants, err := h.s.GetOrCreateDirectConversation(ctx, params)
 	if err != nil {
@@ -50,10 +62,14 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 
 	userIDParam, exists := c.Get("userId")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
-	userID := userIDParam.(int64)
+	userID, ok := userIDParam.(int64)
+	if !ok {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
+		return
+	}
 
 	conversations, err := h.s.GetConvsByUserID(ctx, userID)
 	if err != nil {
@@ -71,13 +87,13 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 func (h *ConvHandler) GetBulkChatsByUserID(c *gin.Context) {
 	userIDParam, exists := c.Get("userId")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	userID, ok := userIDParam.(int64)
 	if !ok {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
@@ -96,13 +112,13 @@ func (h *ConvHandler) GetBulkChatsByUserID(c *gin.Context) {
 func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	params, exists := c.Get("params")
 	if !exists {
-		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("invalid conversation id"))
 		return
 	}
 
 	userIDParam, exists := c.Get("userId")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
@@ -117,7 +133,7 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	convID := params.(types.URLParamInt).ID
 	userID, ok := userIDParam.(int64)
 	if !ok {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
@@ -146,14 +162,14 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 func (h *ConvHandler) WipeConversation(c *gin.Context) {
 	userIDParam, exists := c.Get("userId")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 	userID := userIDParam.(int64)
 
 	ConvIDParam, exists := c.Get("params")
 	if !exists {
-		helpers.WriteError(c, errors.NewBadRequestError("invalid conversation id"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("invalid conversation id"))
 		return
 	}
 	convID := int64(ConvIDParam.(types.URLParamInt).ID)

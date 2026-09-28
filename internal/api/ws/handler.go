@@ -3,9 +3,9 @@ package ws
 import (
 	"net/http"
 
+	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
-	"github.com/DanielJohn17/tui-chat/internal/api/errors"
 	"github.com/DanielJohn17/tui-chat/internal/api/helpers"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -53,25 +53,25 @@ var _ WSHandlerInt = (*WSHandler)(nil)
 func (h *WSHandler) HandleWS(c *gin.Context) {
 	userIDParam, exists := c.Get("userId")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	usernameParam, exists := c.Get("username")
 	if !exists {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	userID, ok := userIDParam.(int64)
 	if !ok {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	username, ok := usernameParam.(string)
 	if !ok {
-		helpers.WriteError(c, errors.NewUnauthorizedError("unauthorized"))
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 

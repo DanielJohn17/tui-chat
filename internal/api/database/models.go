@@ -12,6 +12,8 @@ type Conversation struct {
 	ID         int64
 	IsDeleting bool
 	CreatedAt  pgtype.Timestamptz
+	UserMinID  pgtype.Int8
+	UserMaxID  pgtype.Int8
 }
 
 type Message struct {

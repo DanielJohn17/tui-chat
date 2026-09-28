@@ -14,12 +14,14 @@ import (
 const createMessageAndGetRecipient = `-- name: CreateMessageAndGetRecipient :one
 WITH
 verified_sender AS (
-    SELECT conv_id
+    SELECT p.conv_id
     FROM
-        participants
+        participants p
+    JOIN conversations c ON c.id = p.conv_id
     WHERE
-        user_id = $1
-        AND conv_id = $2
+        p.user_id = $1
+        AND p.conv_id = $2
+        AND c.is_deleting = FALSE
 ),
 
 recipient AS (
@@ -65,9 +67,9 @@ CROSS JOIN recipient r
 `
 
 type CreateMessageAndGetRecipientParams struct {
-	SenderID pgtype.Int8
-	ConvID   pgtype.Int8
-	Content  pgtype.Text
+	SenderID int64
+	ConvID   int64
+	Content  string
 }
 
 type CreateMessageAndGetRecipientRow struct {
@@ -478,62 +480,48 @@ func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([
 
 const getOrCreateDirectConversation = `-- name: GetOrCreateDirectConversation :many
 WITH
-existing AS (
-    SELECT p1.conv_id
-    FROM
-        participants p1
-    JOIN participants p2 ON p1.conv_id = p2.conv_id
-    JOIN conversations c ON c.id = p1.conv_id
-    WHERE
-        p1.user_id = $1
-        AND p2.user_id = $2
-        AND c.is_deleting = FALSE
-    LIMIT
-        1
+params AS (
+    SELECT
+        LEAST($1::bigint, $2::bigint) AS min_id,
+        GREATEST($1::bigint, $2::bigint) AS max_id
 ),
 
 new_conv AS (
     INSERT INTO
-    conversations (created_at)
-    SELECT CURRENT_TIMESTAMP
-    WHERE
-        NOT EXISTS (
-            SELECT 1
-            FROM
-                existing
-        )
+    conversations (user_min_id, user_max_id, created_at)
+    SELECT
+        min_id,
+        max_id,
+        CURRENT_TIMESTAMP
+    FROM
+        params
+    ON CONFLICT (user_min_id, user_max_id) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
+    DO NOTHING
     RETURNING
         id
 ),
 
-inserted_p1 AS (
-    INSERT INTO
-    participants (conv_id, user_id)
-    SELECT
-        id,
-        $1
-    FROM
-        new_conv
-),
-
-inserted_p2 AS (
-    INSERT INTO
-    participants (conv_id, user_id)
-    SELECT
-        id,
-        $2
-    FROM
-        new_conv
-),
-
 target_conv AS (
-    SELECT conv_id AS id
-    FROM
-        existing
+    SELECT id FROM new_conv
     UNION ALL
-    SELECT id
+    SELECT c.id
+    FROM conversations c, params p
+    WHERE c.user_min_id = p.min_id
+      AND c.user_max_id = p.max_id
+      AND c.is_deleting = FALSE
+    LIMIT 1
+),
+
+inserted_participants AS (
+    INSERT INTO
+    participants (conv_id, user_id)
+    SELECT
+        tc.id,
+        u.id
     FROM
-        new_conv
+        target_conv tc
+    CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
+    ON CONFLICT (conv_id, user_id) DO NOTHING
 )
 
 SELECT
@@ -548,8 +536,8 @@ JOIN users u ON u.id = p.user_id
 `
 
 type GetOrCreateDirectConversationParams struct {
-	UserID   int64
-	UserID_2 int64
+	UserID  int64
+	UserID2 int64
 }
 
 type GetOrCreateDirectConversationRow struct {
@@ -560,7 +548,7 @@ type GetOrCreateDirectConversationRow struct {
 }
 
 func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCreateDirectConversationParams) ([]GetOrCreateDirectConversationRow, error) {
-	rows, err := q.db.Query(ctx, getOrCreateDirectConversation, arg.UserID, arg.UserID_2)
+	rows, err := q.db.Query(ctx, getOrCreateDirectConversation, arg.UserID, arg.UserID2)
 	if err != nil {
 		return nil, err
 	}
@@ -611,8 +599,10 @@ func (q *Queries) GetUnreadCountForUser(ctx context.Context, arg GetUnreadCountF
 
 const isUserInConversation = `-- name: IsUserInConversation :one
 SELECT EXISTS(
-    SELECT 1 FROM participants
-    WHERE conv_id = $1 AND user_id = $2
+    SELECT 1 FROM participants p
+    JOIN conversations c ON c.id = p.conv_id
+    WHERE p.conv_id = $1 AND p.user_id = $2
+    AND c.is_deleting = FALSE
 )
 `
 
