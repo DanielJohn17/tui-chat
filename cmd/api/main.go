@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/internal/api/config"
@@ -71,8 +76,43 @@ func main() {
 	router := router.NewRouter(handlers)
 
 	serverAddr := config.ENV.GetServerAddr()
-	if err := router.Run(serverAddr); err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to start gin server: %v\n", err)
-		os.Exit(1)
+
+	srv := &http.Server{
+		Addr:              serverAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,  // Defends against Slowloris
+		ReadTimeout:       10 * time.Second, // Max time to read request
+		WriteTimeout:      30 * time.Second, // Max time to write response
+		IdleTimeout:       60 * time.Second, // Keep-alive idle limit
+		MaxHeaderBytes:    1 << 20,          // 1 MB
 	}
+
+	// Run server in background goroutine
+	go func() {
+		log.Printf("Gin API server listening on Address %s", serverAddr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server error %v", err)
+		}
+	}()
+
+	// Wait for OS interrupt signals
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-quit
+	log.Printf("Received signal %v, initiating graceful shutdown...", sig)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server forced to shutdown: %v", err)
+	}
+
+	// Drain background conversation wipeout workers
+	if err := convService.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Wipeout workers drain timed out: %v", err)
+	}
+
+	log.Println("Server shutdown complete.")
 }

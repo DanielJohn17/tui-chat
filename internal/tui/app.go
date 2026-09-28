@@ -135,7 +135,7 @@ func NewApp(c client.Client) AppModel {
 	chatV := chat.New(c)
 	profileV := profile.New(c)
 	newDMV := modals.NewDM()
-	wsChan := make(chan any, 64)
+	wsChan := make(chan any, 512)
 
 	return AppModel{
 		client:           c,

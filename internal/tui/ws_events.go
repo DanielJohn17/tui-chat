@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -49,7 +50,9 @@ func (m *AppModel) handleWSIncoming(msg WSIncomingMsg) (tea.Model, tea.Cmd) {
 func (m *AppModel) triggerNotification(sender, content string) tea.Cmd {
 	m.notificationID++
 	curID := m.notificationID
-	m.notificationText = fmt.Sprintf("🔔 @%s: %s", sender, content)
+	cleanSender := theme.SanitizeLine(sender)
+	cleanContent := theme.SanitizeLine(content)
+	m.notificationText = fmt.Sprintf("🔔 @%s: %s", cleanSender, cleanContent)
 
 	clearCmd := tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 		return ClearNotificationMsg{ID: curID}

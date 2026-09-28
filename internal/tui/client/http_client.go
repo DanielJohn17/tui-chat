@@ -23,17 +23,20 @@ const (
 )
 
 type HTTPClient struct {
-	baseURL     string
-	httpClient  *http.Client
-	profile     Profile
-	sessionPath string
-	mu          sync.RWMutex
-	chats       []Chat
-	onlineUsers map[int64]bool
-	messages    map[int64][]Message
-	wsConn      *websocket.Conn
-	wsConnected atomic.Bool
-	wsMu        sync.Mutex
+	baseURL            string
+	httpClient         *http.Client
+	profile            Profile
+	sessionPath        string
+	mu                 sync.RWMutex
+	sessionEpoch       uint64
+	chats              []Chat
+	onlineUsers        map[int64]bool
+	messages           map[int64][]Message
+	wsConn             *websocket.Conn
+	wsConnected        atomic.Bool
+	wsIntentionalClose atomic.Bool
+	wsDoneChan         chan struct{}
+	wsMu               sync.Mutex
 }
 
 func NewHTTPClient(baseURL string) Client {
@@ -164,6 +167,7 @@ func (h *HTTPClient) Login(username, password string) (*Profile, error) {
 	}
 
 	h.mu.Lock()
+	h.sessionEpoch++
 	h.profile = Profile{
 		ID:        res.Data.ID,
 		Name:      res.Data.Name,
@@ -218,6 +222,7 @@ func (h *HTTPClient) Register(name, username, password string) (*Profile, error)
 	}
 
 	h.mu.Lock()
+	h.sessionEpoch++
 	h.profile = Profile{
 		ID:        res.Data.ID,
 		Name:      res.Data.Name,
@@ -239,6 +244,7 @@ func (h *HTTPClient) Register(name, username, password string) (*Profile, error)
 func (h *HTTPClient) Logout() error {
 	_ = h.CloseWS()
 	h.mu.Lock()
+	h.sessionEpoch++
 	sessPath := h.sessionPath
 	h.profile = Profile{}
 	h.chats = nil
@@ -294,6 +300,10 @@ func (h *HTTPClient) UpdateProfile(p Profile) {
 }
 
 func (h *HTTPClient) FetchChats() ([]Chat, error) {
+	h.mu.RLock()
+	epoch := h.sessionEpoch
+	h.mu.RUnlock()
+
 	req, err := h.newRequest(http.MethodGet, "/api/v1/conversations", nil)
 	if err != nil {
 		return nil, err
@@ -325,6 +335,10 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 
 	chats := make([]Chat, len(res.Data))
 	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.sessionEpoch != epoch || h.profile.Token == "" {
+		return nil, errors.New("session invalidated")
+	}
 	for i, c := range res.Data {
 		timeStr := formatFriendlyTime(c.LastMessageTime)
 		chats[i] = Chat{
@@ -339,7 +353,6 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 		}
 	}
 	h.chats = chats
-	h.mu.Unlock()
 
 	return chats, nil
 }
@@ -391,6 +404,7 @@ func (h *HTTPClient) SetOnlineUsers(userIDs []int64) {
 
 func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	h.mu.RLock()
+	epoch := h.sessionEpoch
 	currentUserID := h.profile.ID
 	h.mu.RUnlock()
 
@@ -459,10 +473,31 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	}
 
 	h.mu.Lock()
-	h.messages[chatID] = messages
-	h.mu.Unlock()
+	defer h.mu.Unlock()
+	if h.sessionEpoch != epoch || h.profile.Token == "" {
+		return nil, errors.New("session invalidated")
+	}
 
-	return messages, nil
+	existing := h.messages[chatID]
+	if len(existing) == 0 {
+		h.messages[chatID] = messages
+	} else {
+		seen := make(map[int64]bool, len(messages))
+		for _, m := range messages {
+			if m.ID > 0 {
+				seen[m.ID] = true
+			}
+		}
+		merged := append([]Message(nil), messages...)
+		for _, m := range existing {
+			if m.ID == 0 || !seen[m.ID] {
+				merged = append(merged, m)
+			}
+		}
+		h.messages[chatID] = merged
+	}
+
+	return h.messages[chatID], nil
 }
 
 type bulkChatData struct {
@@ -476,6 +511,7 @@ type bulkChatData struct {
 
 func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 	h.mu.RLock()
+	epoch := h.sessionEpoch
 	currentUserID := h.profile.ID
 	chatsMap := make(map[int64]string)
 	for _, ch := range h.chats {
@@ -542,12 +578,33 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 	}
 
 	h.mu.Lock()
-	for convID, msgs := range grouped {
-		h.messages[convID] = msgs
+	defer h.mu.Unlock()
+	if h.sessionEpoch != epoch || h.profile.Token == "" {
+		return nil, errors.New("session invalidated")
 	}
-	h.mu.Unlock()
 
-	return grouped, nil
+	for convID, msgs := range grouped {
+		existing := h.messages[convID]
+		if len(existing) == 0 {
+			h.messages[convID] = msgs
+			continue
+		}
+		seen := make(map[int64]bool, len(msgs))
+		for _, m := range msgs {
+			if m.ID > 0 {
+				seen[m.ID] = true
+			}
+		}
+		merged := append([]Message(nil), msgs...)
+		for _, m := range existing {
+			if m.ID == 0 || !seen[m.ID] {
+				merged = append(merged, m)
+			}
+		}
+		h.messages[convID] = merged
+	}
+
+	return h.messages, nil
 }
 
 func (h *HTTPClient) Messages(chatID int64) []Message {
@@ -644,24 +701,52 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 		return errors.New("Chat server is currently offline or unreachable")
 	}
 
+	connDone := make(chan struct{})
+	h.wsDoneChan = connDone
 	h.wsConn = conn
 	h.wsConnected.Store(true)
+	h.wsIntentionalClose.Store(false)
 
 	// Launch reader pump
 	go func() {
 		defer func() {
 			h.wsMu.Lock()
-			if h.wsConn == conn {
+			wasCurrent := (h.wsConn == conn)
+			if wasCurrent {
 				h.wsConnected.Store(false)
 				h.wsConn = nil
+				if h.wsDoneChan == connDone {
+					h.wsDoneChan = nil
+				}
 			}
+			isIntentional := h.wsIntentionalClose.Swap(false)
 			h.wsMu.Unlock()
+
+			select {
+			case <-connDone:
+			default:
+				close(connDone)
+			}
 			_ = conn.Close()
-			eventsChan <- WSErrorPayload{
-				Type:  "disconnected",
-				Error: "websocket connection lost",
+
+			if wasCurrent && !isIntentional {
+				select {
+				case eventsChan <- WSErrorPayload{
+					Type:  "disconnected",
+					Error: "websocket connection lost",
+				}:
+				default:
+				}
 			}
 		}()
+
+		sendEvent := func(evt any) {
+			select {
+			case eventsChan <- evt:
+			case <-connDone:
+			default:
+			}
+		}
 
 		for {
 			_, message, err := conn.ReadMessage()
@@ -678,32 +763,32 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 			case "chat_message":
 				var p WSChatMessagePayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			case "chat_notification":
 				var p WSChatNotificationPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			case "conversation_read":
 				var p WSConversationReadPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			case "user_presence":
 				var p WSUserPresencePayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			case "presence_snapshot":
 				var p WSPresenceSnapshotPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			case "error":
 				var p WSErrorPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
-					eventsChan <- p
+					sendEvent(p)
 				}
 			}
 		}
@@ -716,7 +801,16 @@ func (h *HTTPClient) CloseWS() error {
 	h.wsMu.Lock()
 	defer h.wsMu.Unlock()
 
+	h.wsIntentionalClose.Store(true)
 	h.wsConnected.Store(false)
+	if h.wsDoneChan != nil {
+		select {
+		case <-h.wsDoneChan:
+		default:
+			close(h.wsDoneChan)
+		}
+		h.wsDoneChan = nil
+	}
 	if h.wsConn != nil {
 		err := h.wsConn.Close()
 		h.wsConn = nil
@@ -730,12 +824,12 @@ func (h *HTTPClient) IsWSConnected() bool {
 }
 
 func (h *HTTPClient) SendWS(convID int64, text string) error {
+	h.wsMu.Lock()
+	defer h.wsMu.Unlock()
+
 	if !h.wsConnected.Load() || h.wsConn == nil {
 		return errors.New("websocket is not connected")
 	}
-
-	h.wsMu.Lock()
-	defer h.wsMu.Unlock()
 
 	payload, _ := json.Marshal(map[string]any{
 		"conv_id": convID,
@@ -757,12 +851,12 @@ func (h *HTTPClient) SendWS(convID int64, text string) error {
 }
 
 func (h *HTTPClient) FocusConv(convID int64) error {
+	h.wsMu.Lock()
+	defer h.wsMu.Unlock()
+
 	if !h.wsConnected.Load() || h.wsConn == nil {
 		return nil
 	}
-
-	h.wsMu.Lock()
-	defer h.wsMu.Unlock()
 
 	payload, _ := json.Marshal(map[string]any{
 		"conv_id": convID,
@@ -783,12 +877,12 @@ func (h *HTTPClient) FocusConv(convID int64) error {
 }
 
 func (h *HTTPClient) MarkRead(convID int64, messageID int64) error {
+	h.wsMu.Lock()
+	defer h.wsMu.Unlock()
+
 	if !h.wsConnected.Load() || h.wsConn == nil {
 		return nil
 	}
-
-	h.wsMu.Lock()
-	defer h.wsMu.Unlock()
 
 	payload, _ := json.Marshal(map[string]any{
 		"conv_id":    convID,

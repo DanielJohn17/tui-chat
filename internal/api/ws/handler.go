@@ -80,19 +80,11 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 
-	client := &Client{
-		UserID:      userID,
-		Username:    username,
-		Conn:        conn,
-		Send:        make(chan []byte, 256),
-		Hub:         h.hub,
-		convService: h.convService,
-	}
-
-	client.ActiveConvID.Store(0)
+	client := NewClient(userID, username, conn, h.hub, h.convService)
 
 	h.hub.Register <- client
 
 	go client.readPump()
 	go client.writePump()
+	go client.readReceiptWorker()
 }

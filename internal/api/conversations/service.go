@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
@@ -44,6 +45,8 @@ type ConvServiceInt interface {
 	MarkAsRead(ctx context.Context, messageID, userID, convID int64)
 
 	GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error)
+
+	Shutdown(ctx context.Context) error
 }
 
 type ConvService struct {
@@ -52,6 +55,7 @@ type ConvService struct {
 	sem        chan struct{}
 	batchSize  int64
 	sleepDelay time.Duration
+	wg         sync.WaitGroup
 }
 
 func NewConvService(r ConvRepositoryInt, u users.UserServiceInt) *ConvService {
@@ -178,7 +182,7 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Minute)
 
-	go func() {
+	s.wg.Go(func() {
 		defer cancel()
 		defer func() {
 			if err := recover(); err != nil {
@@ -242,7 +246,7 @@ func (s *ConvService) WipeConversation(ctx context.Context, convID, userID int64
 			bgCtx, "conversation wipeout completed successfully",
 			"conv_id", convID,
 		)
-	}()
+	})
 
 	return nil
 }
@@ -294,4 +298,19 @@ func (s *ConvService) GetContactUserIDs(ctx context.Context, userID int64) ([]in
 	}
 
 	return peerIDs, nil
+}
+
+func (s *ConvService) Shutdown(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

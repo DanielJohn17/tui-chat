@@ -9,6 +9,7 @@ func (m *AppModel) handleAuthState(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "esc", "ctrl+c":
+			_ = m.client.CloseWS()
 			return *m, tea.Quit
 		case "f1", "ctrl+h", "?":
 			m.modal = ModalHelp
@@ -65,6 +66,7 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "q", "ctrl+c":
+			_ = m.client.CloseWS()
 			return *m, tea.Quit
 
 		case "j", "down":

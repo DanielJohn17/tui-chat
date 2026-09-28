@@ -42,7 +42,7 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 	if availNameW < 4 {
 		availNameW = 4
 	}
-	leftPart1 := prefixStr + nameStyle.Render(theme.Truncate(ch.Name, availNameW))
+	leftPart1 := prefixStr + nameStyle.Render(theme.Truncate(theme.SanitizeLine(ch.Name), availNameW))
 	spaces1 := innerWidth - lipgloss.Width(leftPart1) - timeW
 	if spaces1 < 1 {
 		spaces1 = 1
@@ -50,9 +50,9 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 	row1 := lipgloss.JoinHorizontal(lipgloss.Center, leftPart1, lipgloss.NewStyle().Width(spaces1).Render(""), timeText)
 
 	// Line 2: Last message preview (left) and Unread badge pill (right)
-	preview := ch.LastMessage
+	preview := theme.SanitizeLine(ch.LastMessage)
 	if preview == "" {
-		preview = "@" + ch.Username
+		preview = "@" + theme.SanitizeLine(ch.Username)
 	}
 
 	var unreadBadge string

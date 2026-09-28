@@ -177,13 +177,11 @@ func (h *Hub) Run() {
 				if activeConv == msg.ConvID {
 					// User is in the current looking conversation
 					if c.TrySend(chatMsgFrame) {
-						// Auto-mark as read in background since recipient is actively looking
-						go func(msgID, userID, convID int64, service MessagePersister) {
-							ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-							defer cancel()
-
-							service.MarkAsRead(ctx, msgID, userID, convID)
-						}(msg.Message.ID, c.UserID, msg.ConvID, c.convService)
+						// Auto-mark as read via client's dedicated coalescing worker
+						c.EnqueueReadReceipt(MarkReadPayload{
+							ConvID:    msg.ConvID,
+							MessageID: msg.Message.ID,
+						})
 					} else {
 						h.dropClient(c)
 					}

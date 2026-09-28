@@ -46,6 +46,30 @@ type Client struct {
 	convService  MessagePersister
 	sendMu       sync.RWMutex
 	closed       bool
+
+	readReceipts chan MarkReadPayload
+	done         chan struct{}
+}
+
+func NewClient(
+	userID int64,
+	username string,
+	conn *websocket.Conn,
+	hub *Hub,
+	convService MessagePersister,
+) *Client {
+	c := &Client{
+		UserID:       userID,
+		Username:     username,
+		Send:         make(chan []byte, 256),
+		Conn:         conn,
+		Hub:          hub,
+		convService:  convService,
+		readReceipts: make(chan MarkReadPayload, 128),
+		done:         make(chan struct{}),
+	}
+	c.ActiveConvID.Store(0)
+	return c
 }
 
 // TrySend attempts to non-blockingly deliver a frame to the client's send channel.
@@ -79,6 +103,9 @@ func (c *Client) Close() {
 	c.closed = true
 	if c.Send != nil {
 		close(c.Send)
+	}
+	if c.done != nil {
+		close(c.done)
 	}
 }
 
@@ -127,7 +154,7 @@ func (c *Client) readPump() {
 
 			c.ActiveConvID.Store(payload.ConvID)
 			if payload.ConvID > 0 {
-				c.triggerReadReceipt(MarkReadPayload{
+				c.EnqueueReadReceipt(MarkReadPayload{
 					ConvID:    payload.ConvID,
 					MessageID: 0,
 				})
@@ -146,7 +173,7 @@ func (c *Client) readPump() {
 			}
 
 			if payload.ConvID > 0 {
-				c.triggerReadReceipt(payload)
+				c.EnqueueReadReceipt(payload)
 			}
 			continue
 		}
@@ -202,23 +229,6 @@ func (c *Client) sendError(convID int64, content, errMsg string, retryable bool)
 
 	if !c.TrySend(errPayload) {
 		log.Printf("ws send buffer full for user %d, dropped error frame", c.UserID)
-	}
-}
-
-func (c *Client) triggerReadReceipt(payload MarkReadPayload) {
-	// Persist to DB asynchronously so not to block the websocket read loop
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		c.convService.MarkAsRead(ctx, payload.MessageID, c.UserID, payload.ConvID)
-	}()
-
-	// hub broadcast
-	c.Hub.BroadcastRead <- &ConversationReadPayload{
-		ConvID:    payload.ConvID,
-		UserID:    c.UserID,
-		MessageID: payload.MessageID,
 	}
 }
 

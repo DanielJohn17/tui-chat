@@ -80,6 +80,11 @@ func (m *MockConvService) GetContactUserIDs(ctx context.Context, userID int64) (
 	return args.Get(0).([]int64), args.Error(1)
 }
 
+func (m *MockConvService) Shutdown(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 func TestConvHandler_GetConvsByUserID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -152,6 +152,10 @@ func (m Model) IsInputFocused() bool {
 	return m.isFocused
 }
 
+func (m Model) InputValue() string {
+	return m.input.Value()
+}
+
 func (m *Model) RefreshMessages() {
 	if m.activeChatID == 0 {
 		m.viewport.SetContent("No conversation selected.")
@@ -212,6 +216,7 @@ func (m *Model) RefreshMessages() {
 	for _, msg := range messages {
 		var senderTag, row string
 		timeTag := theme.StyleDim.Render(msg.Timestamp)
+		cleanText := theme.SanitizeText(msg.Text)
 
 		if msg.Self {
 			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("You")
@@ -219,15 +224,16 @@ func (m *Model) RefreshMessages() {
 			body := lipgloss.NewStyle().
 				Foreground(theme.ColorWhite).
 				Width(contentWidth).
-				Render(msg.Text)
+				Render(cleanText)
 			row = fmt.Sprintf("  %s\n  %s\n", header, body)
 		} else {
-			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render(msg.Sender)
+			cleanSender := theme.SanitizeLine(msg.Sender)
+			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render(cleanSender)
 			header := fmt.Sprintf("%s  %s", senderTag, timeTag)
 			body := lipgloss.NewStyle().
 				Foreground(theme.ColorWhite).
 				Width(contentWidth).
-				Render(msg.Text)
+				Render(cleanText)
 			row = fmt.Sprintf("  %s\n  %s\n", header, body)
 		}
 		sb.WriteString(row + "\n")
@@ -278,7 +284,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			case "enter":
 				text := strings.TrimSpace(m.input.Value())
 				if text != "" && m.activeChatID != 0 {
-					_ = m.client.SendWS(m.activeChatID, text)
+					if err := m.client.SendWS(m.activeChatID, text); err != nil {
+						// Do not append message or clear input on SendWS failure
+						return m, nil
+					}
 					nowStr := "now"
 					m.client.AppendMessage(client.Message{
 						ConvID:    m.activeChatID,
@@ -324,8 +333,8 @@ func (m Model) View(activeChat *client.Chat) string {
 
 		leftTitle := lipgloss.JoinHorizontal(lipgloss.Center,
 			dot, " ",
-			theme.StyleSubtitle.Render(activeChat.Name), " ",
-			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+activeChat.Username),
+			theme.StyleSubtitle.Render(theme.SanitizeLine(activeChat.Name)), " ",
+			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.SanitizeLine(activeChat.Username)),
 		)
 
 		var focusHint string

@@ -12,18 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type MockConvService struct {
-	mock.Mock
-}
-
-func (m *MockConvService) GetContactUserIDs(ctx context.Context, userID int64) ([]int64, error) {
-	args := m.Called(ctx, userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]int64), args.Error(1)
-}
-
 func TestHub_GetOnlineStatus(t *testing.T) {
 	mockService := new(MockConvService)
 	hub := ws.NewHub(mockService)

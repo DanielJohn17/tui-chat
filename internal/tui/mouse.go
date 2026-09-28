@@ -58,6 +58,7 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 	// Click in status bar at bottom
 	if mouseMsg.Y >= mainHeight {
 		if mouseMsg.X >= m.width-12 {
+			_ = m.client.CloseWS()
 			return *m, tea.Quit, true
 		}
 		normX := float64(mouseMsg.X) / float64(m.width)
