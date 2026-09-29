@@ -111,18 +111,22 @@ func (m *Model) SetSize(w, h int) {
 	m.height = h
 
 	vpWidth := w - 4
-	if vpWidth < 20 {
-		vpWidth = 20
+	if vpWidth < 1 {
+		vpWidth = 1
 	}
 	// Reserve 2 lines for header, 3 lines for input box, 1 blank line before input, 2 lines for outer borders
 	vpHeight := h - 8
-	if vpHeight < 4 {
-		vpHeight = 4
+	if vpHeight < 1 {
+		vpHeight = 1
 	}
 
 	m.viewport.Width = vpWidth
 	m.viewport.Height = vpHeight
-	m.input.Width = vpWidth - 4
+	inputW := vpWidth - 4
+	if inputW < 1 {
+		inputW = 1
+	}
+	m.input.Width = inputW
 	m.RefreshMessages()
 }
 
@@ -317,8 +321,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) View(activeChat *client.Chat) string {
 	contentWidth := m.width - 4
-	if contentWidth < 20 {
-		contentWidth = 20
+	if contentWidth < 1 {
+		contentWidth = 1
 	}
 
 	// 1. Chat Header
@@ -331,24 +335,38 @@ func (m Model) View(activeChat *client.Chat) string {
 			dot = theme.StyleDim.Render("○")
 		}
 
+		nameW := 14
+		if contentWidth < 30 {
+			nameW = 8
+		}
 		leftTitle := lipgloss.JoinHorizontal(lipgloss.Center,
 			dot, " ",
-			theme.StyleSubtitle.Render(theme.SanitizeLine(activeChat.Name)), " ",
-			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.SanitizeLine(activeChat.Username)),
+			theme.StyleSubtitle.Render(theme.Truncate(theme.SanitizeLine(activeChat.Name), nameW)), " ",
+			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.Truncate(theme.SanitizeLine(activeChat.Username), nameW)),
 		)
 
+		if lipgloss.Width(leftTitle) > contentWidth {
+			leftTitle = theme.Truncate(theme.SanitizeLine(activeChat.Name), contentWidth)
+		}
+
 		var focusHint string
-		if m.isFocused {
-			focusHint = theme.StyleDim.Render("[Esc: unfocus input]")
-		} else {
-			focusHint = theme.StyleDim.Render("[i / Enter: focus input]")
+		if contentWidth >= 35 {
+			if m.isFocused {
+				focusHint = theme.StyleDim.Render("[Esc: unfocus]")
+			} else {
+				focusHint = theme.StyleDim.Render("[i: focus]")
+			}
 		}
 
 		hSpaces := contentWidth - lipgloss.Width(leftTitle) - lipgloss.Width(focusHint)
 		if hSpaces < 1 {
 			hSpaces = 1
 		}
-		header = lipgloss.JoinHorizontal(lipgloss.Center, leftTitle, lipgloss.NewStyle().Width(hSpaces).Render(""), focusHint)
+		if focusHint != "" && lipgloss.Width(leftTitle)+lipgloss.Width(focusHint)+1 <= contentWidth {
+			header = lipgloss.JoinHorizontal(lipgloss.Center, leftTitle, lipgloss.NewStyle().Width(hSpaces).Render(""), focusHint)
+		} else {
+			header = leftTitle
+		}
 	} else {
 		header = theme.StyleDim.Render("No active conversation")
 	}
@@ -362,8 +380,8 @@ func (m Model) View(activeChat *client.Chat) string {
 		inputBorder = theme.ColorCyan
 	}
 	inputBoxWidth := contentWidth - 2
-	if inputBoxWidth < 10 {
-		inputBoxWidth = 10
+	if inputBoxWidth < 1 {
+		inputBoxWidth = 1
 	}
 	inputRendered := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -374,12 +392,12 @@ func (m Model) View(activeChat *client.Chat) string {
 
 	// Assemble Pane
 	boxWidth := m.width - 2
-	if boxWidth < 10 {
-		boxWidth = 10
+	if boxWidth < 1 {
+		boxWidth = 1
 	}
 	boxHeight := m.height - 2
-	if boxHeight < 6 {
-		boxHeight = 6
+	if boxHeight < 1 {
+		boxHeight = 1
 	}
 
 	pane := lipgloss.NewStyle().

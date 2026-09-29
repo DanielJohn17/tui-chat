@@ -50,11 +50,20 @@ help: ## Display this help message
 
 GO_ENV ?= development
 API_URL ?= http://localhost:8080
+APP_SHARED_SECRET ?= $(shell grep -E '^APP_SHARED_SECRET=' $(ENV_FILE) 2>/dev/null | cut -d '=' -f2-)
+TUI_LDFLAGS := -X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV) -X main.DefaultAppSecret=$(APP_SHARED_SECRET)
 
 ## ----------------------------------------------------------------------------
 ## Build Targets
 ## ----------------------------------------------------------------------------
-.PHONY: build build-api build-tui build-linux build-windows build-darwin build-cross build-all
+.PHONY: check-secret build build-api build-tui build-linux build-windows build-darwin build-cross build-all
+
+check-secret: ## Verify that APP_SHARED_SECRET is present before building
+	@if [ -z "$(strip $(APP_SHARED_SECRET))" ]; then \
+		printf "$(YELLOW)FATAL: APP_SHARED_SECRET is required to build LineTalk. Define it in $(ENV_FILE) or pass APP_SHARED_SECRET=...$(RESET)\n"; \
+		exit 1; \
+	fi
+
 build: build-api build-tui ## Build both API and host LineTalk binaries into bin/
 
 build-api: ## Build the Go API binary
@@ -63,34 +72,34 @@ build-api: ## Build the Go API binary
 	@go build -o $(API_BIN) ./cmd/api
 	@printf "$(GREEN)✓ API binary built successfully.$(RESET)\n"
 
-build-tui: ## Build host LineTalk binary (optionally: make build-tui API_URL=... GO_ENV=...)
+build-tui: check-secret ## Build host LineTalk binary (optionally: make build-tui API_URL=... GO_ENV=...)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(YELLOW)Building LineTalk binary -> $(TUI_BIN) (GO_ENV=$(GO_ENV))...$(RESET)\n"
-	@go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(TUI_BIN) ./cmd/tui
+	@go build -ldflags "$(TUI_LDFLAGS)" -o $(TUI_BIN) ./cmd/tui
 	@printf "$(GREEN)✓ LineTalk binary built successfully.$(RESET)\n"
 
-build-linux: ## Build Linux LineTalk binaries (amd64, 386, arm64, arm)
+build-linux: check-secret ## Build Linux LineTalk binaries (amd64, 386, arm64, arm)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(YELLOW)Cross-compiling Linux LineTalk binaries (amd64, 386, arm64, arm)...$(RESET)\n"
-	@GOOS=linux GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-amd64 ./cmd/tui
-	@GOOS=linux GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-386 ./cmd/tui
-	@GOOS=linux GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-arm64 ./cmd/tui
-	@GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-linux-arm ./cmd/tui
+	@GOOS=linux GOARCH=amd64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-linux-amd64 ./cmd/tui
+	@GOOS=linux GOARCH=386 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-linux-386 ./cmd/tui
+	@GOOS=linux GOARCH=arm64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-linux-arm64 ./cmd/tui
+	@GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-linux-arm ./cmd/tui
 	@printf "$(GREEN)✓ Linux LineTalk binaries built in $(BIN_DIR)/ (amd64, 386, arm64, arm).$(RESET)\n"
 
-build-windows: ## Build Windows LineTalk binaries (amd64, 386, arm64)
+build-windows: check-secret ## Build Windows LineTalk binaries (amd64, 386, arm64)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(YELLOW)Cross-compiling Windows LineTalk binaries (amd64, 386, arm64)...$(RESET)\n"
-	@GOOS=windows GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-amd64.exe ./cmd/tui
-	@GOOS=windows GOARCH=386 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-386.exe ./cmd/tui
-	@GOOS=windows GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-windows-arm64.exe ./cmd/tui
+	@GOOS=windows GOARCH=amd64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-windows-amd64.exe ./cmd/tui
+	@GOOS=windows GOARCH=386 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-windows-386.exe ./cmd/tui
+	@GOOS=windows GOARCH=arm64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-windows-arm64.exe ./cmd/tui
 	@printf "$(GREEN)✓ Windows LineTalk binaries built in $(BIN_DIR)/ (amd64, 386, arm64).$(RESET)\n"
 
-build-darwin: ## Build macOS LineTalk binaries (amd64, arm64)
+build-darwin: check-secret ## Build macOS LineTalk binaries (amd64, arm64)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(YELLOW)Cross-compiling macOS LineTalk binaries (amd64, arm64)...$(RESET)\n"
-	@GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-darwin-amd64 ./cmd/tui
-	@GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.DefaultAPIURL=$(API_URL) -X main.DefaultGoEnv=$(GO_ENV)" -o $(BIN_DIR)/linetalk-darwin-arm64 ./cmd/tui
+	@GOOS=darwin GOARCH=amd64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-darwin-amd64 ./cmd/tui
+	@GOOS=darwin GOARCH=arm64 go build -ldflags "$(TUI_LDFLAGS)" -o $(BIN_DIR)/linetalk-darwin-arm64 ./cmd/tui
 	@printf "$(GREEN)✓ macOS LineTalk binaries built in $(BIN_DIR)/ (amd64, arm64).$(RESET)\n"
 
 build-cross: build-linux build-windows build-darwin ## Cross-compile LineTalk for Linux, Windows & macOS
@@ -102,11 +111,11 @@ build-all: build build-cross ## Build host binaries and all cross-compiled targe
 .PHONY: run-api run-tui dev-api dev-user1 dev-user2 seed
 run-api: ## Run Go API server directly with go run
 	@printf "$(YELLOW)Starting Go API server...$(RESET)\n"
-	@go run ./cmd/api
+	@APP_SHARED_SECRET="$(APP_SHARED_SECRET)" go run ./cmd/api
 
 run-tui: ## Run Go TUI client directly (supports: make run-tui SESSION=alice)
 	@printf "$(YELLOW)Starting Go TUI client (GO_ENV=$(GO_ENV), SESSION=$(SESSION))...$(RESET)\n"
-	@SESSION="$(SESSION)" GO_ENV="$(GO_ENV)" API_URL="$(API_URL)" go run ./cmd/tui
+	@APP_SHARED_SECRET="$(APP_SHARED_SECRET)" SESSION="$(SESSION)" GO_ENV="$(GO_ENV)" API_URL="$(API_URL)" go run ./cmd/tui
 
 dev-user1: ## Run TUI as User 1 in dev mode (SESSION=alice)
 	@$(MAKE) run-tui SESSION=alice

@@ -99,4 +99,35 @@ func TestProfileDateFormattingAndNoUserID(t *testing.T) {
 	assert.NotContains(t, view, "User ID:", "Profile view should not expose User ID")
 	assert.Contains(t, view, "Member Since:", "Profile view must display Member Since")
 	assert.Contains(t, view, "Status:", "Profile view must display Status")
+	assert.Contains(t, view, "Sync:", "Profile view must display Sync storage notice")
+}
+
+func TestProfileBioPersistence(t *testing.T) {
+	model := authenticatedApp()
+
+	// 1. Open profile edit page via 'p'
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	assert.Contains(t, model.View(), "PAGE: PROFILE EDIT")
+
+	// 2. Press Tab twice to focus Bio field (0=Name, 1=Username, 2=Bio)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+
+	// Enter new bio text
+	for _, r := range "Building Go TUIs 💻" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// 3. Save profile
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab}) // focus Save button
+	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		msg := cmd()
+		model, _ = model.Update(msg)
+	}
+
+	// 4. Re-open profile and verify bio is preserved
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	view := model.View()
+	assert.Contains(t, view, "Building Go TUIs")
 }

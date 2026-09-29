@@ -3,7 +3,7 @@ name: Release & Build Binaries
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -20,11 +20,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: "1.27"
           cache-dependency-path: go.sum
 
       - name: Download Go dependencies
         run: go mod download
+
+      - name: Validate Release Secrets
+        run: |
+          if [ -z "${{ secrets.APP_SHARED_SECRET }}" ]; then
+            echo "::error::APP_SHARED_SECRET repository secret is required to build release binaries!"
+            exit 1
+          fi
 
       - name: Build TUI Client Binaries (Public) & Server API (Private)
         env:
@@ -40,7 +47,7 @@ jobs:
 
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          TUI_LDFLAGS="-s -w -X main.DefaultAPIURL=${RELEASE_API_URL} -X main.DefaultGoEnv=production -X main.Version=${TAG_NAME} -X main.Commit=${GITHUB_SHA} -X main.BuildDate=${BUILD_DATE}"
+          TUI_LDFLAGS="-s -w -X main.DefaultAPIURL=${RELEASE_API_URL} -X main.DefaultGoEnv=production -X main.DefaultAppSecret=${{ secrets.APP_SHARED_SECRET }} -X main.Version=${TAG_NAME} -X main.Commit=${GITHUB_SHA} -X main.BuildDate=${BUILD_DATE}"
 
 
 

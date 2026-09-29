@@ -15,11 +15,12 @@ import (
 //
 //	go build -ldflags "-X main.DefaultAPIURL=https://api.yourdomain.com -X main.DefaultGoEnv=development" ./cmd/tui
 var (
-	DefaultAPIURL = "http://localhost:8080"
-	DefaultGoEnv  = "development"
-	Version       = "dev"
-	Commit        = "none"
-	BuildDate     = "unknown"
+	DefaultAPIURL    = "http://localhost:8080"
+	DefaultGoEnv     = "development"
+	DefaultAppSecret = ""
+	Version          = "dev"
+	Commit           = "none"
+	BuildDate        = "unknown"
 )
 
 func main() {
@@ -38,7 +39,11 @@ func main() {
 	}
 
 	// Attempt to load .env from current directory or parent directories
-	_ = godotenv.Load(".env", "../../.env", "../../../.env")
+	for _, envPath := range []string{".env", "../../.env", "../../../.env"} {
+		if err := godotenv.Load(envPath); err == nil {
+			break
+		}
+	}
 
 	apiURL := os.Getenv("API_URL")
 	if apiURL == "" {
@@ -50,6 +55,15 @@ func main() {
 		goEnv = DefaultGoEnv
 	}
 
+	appSecret := os.Getenv("APP_SHARED_SECRET")
+	if appSecret == "" {
+		appSecret = DefaultAppSecret
+	}
+	if appSecret == "" {
+		fmt.Fprintln(os.Stderr, "FATAL: APP_SHARED_SECRET is required. Please set it in your .env file or build with ldflags.")
+		os.Exit(1)
+	}
+
 	sessionName := sessionFlag
 	if sessionName == "" {
 		sessionName = os.Getenv("SESSION")
@@ -58,7 +72,7 @@ func main() {
 		}
 	}
 
-	c := client.NewHTTPClient(apiURL)
+	c := client.NewHTTPClient(apiURL, appSecret)
 
 	sessionPath := client.ResolveSessionPath(goEnv, sessionName)
 	c.SetSessionPath(sessionPath)

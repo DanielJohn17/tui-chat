@@ -23,6 +23,7 @@ type Config struct {
 	DBSSLMode              string
 	DatabaseURL            string
 	JWTSecretKey           string
+	AppSharedSecret        string
 	GoEnv                  string
 	Port                   string
 }
@@ -31,7 +32,11 @@ type Config struct {
 var ENV = initConfig()
 
 func initConfig() *Config {
-	_ = godotenv.Load(".env", "../../.env", "../../../.env")
+	for _, envPath := range []string{".env", "../../.env", "../../../.env", "../../../../.env"} {
+		if err := godotenv.Load(envPath); err == nil {
+			break
+		}
+	}
 
 	dbUser := GetEnv("DB_USER", GetEnv("PGUSER", "postgres"))
 	dbPassword := GetEnv("DB_PASSWORD", GetEnv("PGPASSWORD", "postgres"))
@@ -66,19 +71,32 @@ func initConfig() *Config {
 
 	goEnv := GetEnv("GO_ENV", "production")
 	jwtSecret := GetEnv("JWT_SECRET_KEY", "")
+	appSecret := GetEnv("APP_SHARED_SECRET", GetEnv("CLIENT_SHARED_SECRET", ""))
 
-	// In test environments, if no secret is provided, provide a development fallback so tests pass cleanly
-	if jwtSecret == "" && isTestEnv() {
-		jwtSecret = DevDefaultSecretKey
+	// In test environments, if no secret is provided, provide a test fallback so tests pass cleanly
+	if isTestEnv() {
+		if jwtSecret == "" {
+			jwtSecret = DevDefaultSecretKey
+		}
+		if appSecret == "" {
+			appSecret = "test-automated-suite-shared-secret-32-chars"
+		}
 	}
 
 	if err := ValidateJWTSecret(jwtSecret, goEnv); err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL CONFIG ERROR: %v\n", err)
 		os.Exit(1)
 	}
+	if err := ValidateAppSecret(appSecret, goEnv); err != nil {
+		fmt.Fprintf(os.Stderr, "FATAL CONFIG ERROR: %v\n", err)
+		os.Exit(1)
+	}
 
 	if jwtSecret == "" {
 		jwtSecret = DevDefaultSecretKey
+	}
+	if appSecret == "" {
+		appSecret = DevDefaultAppSecret
 	}
 
 	return &Config{
@@ -90,6 +108,7 @@ func initConfig() *Config {
 		DBSSLMode:              dbSSLMode,
 		DatabaseURL:            rawDBURL,
 		JWTSecretKey:           jwtSecret,
+		AppSharedSecret:        appSecret,
 		JWTExpirationInSeconds: GetEnvAsInt("JWT_EXP", 259200),
 		GoEnv:                  goEnv,
 		Port:                   GetEnv("PORT", "8080"),
@@ -100,6 +119,12 @@ const (
 	DefaultInsecureSecretKey = "your-default-secret-key-change-in-production"
 	DevDefaultSecretKey      = "dev-insecure-jwt-secret-key-min-32-characters-long"
 	MinJWTSecretLength       = 32
+
+	DefaultInsecureAppSecret = "your-default-app-secret-change-in-production"
+	DevDefaultAppSecret      = "dev-insecure-client-shared-secret-min-32-chars-long"
+	MinAppSecretLength       = 32
+	ClientSecretHeader       = "X-App-Secret"
+	AltClientSecretHeader    = "X-Client-Secret"
 )
 
 // ValidateJWTSecret validates that the JWT secret is sufficiently secure.
@@ -111,6 +136,24 @@ func ValidateJWTSecret(secret, goEnv string) error {
 		}
 		if len(secret) < MinJWTSecretLength {
 			return fmt.Errorf("JWT_SECRET_KEY in production must be at least %d characters long for security", MinJWTSecretLength)
+		}
+	}
+	return nil
+}
+
+// ValidateAppSecret verifies that the client shared secret meets security requirements.
+// Requires the secret to be non-empty in all environments.
+// In production, placeholder/dev secrets are forbidden and length must be >= 32 characters.
+func ValidateAppSecret(secret, goEnv string) error {
+	if secret == "" {
+		return errors.New("APP_SHARED_SECRET environment variable is required and must be defined in your .env file")
+	}
+	if goEnv == "production" {
+		if secret == DefaultInsecureAppSecret || secret == DevDefaultAppSecret {
+			return errors.New("APP_SHARED_SECRET cannot use default or development placeholder secret in production")
+		}
+		if len(secret) < MinAppSecretLength {
+			return fmt.Errorf("APP_SHARED_SECRET in production must be at least %d characters long for security", MinAppSecretLength)
 		}
 	}
 	return nil

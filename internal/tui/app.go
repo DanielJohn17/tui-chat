@@ -196,17 +196,29 @@ func (m *AppModel) handleResize(w, h int) {
 	m.profileView.SetSize(w, h)
 
 	mainHeight := h - 3
-	if mainHeight < 10 {
-		mainHeight = 10
+	if mainHeight < 1 {
+		mainHeight = 1
 	}
 
-	sidebarWidth := 38
-	if w < 100 {
+	var sidebarWidth int
+	if w >= 100 {
+		sidebarWidth = 38
+	} else if w >= 70 {
 		sidebarWidth = 30
+	} else if w >= 50 {
+		sidebarWidth = w * 4 / 10
+	} else {
+		sidebarWidth = w / 2
+	}
+	if sidebarWidth < 1 {
+		sidebarWidth = 1
 	}
 	chatWidth := w - sidebarWidth
-	if chatWidth < 30 {
-		chatWidth = 30
+	if chatWidth < 1 {
+		chatWidth = 1
+	}
+	if w >= 2 && sidebarWidth+chatWidth != w {
+		chatWidth = w - sidebarWidth
 	}
 
 	m.sidebarView.SetSize(sidebarWidth, mainHeight)

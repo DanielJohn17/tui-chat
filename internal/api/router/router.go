@@ -2,6 +2,8 @@
 package router
 
 import (
+	"context"
+
 	"github.com/DanielJohn17/tui-chat/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
@@ -19,7 +21,7 @@ type Handlers struct {
 	WS   ws.WSHandlerInt
 }
 
-func NewRouter(h Handlers) *gin.Engine {
+func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 	if config.ENV.GoEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -27,14 +29,21 @@ func NewRouter(h Handlers) *gin.Engine {
 	router := gin.Default()
 	_ = router.SetTrustedProxies(nil)
 
-	// Enable CORS & client header validation
-	router.Use(middleware.CORS())
+	// Enforce client shared secret validation on all incoming traffic
+	router.Use(middleware.ClientSecretAuth(config.ENV.AppSharedSecret))
+
+	// Health check probe
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 
 	subRouter := router.Group("/api/v1")
 
 	// Public auth routes
-	subRouter.POST("/auth/register", h.Auth.RegisterUser)
-	subRouter.POST("/auth/login", h.Auth.LoginUser)
+	authLimiter := middleware.AuthRateLimiter(ctx, 10, 15)
+
+	subRouter.POST("/auth/register", authLimiter, h.Auth.RegisterUser)
+	subRouter.POST("/auth/login", authLimiter, h.Auth.LoginUser)
 
 	subRouter.Use(middleware.Auth())
 	{

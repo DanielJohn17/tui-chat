@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const testAppSecret = "dev-insecure-client-shared-secret-min-32-chars-long"
 
 // 1. Sanitization tests for OSC 52 clipboard injection, CSI escape sequences, and control chars
 func TestSanitizeANSIAndOSC52(t *testing.T) {
@@ -134,7 +137,7 @@ func TestFetchSessionEpochDiscardAfterLogout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	httpClient := client.NewHTTPClient(server.URL)
+	httpClient := client.NewHTTPClient(server.URL, testAppSecret)
 	httpClient.SetProfile(client.Profile{
 		ID:    1,
 		Token: "test-token",
@@ -185,7 +188,7 @@ func TestFetchBulkMessagesMergesWithoutOverwritingNewerWSMessage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	httpClient := client.NewHTTPClient(server.URL)
+	httpClient := client.NewHTTPClient(server.URL, testAppSecret)
 	httpClient.SetProfile(client.Profile{
 		ID:    1,
 		Token: "test-token",
@@ -231,7 +234,7 @@ func TestCloseWSDistinguishesIntentionalClose(t *testing.T) {
 	}))
 	defer server.Close()
 
-	httpClient := client.NewHTTPClient(server.URL)
+	httpClient := client.NewHTTPClient(server.URL, testAppSecret)
 	httpClient.SetProfile(client.Profile{
 		ID:    1,
 		Token: "test-token",
@@ -255,4 +258,66 @@ func TestCloseWSDistinguishesIntentionalClose(t *testing.T) {
 	default:
 		// Clean: no unwanted reconnect event fired
 	}
+}
+
+// 6. Test that HTTP responses exceeding payload limits are rejected cleanly
+func TestPayloadSizeLimitEnforcement(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Write 3MB of bytes (exceeds 2MB maxHTTPPayloadBytes)
+		chunk := bytes.Repeat([]byte("A"), 64*1024)
+		for i := 0; i < 48; i++ {
+			_, _ = w.Write(chunk)
+		}
+	}))
+	defer server.Close()
+
+	httpClient := client.NewHTTPClient(server.URL, testAppSecret)
+	_, err := httpClient.Login("alice", "password123")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "payload size")
+}
+
+// 7. Test that client transmits X-App-Secret on both REST requests and WebSocket upgrades
+func TestAppSecretHeaderTransmitted(t *testing.T) {
+	const expectedSecret = "my-secure-production-ready-app-secret-12345"
+	var receivedHTTPSecret string
+	var receivedWSSecret string
+
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/auth/login" {
+			receivedHTTPSecret = r.Header.Get("X-App-Secret")
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success": true,
+				"data": map[string]any{
+					"id":       1,
+					"username": "tester",
+					"token":    "sample-jwt",
+				},
+			})
+			return
+		}
+		if r.URL.Path == "/api/v1/ws" {
+			receivedWSSecret = r.Header.Get("X-App-Secret")
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err == nil {
+				_ = conn.Close()
+			}
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	c := client.NewHTTPClient(server.URL, expectedSecret)
+	_, err := c.Login("tester", "password")
+	require.NoError(t, err)
+	assert.Equal(t, expectedSecret, receivedHTTPSecret, "HTTP REST request must send X-App-Secret header")
+
+	events := make(chan any, 1)
+	_ = c.ConnectWS(events)
+	assert.Equal(t, expectedSecret, receivedWSSecret, "WebSocket handshake must send X-App-Secret header")
 }

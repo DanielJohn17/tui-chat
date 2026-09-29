@@ -4,6 +4,7 @@ type Profile struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	Username  string `json:"username"`
+	Bio       string `json:"bio,omitempty"`
 	Password  string `json:"password,omitempty"`
 	Token     string `json:"token,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`

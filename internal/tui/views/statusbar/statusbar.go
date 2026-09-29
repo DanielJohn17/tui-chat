@@ -20,31 +20,46 @@ const (
 
 func Render(activeChat *client.Chat, isInputFocused bool, status ConnectionStatus, retrySeconds int, spinnerFrame string, notificationText string, width int) string {
 	contentWidth := width - 4
-	if contentWidth < 40 {
-		contentWidth = 40
+	if contentWidth < 1 {
+		contentWidth = 1
 	}
 
 	var leftText string
 	if isInputFocused {
-		leftText = lipgloss.JoinHorizontal(lipgloss.Center,
-			theme.StyleBadge.Render("INPUT MODE"),
-			" ",
-			theme.StyleDim.Render("Esc to unfocus"),
-		)
+		if width < 50 {
+			leftText = theme.StyleBadge.Render("INPUT")
+		} else {
+			leftText = lipgloss.JoinHorizontal(lipgloss.Center,
+				theme.StyleBadge.Render("INPUT MODE"),
+				" ",
+				theme.StyleDim.Render("Esc to unfocus"),
+			)
+		}
 	} else if activeChat != nil {
 		badgeText := "NAV MODE"
 		nameLimit := 16
-		if width < 85 {
+		if width < 60 {
+			badgeText = "NAV"
+			nameLimit = 6
+		} else if width < 85 {
 			badgeText = "NAV"
 			nameLimit = 10
 		}
-		leftText = lipgloss.JoinHorizontal(lipgloss.Center,
-			theme.StyleKeyBadge.Render(badgeText),
-			" ",
-			theme.StyleSubtitle.Render(theme.Truncate(activeChat.Name, nameLimit)),
-		)
+		if width < 45 {
+			leftText = theme.StyleKeyBadge.Render(badgeText)
+		} else {
+			leftText = lipgloss.JoinHorizontal(lipgloss.Center,
+				theme.StyleKeyBadge.Render(badgeText),
+				" ",
+				theme.StyleSubtitle.Render(theme.Truncate(activeChat.Name, nameLimit)),
+			)
+		}
 	} else {
-		leftText = theme.StyleKeyBadge.Render("NAV MODE")
+		if width < 50 {
+			leftText = theme.StyleKeyBadge.Render("NAV")
+		} else {
+			leftText = theme.StyleKeyBadge.Render("NAV MODE")
+		}
 	}
 
 	if spinnerFrame == "" {
@@ -92,33 +107,31 @@ func Render(activeChat *client.Chat, isInputFocused bool, status ConnectionStatu
 	var middleText string
 	if notificationText != "" {
 		availNotifW := contentWidth - lipgloss.Width(leftText) - lipgloss.Width(onlineStatus) - 6
-		if availNotifW < 12 {
-			availNotifW = 12
+		if availNotifW >= 8 {
+			msg := strings.TrimPrefix(notificationText, "🔔 ")
+			badge := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(theme.ColorBlack).
+				Background(theme.ColorGreen).
+				Padding(0, 1).
+				Render("🔔")
+
+			badgeW := lipgloss.Width(badge)
+			msgW := availNotifW - badgeW
+			if msgW < 4 {
+				msgW = 4
+			}
+
+			banner := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(theme.ColorBlack).
+				Background(theme.ColorYellow).
+				Padding(0, 1).
+				Render(theme.Truncate(msg, msgW))
+
+			middleText = lipgloss.JoinHorizontal(lipgloss.Center, badge, banner)
 		}
-
-		msg := strings.TrimPrefix(notificationText, "🔔 ")
-		badge := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.ColorBlack).
-			Background(theme.ColorGreen).
-			Padding(0, 1).
-			Render("🔔")
-
-		badgeW := lipgloss.Width(badge)
-		msgW := availNotifW - badgeW
-		if msgW < 6 {
-			msgW = 6
-		}
-
-		banner := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.ColorBlack).
-			Background(theme.ColorYellow).
-			Padding(0, 1).
-			Render(theme.Truncate(msg, msgW))
-
-		middleText = lipgloss.JoinHorizontal(lipgloss.Center, badge, banner)
-	} else {
+	} else if width >= 60 {
 		var shortcutsText string
 		if width < 85 {
 			if status == StatusOffline || status == StatusReconnecting {
@@ -142,26 +155,39 @@ func Render(activeChat *client.Chat, isInputFocused bool, status ConnectionStatu
 		middleText = theme.StyleDim.Render(shortcutsText)
 	}
 
-	spaces1 := (contentWidth - lipgloss.Width(leftText) - lipgloss.Width(middleText) - lipgloss.Width(onlineStatus)) / 2
-	if spaces1 < 1 {
-		spaces1 = 1
-	}
-	spaces2 := contentWidth - lipgloss.Width(leftText) - spaces1 - lipgloss.Width(middleText) - lipgloss.Width(onlineStatus)
-	if spaces2 < 1 {
-		spaces2 = 1
+	// Fit elements within contentWidth
+	availSpace := contentWidth - lipgloss.Width(leftText) - lipgloss.Width(onlineStatus)
+	if availSpace < 0 {
+		leftText = theme.Truncate(leftText, max(1, contentWidth-lipgloss.Width(onlineStatus)))
+		middleText = ""
+	} else if lipgloss.Width(middleText) > availSpace {
+		middleText = ""
 	}
 
-	bar := lipgloss.JoinHorizontal(lipgloss.Center,
-		leftText,
-		lipgloss.NewStyle().Width(spaces1).Render(""),
-		middleText,
-		lipgloss.NewStyle().Width(spaces2).Render(""),
-		onlineStatus,
-	)
+	remaining := contentWidth - lipgloss.Width(leftText) - lipgloss.Width(middleText) - lipgloss.Width(onlineStatus)
+	var spaces1, spaces2 int
+	if remaining > 0 {
+		spaces1 = remaining / 2
+		spaces2 = remaining - spaces1
+	}
+
+	barParts := []string{leftText}
+	if spaces1 > 0 {
+		barParts = append(barParts, lipgloss.NewStyle().Width(spaces1).Render(""))
+	}
+	if middleText != "" {
+		barParts = append(barParts, middleText)
+	}
+	if spaces2 > 0 {
+		barParts = append(barParts, lipgloss.NewStyle().Width(spaces2).Render(""))
+	}
+	barParts = append(barParts, onlineStatus)
+
+	bar := lipgloss.JoinHorizontal(lipgloss.Center, barParts...)
 
 	boxWidth := width - 2
-	if boxWidth < 20 {
-		boxWidth = 20
+	if boxWidth < 1 {
+		boxWidth = 1
 	}
 
 	return lipgloss.NewStyle().

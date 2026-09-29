@@ -178,8 +178,8 @@ func (m *Model) SelectedChat() *client.Chat {
 func (m *Model) View() string {
 	chats := m.client.Chats()
 	contentWidth := m.width - 4
-	if contentWidth < 20 {
-		contentWidth = 20
+	if contentWidth < 1 {
+		contentWidth = 1
 	}
 
 	// 1. Header component
@@ -187,15 +187,15 @@ func (m *Model) View() string {
 
 	// Available inner height inside rounded border
 	innerH := m.height - 2
-	if innerH < 8 {
-		innerH = 8
+	if innerH < 1 {
+		innerH = 1
 	}
 
 	headerHeight := 2
 	footerHeight := 3
 	availableListHeight := innerH - headerHeight - footerHeight
-	if availableListHeight < 4 {
-		availableListHeight = 4
+	if availableListHeight < 1 {
+		availableListHeight = 1
 	}
 
 	m.ensureVisible()
@@ -290,12 +290,12 @@ func (m *Model) View() string {
 	bodyItems = append(bodyItems, footerBlock)
 
 	boxWidth := m.width - 2
-	if boxWidth < 10 {
-		boxWidth = 10
+	if boxWidth < 1 {
+		boxWidth = 1
 	}
 	boxHeight := m.height - 2
-	if boxHeight < 6 {
-		boxHeight = 6
+	if boxHeight < 1 {
+		boxHeight = 1
 	}
 
 	return lipgloss.NewStyle().

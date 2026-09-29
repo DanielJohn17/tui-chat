@@ -18,12 +18,14 @@ import (
 )
 
 const (
-	ClientHeaderApp = "X-Client-App"
-	ClientAppName   = "tui-chat"
+	ClientHeaderApp    = "X-Client-App"
+	ClientAppName      = "tui-chat"
+	ClientHeaderSecret = "X-App-Secret"
 )
 
 type HTTPClient struct {
 	baseURL            string
+	appSecret          string
 	httpClient         *http.Client
 	profile            Profile
 	sessionPath        string
@@ -39,7 +41,7 @@ type HTTPClient struct {
 	wsMu               sync.Mutex
 }
 
-func NewHTTPClient(baseURL string) Client {
+func NewHTTPClient(baseURL, appSecret string) Client {
 	if baseURL == "" {
 		baseURL = os.Getenv("API_URL")
 		if baseURL == "" {
@@ -49,7 +51,8 @@ func NewHTTPClient(baseURL string) Client {
 	baseURL = strings.TrimRight(baseURL, "/")
 
 	return &HTTPClient{
-		baseURL: baseURL,
+		baseURL:   baseURL,
+		appSecret: appSecret,
 		httpClient: &http.Client{
 			Timeout: 8 * time.Second,
 		},
@@ -103,6 +106,25 @@ type wsOutboundEnvelope struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
+const (
+	maxHTTPPayloadBytes     int64 = 2 * 1024 * 1024  // 2 MB for standard responses
+	maxHTTPBulkPayloadBytes int64 = 10 * 1024 * 1024 // 10 MB for bulk chat history
+	maxWSPayloadBytes       int64 = 512 * 1024       // 512 KB per WebSocket message
+	maxRenderTextLength           = 8000             // Clamp message length before lipgloss rendering
+)
+
+func readLimitedBody(r io.Reader, limit int64) ([]byte, error) {
+	lr := io.LimitReader(r, limit+1)
+	bodyBytes, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, errors.New("Failed to read server response")
+	}
+	if int64(len(bodyBytes)) > limit {
+		return nil, errors.New("Server response exceeded maximum allowed payload size")
+	}
+	return bodyBytes, nil
+}
+
 func (h *HTTPClient) formatNetworkError(err error) error {
 	if errors.Is(err, os.ErrDeadlineExceeded) || strings.Contains(err.Error(), "Client.Timeout") {
 		return errors.New("Request timed out: chat server is taking too long to respond")
@@ -121,6 +143,10 @@ func (h *HTTPClient) newRequest(method, path string, body io.Reader) (*http.Requ
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(ClientHeaderApp, ClientAppName)
 	req.Header.Set("User-Agent", "tui-chat/1.0")
+
+	if h.appSecret != "" {
+		req.Header.Set(ClientHeaderSecret, h.appSecret)
+	}
 
 	h.mu.RLock()
 	token := h.profile.Token
@@ -149,9 +175,9 @@ func (h *HTTPClient) Login(username, password string) (*Profile, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPPayloadBytes)
 	if err != nil {
-		return nil, errors.New("Failed to read server response")
+		return nil, err
 	}
 
 	var res apiResponse[authData]
@@ -204,9 +230,9 @@ func (h *HTTPClient) Register(name, username, password string) (*Profile, error)
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPPayloadBytes)
 	if err != nil {
-		return nil, errors.New("Failed to read server response")
+		return nil, err
 	}
 
 	var res apiResponse[authData]
@@ -315,9 +341,9 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPPayloadBytes)
 	if err != nil {
-		return nil, errors.New("Failed to read server response")
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -420,9 +446,9 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPPayloadBytes)
 	if err != nil {
-		return nil, errors.New("Failed to read server response")
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -459,6 +485,10 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 		if isSelf {
 			senderName = "You"
 		}
+		text := c.Content
+		if len(text) > maxRenderTextLength {
+			text = text[:maxRenderTextLength] + "… [truncated]"
+		}
 		// API returns chats in DESC order (newest first).
 		// Store them chronologically (oldest at index 0, newest at bottom index n-1)
 		messages[n-1-i] = Message{
@@ -466,7 +496,7 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 			SenderID:  c.SenderID,
 			Sender:    senderName,
 			ConvID:    chatID,
-			Text:      c.Content,
+			Text:      text,
 			Timestamp: formatFriendlyTime(c.CreatedAt),
 			Self:      isSelf,
 		}
@@ -535,9 +565,9 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPBulkPayloadBytes)
 	if err != nil {
-		return nil, errors.New("Failed to read server response")
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -564,12 +594,17 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 			senderName = "You"
 		}
 
+		text := c.Content
+		if len(text) > maxRenderTextLength {
+			text = text[:maxRenderTextLength] + "… [truncated]"
+		}
+
 		msg := Message{
 			ID:        c.ID,
 			SenderID:  c.SenderID,
 			Sender:    senderName,
 			ConvID:    c.ConvID,
-			Text:      c.Content,
+			Text:      text,
 			Timestamp: formatFriendlyTime(c.CreatedAt),
 			Self:      isSelf,
 		}
@@ -688,6 +723,9 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 	header.Set("Authorization", "Bearer "+token)
 	header.Set(ClientHeaderApp, ClientAppName)
 	header.Set("User-Agent", "tui-chat/1.0")
+	if h.appSecret != "" {
+		header.Set(ClientHeaderSecret, h.appSecret)
+	}
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 5 * time.Second,
@@ -695,11 +733,18 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 
 	conn, resp, err := dialer.Dial(wsURL, header)
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-			return errors.New("Websocket authentication failed: unauthorized")
+		if resp != nil {
+			if resp.StatusCode == http.StatusForbidden {
+				return errors.New("Client verification failed: unauthorized app secret")
+			}
+			if resp.StatusCode == http.StatusUnauthorized {
+				return errors.New("Websocket authentication failed: unauthorized")
+			}
 		}
 		return errors.New("Chat server is currently offline or unreachable")
 	}
+
+	conn.SetReadLimit(maxWSPayloadBytes)
 
 	connDone := make(chan struct{})
 	h.wsDoneChan = connDone
@@ -763,11 +808,17 @@ func (h *HTTPClient) ConnectWS(eventsChan chan<- any) error {
 			case "chat_message":
 				var p WSChatMessagePayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
+					if len(p.Content) > maxRenderTextLength {
+						p.Content = p.Content[:maxRenderTextLength] + "… [truncated]"
+					}
 					sendEvent(p)
 				}
 			case "chat_notification":
 				var p WSChatNotificationPayload
 				if err := json.Unmarshal(env.Payload, &p); err == nil {
+					if len(p.Content) > maxRenderTextLength {
+						p.Content = p.Content[:maxRenderTextLength] + "… [truncated]"
+					}
 					sendEvent(p)
 				}
 			case "conversation_read":

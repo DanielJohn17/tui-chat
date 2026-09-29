@@ -26,7 +26,8 @@ import (
 func main() {
 	dbURL := config.ENV.GetDBURL()
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	conn, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -58,13 +59,13 @@ func main() {
 	// conversations
 	convRepo := conversations.NewConvRepository(q)
 	convService := conversations.NewConvService(convRepo, userService)
+	convHandler := conversations.NewConvHandler(convService)
 
 	// websocket conn for conversations
 	hub := ws.NewHub(convService)
 	go hub.Run()
 	wsHander := ws.NewWSHanler(hub, convService)
 
-	convHandler := conversations.NewConvHandler(convService)
 	// router
 	handlers := router.Handlers{
 		User: userHandler,
@@ -73,7 +74,7 @@ func main() {
 		WS:   wsHander,
 	}
 
-	router := router.NewRouter(handlers)
+	router := router.NewRouter(handlers, ctx)
 
 	serverAddr := config.ENV.GetServerAddr()
 
@@ -96,11 +97,8 @@ func main() {
 	}()
 
 	// Wait for OS interrupt signals
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	sig := <-quit
-	log.Printf("Received signal %v, initiating graceful shutdown...", sig)
+	<-ctx.Done()
+	log.Printf("Received shutdown signal, initiating graceful shutdown...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

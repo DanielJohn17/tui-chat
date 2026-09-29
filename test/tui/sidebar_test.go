@@ -59,6 +59,23 @@ func TestSidebarDimensionsAndNoOverflow(t *testing.T) {
 	}
 }
 
+func TestNarrowTerminalZeroWrapping(t *testing.T) {
+	widths := []int{45, 50, 60, 70}
+	for _, w := range widths {
+		c := newTestClient()
+		app := tea.Model(tui.NewApp(c))
+		app, _ = app.Update(tea.WindowSizeMsg{Width: w, Height: 24})
+		app, _ = app.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
+		v := app.View()
+		lines := strings.Split(v, "\n")
+		assert.Equal(t, 24, len(lines), "Height must be 24 for width %d", w)
+		for i, l := range lines {
+			lineWidth := lipgloss.Width(l)
+			assert.Equal(t, w, lineWidth, "Line %d width must equal terminal width %d (got %d)", i, w, lineWidth)
+		}
+	}
+}
+
 func TestSidebarAllElementsClickable(t *testing.T) {
 	// 1. Click [+n] button at top right of sidebar (Y: 1, X: 28) opens New DM modal
 	m1 := authenticatedApp()

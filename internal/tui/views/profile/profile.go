@@ -58,7 +58,10 @@ func New(c client.Client) Model {
 
 	ui := createInput(prof.Username, "Enter username", 25)
 
-	bioVal := "Hacking in the terminal 🚀"
+	bioVal := prof.Bio
+	if bioVal == "" {
+		bioVal = "Hacking in the terminal 🚀"
+	}
 	si := createInput(bioVal, "Set custom status / bio", 60)
 
 	return Model{
@@ -79,6 +82,11 @@ func (m *Model) ReloadProfile() {
 	prof := m.client.Profile()
 	m.nameInput.SetValue(prof.Name)
 	m.usernameInput.SetValue(prof.Username)
+	if prof.Bio != "" {
+		m.statusInput.SetValue(prof.Bio)
+	} else {
+		m.statusInput.SetValue("Hacking in the terminal 🚀")
+	}
 	m.successMsg = ""
 	m.errorMsg = ""
 	m.focusIndex = 0
@@ -175,11 +183,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.errorMsg = ""
 
 		switch msg.String() {
-		case "esc":
-			return m, func() tea.Msg { return BackToChatMsg{} }
-
-		case "l", "ctrl+l":
+		case "L", "ctrl+l":
 			return m, func() tea.Msg { return LogoutMsg{} }
+
+		case "l":
+			if m.focusIndex >= 3 {
+				return m, func() tea.Msg { return LogoutMsg{} }
+			}
 
 		case "tab", "down":
 			m.focusIndex = (m.focusIndex + 1) % 6
@@ -219,6 +229,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) save() (Model, tea.Cmd) {
 	name := strings.TrimSpace(m.nameInput.Value())
 	username := strings.TrimSpace(m.usernameInput.Value())
+	bio := strings.TrimSpace(m.statusInput.Value())
+	if bio == "" {
+		bio = "Hacking in the terminal 🚀"
+	}
 
 	if name == "" {
 		m.errorMsg = "Display Name cannot be empty"
@@ -236,9 +250,10 @@ func (m Model) save() (Model, tea.Cmd) {
 	currentProf := m.client.Profile()
 	currentProf.Name = name
 	currentProf.Username = username
+	currentProf.Bio = bio
 	m.client.UpdateProfile(currentProf)
 
-	m.successMsg = "✔ Profile changes saved successfully!"
+	m.successMsg = "✔ Profile changes saved locally to session"
 	m.errorMsg = ""
 
 	return m, func() tea.Msg {
@@ -265,7 +280,7 @@ func (m Model) View() string {
 	// 1. Page Header & Subtitle
 	badge := theme.StyleBadge.Render("PAGE: PROFILE EDIT")
 	title := theme.StyleTitle.Render("◈ EDIT USER PROFILE & IDENTITY ◈")
-	subtitle := theme.StyleDim.Render("Update your terminal account identity and broadcast status")
+	subtitle := theme.StyleDim.Render("Update your local session profile display and status")
 
 	header := lipgloss.JoinVertical(lipgloss.Center,
 		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(badge),
@@ -321,6 +336,7 @@ func (m Model) View() string {
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			renderDetail("Member Since:", created),
 			renderDetail("Status:", "● Connected & Authenticated"),
+			renderDetail("Sync:", "Local Session Only"),
 		))
 
 	// 4. Buttons
