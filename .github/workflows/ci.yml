@@ -26,12 +26,12 @@ jobs:
 
       - name: Run Tests
         env:
-          APP_SHARED_SECRET: dev-insecure-client-shared-secret-min-32-chars-long
+          APP_SHARED_SECRET: ci-test-shared-secret-not-for-production-usage-32
         run: go test -v ./...
 
       - name: Build Test API & TUI
         env:
-          APP_SHARED_SECRET: dev-insecure-client-shared-secret-min-32-chars-long
+          APP_SHARED_SECRET: ci-test-shared-secret-not-for-production-usage-32
         run: |
           go build -v ./cmd/api
-          go build -ldflags "-X main.DefaultAppSecret=dev-insecure-client-shared-secret-min-32-chars-long" -v ./cmd/tui
+          go build -ldflags "-X main.DefaultAppSecret=ci-test-shared-secret-not-for-production-usage-32" -v ./cmd/tui
