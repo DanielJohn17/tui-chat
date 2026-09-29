@@ -84,17 +84,27 @@ jobs:
           path: build/api
           retention-days: 1
 
+      - name: Determine Release Notes Path
+        id: release_notes
+        run: |
+          if [ -f ".github/releases/${{ github.ref_name }}.md" ]; then
+            echo "path=.github/releases/${{ github.ref_name }}.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Public GitHub Release (TUI Clients Only)
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: LineTalk ${{ github.ref_name }}
+          body_path: ${{ steps.release_notes.outputs.path }}
+          generate_release_notes: ${{ steps.release_notes.outputs.path == '' }}
           files: |
             dist/*
           draft: false
           prerelease: false
-          generate_release_notes: true
 
   deploy-to-cpanel:
     name: Auto Deploy to cPanel
