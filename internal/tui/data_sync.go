@@ -11,6 +11,8 @@ func (m *AppModel) handleChatsLoaded(msg ChatsLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		errStr := strings.ToLower(msg.Err.Error())
 		if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "invalid token") || strings.Contains(errStr, "401") || strings.Contains(errStr, "unauthenticated") {
+			m.cancelDiscovery()
+			m.modal = ModalNone
 			_ = m.client.Logout()
 			m.state = StateAuth
 			m.authView.SetErrorMessage("Session expired. Please log in again.")
@@ -72,7 +74,7 @@ func (m *AppModel) handleMessagesLoaded(msg MessagesLoadedMsg) (tea.Model, tea.C
 			msgs := m.client.Messages(msg.ChatID)
 			if len(msgs) > 0 {
 				lastMsg := msgs[len(msgs)-1]
-				_ = m.client.MarkRead(msg.ChatID, lastMsg.ID)
+				return *m, markReadCmd(m.client, msg.ChatID, lastMsg.ID)
 			}
 		}
 	} else {
