@@ -10,6 +10,7 @@ import (
 )
 
 type UserHandlerInt interface {
+	SearchUsers(c *gin.Context)
 	GetUserByUsername(c *gin.Context)
 	GetUserByID(c *gin.Context)
 }
@@ -23,6 +24,21 @@ func NewUserHandler(s UserServiceInt) *UserHandler {
 }
 
 var _ UserHandlerInt = (*UserHandler)(nil)
+
+func (h *UserHandler) SearchUsers(c *gin.Context) {
+	userID, ok := c.Get("userId")
+	id, valid := userID.(int64)
+	if !ok || !valid || id <= 0 {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
+		return
+	}
+	result, err := h.s.SearchUsers(c.Request.Context(), id, c.Query("q"))
+	if err != nil {
+		helpers.WriteError(c, err)
+		return
+	}
+	helpers.WriteJSON(c, http.StatusOK, result)
+}
 
 func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 

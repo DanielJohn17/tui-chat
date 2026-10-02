@@ -2,11 +2,14 @@ package users
 
 import (
 	"context"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/apierrs"
 )
 
 type UserServiceInt interface {
+	SearchUsers(ctx context.Context, userID int64, query string) (*SearchUsersResponse, error)
 	CreateUser(
 		ctx context.Context,
 		input CreateUserType,
@@ -37,6 +40,21 @@ func NewUserService(r UserRepositoryInt) *UserService {
 }
 
 var _ UserServiceInt = (*UserService)(nil)
+
+func (s *UserService) SearchUsers(ctx context.Context, userID int64, query string) (*SearchUsersResponse, error) {
+	query = strings.TrimSpace(query)
+	if n := utf8.RuneCountInString(query); !utf8.ValidString(query) || n < 2 || n > 20 {
+		return nil, apierrs.NewBadRequestError("query must be between 2 and 20 characters")
+	}
+	result, err := s.r.SearchUsers(ctx, userID, query)
+	if err != nil {
+		return nil, apierrs.NewInternalServerError("error searching users", err)
+	}
+	if result == nil {
+		result = []PublicUser{}
+	}
+	return &SearchUsersResponse{Users: result}, nil
+}
 
 func (s *UserService) CreateUser(
 	ctx context.Context,

@@ -1,9 +1,6 @@
 package tui
 
 import (
-	"time"
-
-	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -42,58 +39,25 @@ func (m *AppModel) handleHelpModalUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleNewDMModalUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if mouseMsg, ok := msg.(tea.MouseMsg); ok {
-		if mouseMsg.Action == tea.MouseActionPress && mouseMsg.Button == tea.MouseButtonLeft {
-			boxW := 48
-			boxH := 10
-			startX := (m.width - boxW) / 2
-			startY := (m.height - boxH) / 2
-			relY := mouseMsg.Y - startY
-			relX := mouseMsg.X - startX
-
-			if relY >= 5 && relY <= 8 && relX >= 0 && relX < boxW {
-				if relX < boxW/2 {
-					return m.submitNewDM()
-				}
-				m.modal = ModalNone
-				return *m, nil
-			}
-		}
-	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "esc":
+			m.cancelDiscovery()
 			m.modal = ModalNone
 			return *m, nil
+		case "ctrl+c":
+			m.cancelDiscovery()
+			return *m, tea.Quit
 		case "enter":
 			return m.submitNewDM()
 		}
 	}
 
+	before := m.newDMView.Value()
 	var cmd tea.Cmd
 	m.newDMView, cmd = m.newDMView.Update(msg)
+	if m.newDMView.Value() != before {
+		return *m, tea.Batch(cmd, m.scheduleDiscovery())
+	}
 	return *m, cmd
-}
-
-func (m *AppModel) submitNewDM() (tea.Model, tea.Cmd) {
-	username := m.newDMView.Value()
-	if len(username) < 3 {
-		m.newDMView.SetError("Username must be at least 3 characters")
-		return *m, nil
-	}
-	chats := m.client.Chats()
-	newChat := client.Chat{
-		ID:          time.Now().UnixNano(),
-		RecipientID: 0,
-		Name:        username,
-		Username:    username,
-		Time:        "now",
-		Unread:      0,
-		Online:      false,
-	}
-	m.client.SetChats(append([]client.Chat{newChat}, chats...))
-	m.sidebarView.SelectIndex(0)
-	m.chatView.SetActiveChat(newChat.ID)
-	m.modal = ModalNone
-	return *m, nil
 }

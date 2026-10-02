@@ -66,8 +66,7 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 			m.chatView.FocusInput()
 			return *m, nil, true
 		} else if normX >= 0.50 && normX < 0.60 {
-			m.modal = ModalNewDM
-			m.newDMView.Reset()
+			m.openDiscovery()
 			return *m, nil, true
 		} else if normX >= 0.60 && normX < 0.72 {
 			m.state = StateProfile
@@ -84,8 +83,7 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 	if mouseMsg.X < sidebarWidth && mouseMsg.Y < mainHeight {
 		clickedChat, clickedNewDM, clickedProfile := m.sidebarView.HandleClick(mouseMsg.X, mouseMsg.Y)
 		if clickedNewDM {
-			m.modal = ModalNewDM
-			m.newDMView.Reset()
+			m.openDiscovery()
 			return *m, nil, true
 		}
 		if clickedProfile {

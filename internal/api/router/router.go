@@ -48,6 +48,7 @@ func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 	subRouter.Use(middleware.Auth())
 	{
 		// users routes
+		subRouter.GET("/users/search", middleware.AuthRateLimiter(ctx, 60, 20), h.User.SearchUsers)
 		subRouter.GET(
 			"/users/:id",
 			middleware.ValidateURIParams[types.URLParamInt](),
