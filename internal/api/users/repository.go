@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/api/database"
 )
 
 type UserRepositoryInt interface {
+	SearchUsers(ctx context.Context, userID int64, query string) ([]PublicUser, error)
 	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
 	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
 	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
@@ -17,6 +19,7 @@ type UserRepositoryInt interface {
 }
 
 type UserQuerier interface {
+	SearchUsers(ctx context.Context, arg database.SearchUsersParams) ([]database.SearchUsersRow, error)
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error)
 	GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error)
 	GetUserById(ctx context.Context, id int64) (database.GetUserByIdRow, error)
@@ -32,6 +35,23 @@ func NewUserRepository(q UserQuerier) *UserRepository {
 }
 
 var _ UserRepositoryInt = (*UserRepository)(nil)
+
+func (r *UserRepository) SearchUsers(ctx context.Context, userID int64, query string) ([]PublicUser, error) {
+	pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query) + "%"
+	rows, err := r.q.SearchUsers(ctx, database.SearchUsersParams{
+		UserID:  userID,
+		Pattern: pattern,
+		Query:   query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search users: %w", err)
+	}
+	result := make([]PublicUser, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, PublicUser{ID: row.ID, Name: row.Name, Username: row.Username})
+	}
+	return result, nil
+}
 
 func (r *UserRepository) CreateUser(
 	ctx context.Context,

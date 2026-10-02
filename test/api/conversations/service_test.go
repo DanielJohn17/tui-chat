@@ -140,6 +140,14 @@ type MockUserService struct {
 	mock.Mock
 }
 
+func (m *MockUserService) SearchUsers(ctx context.Context, userID int64, query string) (*users.SearchUsersResponse, error) {
+	args := m.Called(ctx, userID, query)
+	if res := args.Get(0); res != nil {
+		return res.(*users.SearchUsersResponse), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockUserService) CreateUser(
 	ctx context.Context,
 	input users.CreateUserType,

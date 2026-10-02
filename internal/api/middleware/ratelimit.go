@@ -60,7 +60,7 @@ func AuthRateLimiter(ctx context.Context, ratePerMinute float64, burst int) gin.
 			c.Header("Retry-After", "15")
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"success": false,
-				"error":   "Too many unauthenticated attempts. Please slow down and try again.",
+				"error":   "Too many requests. Please slow down and try again.",
 			})
 
 			return
