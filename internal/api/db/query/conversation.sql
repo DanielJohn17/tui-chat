@@ -16,20 +16,14 @@ new_conv AS (
     FROM
         params
     ON CONFLICT (user_min_id, user_max_id) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
-    DO NOTHING
+    -- RETURNING also exposes a concurrent winner outside this statement's snapshot.
+    DO UPDATE SET user_min_id = EXCLUDED.user_min_id
     RETURNING
         id
 ),
 
 target_conv AS (
     SELECT id FROM new_conv
-    UNION ALL
-    SELECT c.id
-    FROM conversations c, params p
-    WHERE c.user_min_id = p.min_id
-      AND c.user_max_id = p.max_id
-      AND c.is_deleting = FALSE
-    LIMIT 1
 ),
 
 inserted_participants AS (
@@ -51,8 +45,10 @@ SELECT
     u.username
 FROM
     target_conv tc
-JOIN participants p ON p.conv_id = tc.id
-JOIN users u ON u.id = p.user_id;
+-- Base-table scans cannot see participants inserted by a sibling CTE.
+CROSS JOIN (VALUES (sqlc.arg(user_id)::bigint), (sqlc.arg(user_id_2)::bigint)) AS requested(id)
+JOIN users u ON u.id = requested.id
+ORDER BY u.id;
 
 -- name: GetConversationsByUserId :many
 WITH
