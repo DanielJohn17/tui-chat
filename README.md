@@ -206,6 +206,25 @@ LineTalk is designed for fluid, 100% keyboard-driven interaction:
 | <kbd>?</kbd> / <kbd>Ctrl+H</kbd> / <kbd>F1</kbd> | Global | Open **Interactive Keybinding Help** |
 | <kbd>q</kbd> / <kbd>Ctrl+C</kbd> | Global | Quit LineTalk cleanly |
 
+### Find Someone And Chat
+
+Press `Esc` if you are typing, then `n` to open New Direct Message. Enter at least
+two characters of a username. Search is case-insensitive and matches username
+prefixes, returning up to 20 users with their display names and handles.
+Use the up/down arrows to select a result, `Enter` to open the conversation, or
+`Esc` to cancel. Existing conversations are reused; new conversations are saved
+on the server before appearing in the sidebar. Press `i` to start typing.
+
+Discovery is available to authenticated users through
+`GET /api/v1/users/search?q=...`. Results contain only ID, name, and username and
+exclude your own account. Friendship requests and private discovery settings are
+not part of this feature.
+
+Database integration tests require `TEST_DATABASE_URL` pointing to a disposable
+PostgreSQL database. They apply the project migrations and test search and
+concurrent DM creation. The password-free query test also requires permission to
+create a temporary test role. Run them with `make test-api`.
+
 ---
 
 ## 📋 Makefile Reference
