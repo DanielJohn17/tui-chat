@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/DanielJohn17/tui-chat/internal/tui/views/auth"
 	"github.com/DanielJohn17/tui-chat/internal/tui/views/chat"
@@ -96,6 +98,43 @@ func connectWSCmd(c client.Client, eventsChan chan any) tea.Cmd {
 	}
 }
 
+func ensureIdentityKeyCmd(c client.Client) tea.Cmd {
+	return func() tea.Msg {
+		goEnv := os.Getenv("GO_ENV")
+		sessionName := os.Getenv("TUI_CHAT_SESSION")
+		keyPath := crypto.ResolveIdentityKeyPath(goEnv, sessionName)
+		
+		key, err := crypto.LoadOrCreateIdentityKey(keyPath)
+		if err != nil {
+			return IdentityKeyResultMsg{Err: err}
+		}
+		
+		c.SetIdentityKey(key)
+		return IdentityKeyResultMsg{Key: key}
+	}
+}
+
+func uploadPublicKeyCmd(c client.Client) tea.Cmd {
+	return func() tea.Msg {
+		key := c.IdentityKey()
+		if key == nil {
+			return nil
+		}
+		var pubArr []byte = key.PublicKey[:]
+		err := c.UploadPublicKey(pubArr)
+		return PublicKeyUploadedMsg{Err: err}
+	}
+}
+
+type IdentityKeyResultMsg struct {
+	Key *crypto.IdentityKey
+	Err error
+}
+
+type PublicKeyUploadedMsg struct {
+	Err error
+}
+
 type AppModel struct {
 	client       client.Client
 	state        AppState
@@ -174,6 +213,7 @@ func (m AppModel) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		tea.EnterAltScreen,
 		m.authView.Init(),
+		ensureIdentityKeyCmd(m.client),
 	}
 	if m.client.IsAuthenticated() {
 		m.connStatus = statusbar.StatusConnecting
@@ -232,6 +272,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleResize(msg.Width, msg.Height)
 		return m, nil
 
+	case IdentityKeyResultMsg:
+		if msg.Err == nil && m.client.IsAuthenticated() {
+			return m, uploadPublicKeyCmd(m.client)
+		}
+		return m, nil
+
+	case PublicKeyUploadedMsg:
+		return m, nil
+
 	case auth.AuthSuccessMsg:
 		m.state = StateChat
 		m.client.SetProfile(msg.Profile)
@@ -241,6 +290,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.retrySecondsLeft = 0
 		m.spinnerActive = true
 		return m, tea.Batch(
+			uploadPublicKeyCmd(m.client),
 			fetchChatsCmd(m.client),
 			connectWSCmd(m.client, m.wsEventsChan),
 			m.listenWSCmd(),

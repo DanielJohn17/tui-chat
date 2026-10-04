@@ -7,6 +7,7 @@ import (
 	"github.com/DanielJohn17/tui-chat/internal/api/auth"
 	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
+	"github.com/DanielJohn17/tui-chat/internal/api/keys"
 	"github.com/DanielJohn17/tui-chat/internal/api/middleware"
 	"github.com/DanielJohn17/tui-chat/internal/api/types"
 	"github.com/DanielJohn17/tui-chat/internal/api/users"
@@ -19,6 +20,7 @@ type Handlers struct {
 	Auth auth.AuthHandlerInt
 	Conv conversations.ConvHandlerInt
 	WS   ws.WSHandlerInt
+	Keys keys.KeyHandlerInt
 }
 
 func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
@@ -77,6 +79,10 @@ func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 			"/ws",
 			h.WS.HandleWS,
 		)
+
+		// public key exchange for E2EE
+		subRouter.PUT("/keys/me", h.Keys.UploadPublicKey)
+		subRouter.GET("/keys/:user_id", h.Keys.GetPublicKey)
 	}
 	return router
 }

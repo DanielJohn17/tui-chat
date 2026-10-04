@@ -16,6 +16,7 @@ import (
 	"github.com/DanielJohn17/tui-chat/internal/api/conversations"
 	"github.com/DanielJohn17/tui-chat/internal/api/database"
 	"github.com/DanielJohn17/tui-chat/internal/api/db"
+	"github.com/DanielJohn17/tui-chat/internal/api/keys"
 	"github.com/DanielJohn17/tui-chat/internal/api/router"
 	"github.com/DanielJohn17/tui-chat/internal/api/users"
 	"github.com/DanielJohn17/tui-chat/internal/api/ws"
@@ -66,12 +67,17 @@ func main() {
 	go hub.Run()
 	wsHander := ws.NewWSHanler(hub, convService)
 
+	// keys
+	keyService := keys.NewKeyService(userService)
+	keyHandler := keys.NewKeyHandler(keyService)
+
 	// router
 	handlers := router.Handlers{
 		User: userHandler,
 		Auth: authHandler,
 		Conv: convHandler,
 		WS:   wsHander,
+		Keys: keyHandler,
 	}
 
 	router := router.NewRouter(handlers, ctx)

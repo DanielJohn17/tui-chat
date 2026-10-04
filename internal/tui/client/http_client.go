@@ -39,6 +39,11 @@ type HTTPClient struct {
 	wsIntentionalClose atomic.Bool
 	wsDoneChan         chan struct{}
 	wsMu               sync.Mutex
+
+	// E2EE fields
+	identityKey *crypto.IdentityKey
+	peerPubKeys map[int64][32]byte // userID → cached public key
+	peerKeyMu   sync.RWMutex
 }
 
 func NewHTTPClient(baseURL, appSecret string) Client {
@@ -58,6 +63,7 @@ func NewHTTPClient(baseURL, appSecret string) Client {
 		},
 		onlineUsers: make(map[int64]bool),
 		messages:    make(map[int64][]Message),
+		peerPubKeys: make(map[int64][32]byte),
 	}
 }
 
@@ -465,10 +471,12 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	}
 
 	var recipientName string
+	var recipientID int64
 	h.mu.RLock()
 	for _, ch := range h.chats {
 		if ch.ID == chatID {
 			recipientName = ch.Name
+			recipientID = ch.RecipientID
 			if recipientName == "" {
 				recipientName = ch.Username
 			}
@@ -476,6 +484,21 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 		}
 	}
 	h.mu.RUnlock()
+
+	var symKey [32]byte
+	var hasSymKey bool
+	if recipientID != 0 {
+		if peerPub, err := h.GetPeerPublicKey(recipientID); err == nil {
+			var peerArr [32]byte
+			copy(peerArr[:], peerPub)
+			if idKey := h.IdentityKey(); idKey != nil {
+				if key, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+					symKey = key
+					hasSymKey = true
+				}
+			}
+		}
+	}
 
 	n := len(res.Data)
 	messages := make([]Message, n)
@@ -485,7 +508,22 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 		if isSelf {
 			senderName = "You"
 		}
+		
 		text := c.Content
+		if hasSymKey {
+			decrypted, err := crypto.Decrypt(symKey, text)
+			if err == nil {
+				text = decrypted
+			} else if errors.Is(err, crypto.ErrLegacyMessage) {
+				// use text as-is
+			} else {
+				text = "[legacy message — not encrypted]"
+			}
+		} else if text != "" && !strings.Contains(text, " ") && len(text) > 20 {
+			// fallback if we have ciphertext but no key
+			text = "[legacy message — not encrypted]"
+		}
+
 		if len(text) > maxRenderTextLength {
 			text = text[:maxRenderTextLength] + "… [truncated]"
 		}
@@ -544,14 +582,30 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 	epoch := h.sessionEpoch
 	currentUserID := h.profile.ID
 	chatsMap := make(map[int64]string)
+	recipientMap := make(map[int64]int64)
 	for _, ch := range h.chats {
 		name := ch.Name
 		if name == "" {
 			name = ch.Username
 		}
 		chatsMap[ch.ID] = name
+		recipientMap[ch.ID] = ch.RecipientID
 	}
 	h.mu.RUnlock()
+
+	// Pre-derive symmetric keys for all conversations
+	symKeys := make(map[int64][32]byte) // map convID -> key
+	if idKey := h.IdentityKey(); idKey != nil {
+		for convID, peerID := range recipientMap {
+			if peerPub, err := h.GetPeerPublicKey(peerID); err == nil {
+				var peerArr [32]byte
+				copy(peerArr[:], peerPub)
+				if key, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+					symKeys[convID] = key
+				}
+			}
+		}
+	}
 
 	path := "/api/v1/conversations/bulk"
 	req, err := h.newRequest(http.MethodGet, path, nil)
@@ -595,6 +649,19 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 		}
 
 		text := c.Content
+		if symKey, ok := symKeys[c.ConvID]; ok {
+			decrypted, err := crypto.Decrypt(symKey, text)
+			if err == nil {
+				text = decrypted
+			} else if errors.Is(err, crypto.ErrLegacyMessage) {
+				// keep text as-is
+			} else {
+				text = "[legacy message — not encrypted]"
+			}
+		} else if text != "" && !strings.Contains(text, " ") && len(text) > 20 {
+			text = "[legacy message — not encrypted]"
+		}
+
 		if len(text) > maxRenderTextLength {
 			text = text[:maxRenderTextLength] + "… [truncated]"
 		}
@@ -875,6 +942,47 @@ func (h *HTTPClient) IsWSConnected() bool {
 }
 
 func (h *HTTPClient) SendWS(convID int64, text string) error {
+	// 1. Find recipient ID
+	h.mu.RLock()
+	var recipientID int64
+	for _, c := range h.chats {
+		if c.ID == convID {
+			recipientID = c.RecipientID
+			break
+		}
+	}
+	h.mu.RUnlock()
+
+	if recipientID == 0 {
+		return errors.New("chat not found")
+	}
+
+	// 2. Fetch peer public key
+	peerPub, err := h.GetPeerPublicKey(recipientID)
+	if err != nil {
+		return fmt.Errorf("failed to get peer public key: %w", err)
+	}
+
+	// 3. Derive symmetric key
+	var peerPubArr [32]byte
+	copy(peerPubArr[:], peerPub)
+
+	idKey := h.IdentityKey()
+	if idKey == nil {
+		return errors.New("identity key not loaded")
+	}
+
+	symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerPubArr)
+	if err != nil {
+		return fmt.Errorf("failed to derive key: %w", err)
+	}
+
+	// 4. Encrypt
+	encrypted, err := crypto.Encrypt(symKey, text)
+	if err != nil {
+		return fmt.Errorf("encryption failed: %w", err)
+	}
+
 	h.wsMu.Lock()
 	defer h.wsMu.Unlock()
 
@@ -884,7 +992,7 @@ func (h *HTTPClient) SendWS(convID int64, text string) error {
 
 	payload, _ := json.Marshal(map[string]any{
 		"conv_id": convID,
-		"content": text,
+		"content": encrypted,
 	})
 
 	inbound := wsInboundEnvelope{
@@ -974,4 +1082,91 @@ func formatFriendlyTime(tStr string) string {
 		return t.Format("Jan 02")
 	}
 	return t.Format("02/01/06")
+}
+
+// E2EE implementations
+
+func (h *HTTPClient) SetIdentityKey(key *crypto.IdentityKey) {
+	h.peerKeyMu.Lock()
+	defer h.peerKeyMu.Unlock()
+	h.identityKey = key
+}
+
+func (h *HTTPClient) IdentityKey() *crypto.IdentityKey {
+	h.peerKeyMu.RLock()
+	defer h.peerKeyMu.RUnlock()
+	return h.identityKey
+}
+
+func (h *HTTPClient) UploadPublicKey(pubKey []byte) error {
+	hexKey := fmt.Sprintf("%x", pubKey)
+	reqBody, _ := json.Marshal(map[string]string{
+		"public_key": hexKey,
+	})
+
+	req, err := h.newRequest(http.MethodPut, "/api/v1/keys/me", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return h.formatNetworkError(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to upload public key: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
+	h.peerKeyMu.RLock()
+	cached, ok := h.peerPubKeys[userID]
+	h.peerKeyMu.RUnlock()
+	if ok {
+		return cached[:], nil
+	}
+
+	req, err := h.newRequest(http.MethodGet, fmt.Sprintf("/api/v1/keys/%d", userID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return nil, h.formatNetworkError(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch peer public key: HTTP %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := readLimitedBody(resp.Body, maxHTTPPayloadBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// PublicKeyResponse has { user_id, public_key string }
+	var res apiResponse[struct {
+		UserID    int64  `json:"user_id"`
+		PublicKey string `json:"public_key"`
+	}]
+	if err := json.Unmarshal(bodyBytes, &res); err != nil {
+		return nil, errors.New("invalid public key response")
+	}
+
+	var pubKeyBytes [32]byte
+	_, err = fmt.Sscanf(res.Data.PublicKey, "%x", &pubKeyBytes)
+	if err != nil {
+		return nil, errors.New("invalid hex in public key response")
+	}
+
+	h.peerKeyMu.Lock()
+	h.peerPubKeys[userID] = pubKeyBytes
+	h.peerKeyMu.Unlock()
+
+	return pubKeyBytes[:], nil
 }

@@ -68,9 +68,11 @@ func (m *AppModel) triggerNotification(sender, content string) tea.Cmd {
 
 func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 	senderName := "Recipient"
+	var peerID int64
 	chats := m.client.Chats()
 	for _, ch := range chats {
 		if ch.ID == p.ConvID {
+			peerID = ch.RecipientID
 			senderName = ch.Name
 			if senderName == "" {
 				senderName = ch.Username
@@ -83,11 +85,29 @@ func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 		senderName = "You"
 	}
 
+	// Decrypt content
+	text := p.Content
+	if peerID != 0 {
+		if peerPub, err := m.client.GetPeerPublicKey(peerID); err == nil {
+			var peerArr [32]byte
+			copy(peerArr[:], peerPub)
+			if idKey := m.client.IdentityKey(); idKey != nil {
+				if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+					if dec, err := crypto.Decrypt(symKey, text); err == nil {
+						text = dec
+					} else if !errors.Is(err, crypto.ErrLegacyMessage) {
+						text = "[legacy message — not encrypted]"
+					}
+				}
+			}
+		}
+	}
+
 	// Check if message is already stored in client memory (avoids duplication on sender window)
 	existing := m.client.Messages(p.ConvID)
 	alreadyExists := false
 	for _, ex := range existing {
-		if (p.ID > 0 && ex.ID == p.ID) || (isSelf && ex.ID == 0 && ex.Text == p.Content) {
+		if (p.ID > 0 && ex.ID == p.ID) || (isSelf && ex.ID == 0 && ex.Text == text) {
 			alreadyExists = true
 			break
 		}
@@ -99,7 +119,7 @@ func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 			SenderID:  p.SenderID,
 			Sender:    senderName,
 			ConvID:    p.ConvID,
-			Text:      p.Content,
+			Text:      text,
 			Timestamp: "now",
 			Self:      isSelf,
 		})
@@ -113,15 +133,15 @@ func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 		if !isSelf {
 			_ = m.client.MarkRead(p.ConvID, p.ID)
 		}
-		m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, nil)
+		m.client.UpdateChatSnippet(p.ConvID, text, "now", 0, nil)
 	} else {
 		unreadDelta := 1
 		if isSelf {
 			unreadDelta = 0
 		}
-		m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", unreadDelta, nil)
+		m.client.UpdateChatSnippet(p.ConvID, text, "now", unreadDelta, nil)
 		if !isSelf {
-			notifCmd = m.triggerNotification(senderName, p.Content)
+			notifCmd = m.triggerNotification(senderName, text)
 		}
 	}
 
@@ -139,6 +159,21 @@ func (m *AppModel) handleWSChatNotification(p client.WSChatNotificationPayload) 
 		senderName = "User"
 	}
 
+	text := p.Content
+	if peerPub, err := m.client.GetPeerPublicKey(p.SenderID); err == nil {
+		var peerArr [32]byte
+		copy(peerArr[:], peerPub)
+		if idKey := m.client.IdentityKey(); idKey != nil {
+			if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+				if dec, err := crypto.Decrypt(symKey, text); err == nil {
+					text = dec
+				} else if !errors.Is(err, crypto.ErrLegacyMessage) {
+					text = "[legacy message — not encrypted]"
+				}
+			}
+		}
+	}
+
 	// 1. Check if conversation exists in sidebar list; if not, create/prepend it!
 	chats := m.client.Chats()
 	found := false
@@ -154,21 +189,21 @@ func (m *AppModel) handleWSChatNotification(p client.WSChatNotificationPayload) 
 			RecipientID: p.SenderID,
 			Name:        p.SenderName,
 			Username:    p.SenderName,
-			LastMessage: p.Content,
+			LastMessage: text,
 			Time:        "now",
 			Unread:      p.UnreadCount,
 			Online:      true,
 		}
 		m.client.SetChats(append([]client.Chat{newChat}, chats...))
 	} else {
-		m.client.UpdateChatSnippet(p.ConvID, p.Content, "now", 0, &p.UnreadCount)
+		m.client.UpdateChatSnippet(p.ConvID, text, "now", 0, &p.UnreadCount)
 	}
 
 	// 2. Append message to local message buffer so opening this chat shows the message
 	existing := m.client.Messages(p.ConvID)
 	alreadyExists := false
 	for _, ex := range existing {
-		if ex.Text == p.Content && ex.Timestamp == "now" {
+		if ex.Text == text && ex.Timestamp == "now" {
 			alreadyExists = true
 			break
 		}
@@ -179,7 +214,7 @@ func (m *AppModel) handleWSChatNotification(p client.WSChatNotificationPayload) 
 			SenderID:  p.SenderID,
 			Sender:    senderName,
 			ConvID:    p.ConvID,
-			Text:      p.Content,
+			Text:      text,
 			Timestamp: "now",
 			Self:      false,
 		})
@@ -191,7 +226,7 @@ func (m *AppModel) handleWSChatNotification(p client.WSChatNotificationPayload) 
 	}
 
 	// 4. Trigger visual notification and terminal bell
-	return m.triggerNotification(senderName, p.Content)
+	return m.triggerNotification(senderName, text)
 }
 
 func (m *AppModel) handleWSConversationRead(p client.WSConversationReadPayload) {

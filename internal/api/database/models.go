@@ -37,6 +37,7 @@ type User struct {
 	Name      string
 	Username  string
 	Password  string
+	PublicKey []byte
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 }
@@ -46,6 +47,7 @@ type UsersArchive struct {
 	Name      string
 	Username  string
 	Password  string
+	PublicKey []byte
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 	DeletedAt pgtype.Timestamptz

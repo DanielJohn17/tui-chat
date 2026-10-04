@@ -1,5 +1,7 @@
 package client
 
+import "github.com/DanielJohn17/tui-chat/internal/tui/crypto"
+
 type Profile struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
@@ -106,4 +108,14 @@ type Client interface {
 	FocusConv(convID int64) error
 	MarkRead(convID int64, messageID int64) error
 	IsWSConnected() bool
+
+	// E2EE operations
+	// SetIdentityKey stores the local X25519 identity key for use in all crypto operations.
+	SetIdentityKey(key *crypto.IdentityKey)
+	// IdentityKey returns the local identity key, or nil if not yet initialised.
+	IdentityKey() *crypto.IdentityKey
+	// UploadPublicKey publishes the local public key to the server so peers can derive shared keys.
+	UploadPublicKey(pubKey []byte) error
+	// GetPeerPublicKey fetches and caches a peer's public key from the server.
+	GetPeerPublicKey(userID int64) ([]byte, error)
 }
