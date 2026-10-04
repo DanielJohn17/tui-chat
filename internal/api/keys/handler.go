@@ -26,20 +26,25 @@ func NewKeyHandler(s KeyServiceInt) *KeyHandler {
 var _ KeyHandlerInt = (*KeyHandler)(nil)
 
 func (h *KeyHandler) UploadPublicKey(c *gin.Context) {
-	claims, err := helpers.GetClaimsFromContext(c)
-	if err != nil {
-		apierrs.RespondWithError(c, apierrs.NewUnauthorizedError("unauthorized"))
+	userIDAny, exists := c.Get("userId")
+	if !exists {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
+		return
+	}
+	userID, ok := userIDAny.(int64)
+	if !ok {
+		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	var req UploadPublicKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apierrs.RespondWithError(c, apierrs.NewBadRequestError(err.Error()))
+		helpers.WriteError(c, apierrs.NewBadRequestError(err.Error()))
 		return
 	}
 
-	if err := h.s.UploadPublicKey(c.Request.Context(), claims.ID, req.PublicKey); err != nil {
-		apierrs.RespondWithError(c, err)
+	if err := h.s.UploadPublicKey(c.Request.Context(), userID, req.PublicKey); err != nil {
+		helpers.WriteError(c, err)
 		return
 	}
 
@@ -50,13 +55,13 @@ func (h *KeyHandler) GetPublicKey(c *gin.Context) {
 	userIDStr := c.Param("user_id")
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil || userID <= 0 {
-		apierrs.RespondWithError(c, apierrs.NewBadRequestError("invalid user_id"))
+		helpers.WriteError(c, apierrs.NewBadRequestError("invalid user_id"))
 		return
 	}
 
 	resp, err := h.s.GetPublicKey(c.Request.Context(), userID)
 	if err != nil {
-		apierrs.RespondWithError(c, err)
+		helpers.WriteError(c, err)
 		return
 	}
 

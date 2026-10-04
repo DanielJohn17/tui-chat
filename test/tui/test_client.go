@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 )
 
 type TestClient struct {
@@ -361,4 +362,18 @@ func (m *TestClient) MarkRead(convID int64, messageID int64) error {
 
 func (m *TestClient) IsWSConnected() bool {
 	return m.wsConnected
+}
+
+func (m *TestClient) SetIdentityKey(key *crypto.IdentityKey) {}
+
+func (m *TestClient) IdentityKey() *crypto.IdentityKey {
+	return nil
+}
+
+func (m *TestClient) UploadPublicKey(pubKey []byte) error {
+	return nil
+}
+
+func (m *TestClient) GetPeerPublicKey(peerID int64) ([]byte, error) {
+	return nil, nil
 }

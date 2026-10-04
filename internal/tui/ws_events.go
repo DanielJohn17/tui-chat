@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 )

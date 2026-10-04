@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 	"github.com/gorilla/websocket"
 )
 
