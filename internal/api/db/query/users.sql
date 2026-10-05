@@ -10,6 +10,15 @@ RETURNING
     created_at,
     updated_at;
 
+-- name: SearchUsers :many
+SELECT id, name, username
+FROM users
+WHERE id <> sqlc.arg(user_id)::bigint
+  AND LOWER(username) LIKE LOWER(sqlc.arg(pattern)::text) ESCAPE '\'
+ORDER BY (LOWER(username) = LOWER(sqlc.arg(query)::text)) DESC,
+         LOWER(username) COLLATE "C", username COLLATE "C", id
+LIMIT 20;
+
 -- name: GetUserByUsername :one
 SELECT
     id,

@@ -1,6 +1,16 @@
 // Package users
 package users
 
+type PublicUser struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+}
+
+type SearchUsersResponse struct {
+	Users []PublicUser `json:"users"`
+}
+
 type CreateUserType struct {
 	Name     string
 	Username string

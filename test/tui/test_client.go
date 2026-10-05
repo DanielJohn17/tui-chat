@@ -1,6 +1,9 @@
 package test
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
@@ -241,6 +244,31 @@ func (m *TestClient) UpdateProfile(p client.Profile) {
 
 func (m *TestClient) FetchChats() ([]client.Chat, error) {
 	return m.Chats(), nil
+}
+
+func (m *TestClient) SearchUsers(ctx context.Context, query string) ([]client.UserSummary, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	users := []client.UserSummary{}
+	for _, ch := range m.chats {
+		if strings.HasPrefix(strings.ToLower(ch.Username), strings.ToLower(query)) && ch.RecipientID != m.profile.ID {
+			users = append(users, client.UserSummary{ID: ch.RecipientID, Name: ch.Name, Username: ch.Username})
+		}
+	}
+	return users, nil
+}
+
+func (m *TestClient) OpenDirectConversation(ctx context.Context, userID int64) (client.Chat, error) {
+	if err := ctx.Err(); err != nil {
+		return client.Chat{}, err
+	}
+	for _, ch := range m.chats {
+		if ch.RecipientID == userID {
+			return ch, nil
+		}
+	}
+	return client.Chat{}, fmt.Errorf("user not found")
 }
 
 func (m *TestClient) Chats() []client.Chat {

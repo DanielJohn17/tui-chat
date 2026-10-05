@@ -111,8 +111,7 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return *m, nil
 
 		case "n":
-			m.modal = ModalNewDM
-			m.newDMView.Reset()
+			m.openDiscovery()
 			return *m, nil
 
 		case "p":

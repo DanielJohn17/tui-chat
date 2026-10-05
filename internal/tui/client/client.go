@@ -1,5 +1,13 @@
 package client
 
+import "context"
+
+type UserSummary struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+}
+
 type Profile struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
@@ -88,6 +96,8 @@ type Client interface {
 	SetSessionPath(string)
 
 	// REST Data operations
+	SearchUsers(context.Context, string) ([]UserSummary, error)
+	OpenDirectConversation(context.Context, int64) (Chat, error)
 	FetchChats() ([]Chat, error)
 	Chats() []Chat
 	SetChats([]Chat)
