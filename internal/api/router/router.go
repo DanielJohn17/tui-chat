@@ -40,15 +40,15 @@ func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 	subRouter := router.Group("/api/v1")
 
 	// Public auth routes
-	authLimiter := middleware.AuthRateLimiter(ctx, 10, 15)
+	rateLimiter := middleware.RateLimiter(ctx, 10, 15)
 
-	subRouter.POST("/auth/register", authLimiter, h.Auth.RegisterUser)
-	subRouter.POST("/auth/login", authLimiter, h.Auth.LoginUser)
+	subRouter.POST("/auth/register", rateLimiter, h.Auth.RegisterUser)
+	subRouter.POST("/auth/login", rateLimiter, h.Auth.LoginUser)
 
 	subRouter.Use(middleware.Auth())
 	{
 		// users routes
-		subRouter.GET("/users/search", middleware.AuthRateLimiter(ctx, 60, 20), h.User.SearchUsers)
+		subRouter.GET("/users/search", middleware.RateLimiter(ctx, 60, 20), h.User.SearchUsers)
 		subRouter.GET(
 			"/users/:id",
 			middleware.ValidateURIParams[types.URLParamInt](),

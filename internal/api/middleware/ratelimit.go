@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -9,18 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ipLimiter struct {
+type tokenLimiter struct {
 	tokens     float64
 	lastRefill time.Time
 }
 
-// AuthRateLimiter creates an IP-based token-bucket rate limiter.
+// RateLimiter creates a token-bucket rate limiter that keys by (userID + IP).
 // ctx: context with cancel
 // ratePerMinute: number of tokens replenished per minute (e.g. 5)
 // burst: maximum burst capacity (e.g. 10)
-func AuthRateLimiter(ctx context.Context, ratePerMinute float64, burst int) gin.HandlerFunc {
+func RateLimiter(ctx context.Context, ratePerMinute float64, burst int) gin.HandlerFunc {
 	var mu sync.Mutex
-	clients := make(map[string]*ipLimiter)
+	clients := make(map[string]*tokenLimiter)
 
 	// prevents a panic on <-ctx.Done() if a test ever calls the router or middleware with a nil context.
 	if ctx == nil {
@@ -31,17 +32,17 @@ func AuthRateLimiter(ctx context.Context, ratePerMinute float64, burst int) gin.
 
 	ratePerSec := ratePerMinute / 60.0
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		key := resolveClientKey(c)
 		now := time.Now()
 
 		mu.Lock()
-		lim, exists := clients[ip]
+		lim, exists := clients[key]
 		if !exists {
-			lim = &ipLimiter{
+			lim = &tokenLimiter{
 				tokens:     float64(burst) - 1.0,
 				lastRefill: now,
 			}
-			clients[ip] = lim
+			clients[key] = lim
 			mu.Unlock()
 			c.Next()
 			return
@@ -72,7 +73,7 @@ func AuthRateLimiter(ctx context.Context, ratePerMinute float64, burst int) gin.
 	}
 }
 
-func startCleaner(ctx context.Context, mu *sync.Mutex, clients map[string]*ipLimiter) {
+func startCleaner(ctx context.Context, mu *sync.Mutex, clients map[string]*tokenLimiter) {
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
@@ -87,13 +88,22 @@ func startCleaner(ctx context.Context, mu *sync.Mutex, clients map[string]*ipLim
 					defer mu.Unlock()
 
 					now := time.Now()
-					for ip, lim := range clients {
+					for key, lim := range clients {
 						if now.Sub(lim.lastRefill) > 10*time.Minute {
-							delete(clients, ip)
+							delete(clients, key)
 						}
 					}
 				}()
 			}
 		}
 	}()
+}
+
+func resolveClientKey(c *gin.Context) string {
+	userID, ok := c.Get("userId")
+	id, valid := userID.(int64)
+	if ok && valid && id > 0 {
+		return fmt.Sprintf("user:%d:%s", id, c.ClientIP())
+	}
+	return fmt.Sprintf("ip:%s", c.ClientIP())
 }

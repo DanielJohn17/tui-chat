@@ -41,16 +41,10 @@ func (h *UserHandler) SearchUsers(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserByUsername(c *gin.Context) {
-
 	ctx := c.Request.Context()
-	params, exists := c.Get("params")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewBadRequestError("invalid parameters"))
-		return
-	}
-	req := params.(types.URLParamString)
-
-	if req.Str == "" {
+	params, ok := c.Get("params")
+	req, valid := params.(types.URLParamString)
+	if !ok || !valid || req.Str == "" {
 		helpers.WriteError(c, apierrs.NewBadRequestError("username is not present"))
 		return
 	}
@@ -66,14 +60,9 @@ func (h *UserHandler) GetUserByUsername(c *gin.Context) {
 
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	ctx := c.Request.Context()
-	params, exists := c.Get("params")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewBadRequestError("invalid parameters"))
-		return
-	}
-	req := params.(types.URLParamInt)
-
-	if req.ID == 0 {
+	params, ok := c.Get("params")
+	req, valid := params.(types.URLParamInt)
+	if !ok || !valid || req.ID <= 0 {
 		helpers.WriteError(c, apierrs.NewBadRequestError("id is not present"))
 		return
 	}
