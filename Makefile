@@ -256,3 +256,12 @@ clean: ## Clean build binaries, coverage files, and temporary artifacts
 	@printf "$(YELLOW)Cleaning artifacts...$(RESET)\n"
 	@rm -rf $(BIN_DIR) tmp/ coverage.out
 	@printf "$(GREEN)✓ Clean complete.$(RESET)\n"
+
+## ----------------------------------------------------------------------------
+## Release & CMS Synchronization Targets
+## ----------------------------------------------------------------------------
+.PHONY: sync-release-sanity
+sync-release-sanity: ## Sync release metadata to Sanity CMS (usage: make sync-release-sanity TAG=v1.1.0 DRY_RUN=true)
+	@printf "$(YELLOW)Synchronizing release to Sanity CMS...$(RESET)\n"
+	@TAG_NAME="$(TAG)" DRY_RUN="$(DRY_RUN)" node .github/scripts/sync-release-sanity.js
+
