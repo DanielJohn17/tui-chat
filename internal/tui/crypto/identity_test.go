@@ -97,6 +97,16 @@ func TestResolveIdentityKeyPath(t *testing.T) {
 		assert.Contains(t, path, "dev_identity_alice.key")
 	})
 
+	t.Run("production with user ID", func(t *testing.T) {
+		path := ResolveIdentityKeyPath("production", "", 42)
+		assert.Contains(t, path, "identity_42.key")
+	})
+
+	t.Run("dev with session name and user ID", func(t *testing.T) {
+		path := ResolveIdentityKeyPath("dev", "alice", 42)
+		assert.Contains(t, path, "dev_identity_alice_42.key")
+	})
+
 	t.Run("env var override", func(t *testing.T) {
 		t.Setenv("TUI_CHAT_IDENTITY_KEY_FILE", "/tmp/custom.key")
 		path := ResolveIdentityKeyPath("production", "")

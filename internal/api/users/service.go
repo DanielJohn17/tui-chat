@@ -133,7 +133,7 @@ func (s *UserService) SetPublicKey(ctx context.Context, userID int64, pubKey []b
 
 func (s *UserService) GetPublicKey(ctx context.Context, userID int64) ([]byte, error) {
 	pk, err := s.r.GetPublicKey(ctx, userID)
-	if err != nil {
+	if err != nil || len(pk) == 0 {
 		return nil, apierrs.NewNotFoundError("public key not found")
 	}
 	return pk, nil

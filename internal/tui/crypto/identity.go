@@ -4,14 +4,13 @@
 package crypto
 
 import (
+	"crypto/ecdh"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/crypto/curve25519"
 )
 
 // IdentityKey holds an X25519 keypair for the local user.
@@ -23,25 +22,16 @@ type IdentityKey struct {
 
 // GenerateIdentityKey creates a fresh X25519 keypair using a secure random source.
 func GenerateIdentityKey() (*IdentityKey, error) {
-	var priv [32]byte
-	if _, err := rand.Read(priv[:]); err != nil {
-		return nil, fmt.Errorf("crypto/identity: failed to generate random private key: %w", err)
-	}
-
-	// Clamp per RFC 7748
-	priv[0] &= 248
-	priv[31] &= 127
-	priv[31] |= 64
-
-	pub, err := curve25519.X25519(priv[:], curve25519.Basepoint)
+	priv, err := ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("crypto/identity: failed to derive public key: %w", err)
+		return nil, fmt.Errorf("crypto/identity: failed to generate keypair: %w", err)
 	}
 
-	var pubArr [32]byte
-	copy(pubArr[:], pub)
+	var privArr, pubArr [32]byte
+	copy(privArr[:], priv.Bytes())
+	copy(pubArr[:], priv.PublicKey().Bytes())
 
-	return &IdentityKey{PrivateKey: priv, PublicKey: pubArr}, nil
+	return &IdentityKey{PrivateKey: privArr, PublicKey: pubArr}, nil
 }
 
 // LoadOrCreateIdentityKey loads an existing identity key from path, or generates
@@ -115,9 +105,9 @@ func parseIdentityKey(data []byte) (*IdentityKey, error) {
 // ResolveIdentityKeyPath returns the filesystem path to the identity key file,
 // mirroring the session path resolution logic in internal/tui/client/session.go.
 //
-//   - Production: ~/.config/tui-chat/identity.key
-//   - Development: ~/.config/tui-chat/dev_identity.key (or dev_identity_<name>.key)
-func ResolveIdentityKeyPath(goEnv, sessionName string) string {
+//   - Production: ~/.config/tui-chat/identity.key (or identity_<userID>.key)
+//   - Development: ~/.config/tui-chat/dev_identity.key (or dev_identity_<name>_<userID>.key)
+func ResolveIdentityKeyPath(goEnv, sessionName string, optionalUserID ...int64) string {
 	if customFile := os.Getenv("TUI_CHAT_IDENTITY_KEY_FILE"); customFile != "" {
 		return customFile
 	}
@@ -134,25 +124,29 @@ func ResolveIdentityKeyPath(goEnv, sessionName string) string {
 
 	appDir := filepath.Join(baseDir, "tui-chat")
 
+	var uid int64
+	if len(optionalUserID) > 0 {
+		uid = optionalUserID[0]
+	}
+
 	sessionName = strings.TrimSpace(sessionName)
 	cleanEnv := strings.ToLower(strings.TrimSpace(goEnv))
 	isDev := cleanEnv == "development" || cleanEnv == "dev" || cleanEnv == "local"
 
-	var fileName string
+	prefix := "identity"
 	if isDev {
-		if sessionName != "" {
-			fileName = fmt.Sprintf("dev_identity_%s.key", sanitize(sessionName))
-		} else {
-			fileName = "dev_identity.key"
-		}
-	} else {
-		if sessionName != "" {
-			fileName = fmt.Sprintf("identity_%s.key", sanitize(sessionName))
-		} else {
-			fileName = "identity.key"
-		}
+		prefix = "dev_identity"
 	}
 
+	parts := []string{prefix}
+	if sessionName != "" {
+		parts = append(parts, sanitize(sessionName))
+	}
+	if uid > 0 {
+		parts = append(parts, fmt.Sprintf("%d", uid))
+	}
+
+	fileName := strings.Join(parts, "_") + ".key"
 	return filepath.Join(appDir, fileName)
 }
 

@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -10,7 +11,6 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -37,8 +37,18 @@ const hkdfInfo = "tui-chat-e2ee-v1"
 //	Alice: DeriveConvKey(alicePriv, bobPub)  == key
 //	Bob:   DeriveConvKey(bobPriv,   alicePub) == key
 func DeriveConvKey(myPriv [32]byte, peerPub [32]byte) ([32]byte, error) {
+	priv, err := ecdh.X25519().NewPrivateKey(myPriv[:])
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("e2ee: invalid private key: %w", err)
+	}
+
+	pub, err := ecdh.X25519().NewPublicKey(peerPub[:])
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("e2ee: invalid peer public key: %w", err)
+	}
+
 	// Perform ECDH
-	shared, err := curve25519.X25519(myPriv[:], peerPub[:])
+	shared, err := priv.ECDH(pub)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("e2ee: ECDH failed: %w", err)
 	}
