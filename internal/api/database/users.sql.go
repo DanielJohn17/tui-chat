@@ -162,6 +162,8 @@ func (q *Queries) GetUserPublicKey(ctx context.Context, id int64) ([]byte, error
 	var public_key []byte
 	err := row.Scan(&public_key)
 	return public_key, err
+}
+
 const searchUsers = `-- name: SearchUsers :many
 SELECT id, name, username
 FROM users

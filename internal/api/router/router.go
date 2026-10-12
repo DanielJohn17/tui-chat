@@ -82,8 +82,10 @@ func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 		)
 
 		// public key exchange for E2EE
-		subRouter.PUT("/keys/me", h.Keys.UploadPublicKey)
-		subRouter.GET("/keys/:user_id", h.Keys.GetPublicKey)
+		if h.Keys != nil {
+			subRouter.PUT("/keys/me", h.Keys.UploadPublicKey)
+			subRouter.GET("/keys/:user_id", h.Keys.GetPublicKey)
+		}
 	}
 	return router
 }

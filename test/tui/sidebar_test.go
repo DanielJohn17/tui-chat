@@ -143,7 +143,7 @@ func TestSidebarAllElementsClickable(t *testing.T) {
 func TestTelegramSidebarLayout(t *testing.T) {
 	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
-	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 50})
 	model, _ = model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
 
 	view := model.View()
