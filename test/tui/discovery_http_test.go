@@ -87,7 +87,7 @@ func TestDiscoveryHTTPOpenDirectConversation(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, client.Chat{
 				ID: 42, RecipientID: 2, Name: "Alice", Username: "alice",
-				LastMessage: "Hello", Time: "02/01/00", Unread: 3, Online: true,
+				LastMessage: "Hello", Time: "02/01/00", Unread: 3, Online: true, CloudID: 42,
 			}, chat)
 			assert.Equal(t, existing, c.Chats(), "discovery must not apply results to the chat cache")
 		})

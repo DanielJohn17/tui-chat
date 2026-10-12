@@ -52,6 +52,8 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+h", "f1":
 				m.modal = ModalHelp
 				return *m, nil
+			case "ctrl+s":
+				return m.toggleChatTab()
 			}
 		}
 		var cmd tea.Cmd
@@ -69,33 +71,20 @@ func (m *AppModel) handleChatState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = m.client.CloseWS()
 			return *m, tea.Quit
 
+		case "tab", "ctrl+s":
+			return m.toggleChatTab()
+
 		case "j", "down":
 			m.sidebarView.MoveDown()
 			if sel := m.sidebarView.SelectedChat(); sel != nil {
-				m.chatView.SetActiveChat(sel.ID)
-				_ = m.client.FocusConv(sel.ID)
-				_ = m.client.MarkRead(sel.ID, 0)
-				zero := 0
-				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
-					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
-					return *m, fetchMessagesCmd(m.client, sel.ID)
-				}
+				return *m, m.selectChat(sel)
 			}
 			return *m, nil
 
 		case "k", "up":
 			m.sidebarView.MoveUp()
 			if sel := m.sidebarView.SelectedChat(); sel != nil {
-				m.chatView.SetActiveChat(sel.ID)
-				_ = m.client.FocusConv(sel.ID)
-				_ = m.client.MarkRead(sel.ID, 0)
-				zero := 0
-				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
-					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
-					return *m, fetchMessagesCmd(m.client, sel.ID)
-				}
+				return *m, m.selectChat(sel)
 			}
 			return *m, nil
 

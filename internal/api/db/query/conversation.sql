@@ -3,27 +3,30 @@ WITH
 params AS (
     SELECT
         LEAST(sqlc.arg(user_id)::bigint, sqlc.arg(user_id_2)::bigint) AS min_id,
-        GREATEST(sqlc.arg(user_id)::bigint, sqlc.arg(user_id_2)::bigint) AS max_id
+        GREATEST(sqlc.arg(user_id)::bigint, sqlc.arg(user_id_2)::bigint) AS max_id,
+        sqlc.arg(is_secret)::boolean AS is_secret
 ),
 
 new_conv AS (
     INSERT INTO
-    conversations (user_min_id, user_max_id, created_at)
+    conversations (user_min_id, user_max_id, is_secret, created_at)
     SELECT
         min_id,
         max_id,
+        is_secret,
         CURRENT_TIMESTAMP
     FROM
         params
-    ON CONFLICT (user_min_id, user_max_id) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
+    ON CONFLICT (user_min_id, user_max_id, is_secret) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
     -- RETURNING also exposes a concurrent winner outside this statement's snapshot.
     DO UPDATE SET user_min_id = EXCLUDED.user_min_id
     RETURNING
-        id
+        id,
+        is_secret
 ),
 
 target_conv AS (
-    SELECT id FROM new_conv
+    SELECT id, is_secret FROM new_conv
 ),
 
 inserted_participants AS (
@@ -40,6 +43,7 @@ inserted_participants AS (
 
 SELECT
     tc.id AS conv_id,
+    tc.is_secret,
     u.id AS user_id,
     u.name,
     u.username
@@ -54,7 +58,7 @@ ORDER BY u.id;
 WITH
   target_conv AS (
     SELECT
-      p.conv_id, c.created_at
+      p.conv_id, c.created_at, c.is_secret
     FROM
       participants p
       JOIN conversations c ON c.id = p.conv_id
@@ -64,6 +68,7 @@ WITH
   )
 SELECT
   tc.conv_id,
+  tc.is_secret,
   u.id AS user_id,
   u.name,
   u.username,

@@ -139,6 +139,31 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 	return i, err
 }
 
+const setUserPublicKey = `-- name: SetUserPublicKey :exec
+UPDATE users SET public_key = $1 WHERE id = $2
+`
+
+type SetUserPublicKeyParams struct {
+	PublicKey []byte
+	ID        int64
+}
+
+func (q *Queries) SetUserPublicKey(ctx context.Context, arg SetUserPublicKeyParams) error {
+	_, err := q.db.Exec(ctx, setUserPublicKey, arg.PublicKey, arg.ID)
+	return err
+}
+
+const getUserPublicKey = `-- name: GetUserPublicKey :one
+SELECT public_key FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserPublicKey(ctx context.Context, id int64) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getUserPublicKey, id)
+	var public_key []byte
+	err := row.Scan(&public_key)
+	return public_key, err
+}
+
 const searchUsers = `-- name: SearchUsers :many
 SELECT id, name, username
 FROM users

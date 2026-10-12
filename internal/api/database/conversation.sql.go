@@ -387,7 +387,7 @@ const getConversationsByUserId = `-- name: GetConversationsByUserId :many
 WITH
   target_conv AS (
     SELECT
-      p.conv_id, c.created_at
+      p.conv_id, c.created_at, c.is_secret
     FROM
       participants p
       JOIN conversations c ON c.id = p.conv_id
@@ -397,6 +397,7 @@ WITH
   )
 SELECT
   tc.conv_id,
+  tc.is_secret,
   u.id AS user_id,
   u.name,
   u.username,
@@ -442,6 +443,7 @@ ORDER BY
 
 type GetConversationsByUserIdRow struct {
 	ConvID          int64
+	IsSecret        bool
 	UserID          int64
 	Name            string
 	Username        string
@@ -461,6 +463,7 @@ func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([
 		var i GetConversationsByUserIdRow
 		if err := rows.Scan(
 			&i.ConvID,
+			&i.IsSecret,
 			&i.UserID,
 			&i.Name,
 			&i.Username,
@@ -483,27 +486,30 @@ WITH
 params AS (
     SELECT
         LEAST($1::bigint, $2::bigint) AS min_id,
-        GREATEST($1::bigint, $2::bigint) AS max_id
+        GREATEST($1::bigint, $2::bigint) AS max_id,
+        $3::boolean AS is_secret
 ),
 
 new_conv AS (
     INSERT INTO
-    conversations (user_min_id, user_max_id, created_at)
+    conversations (user_min_id, user_max_id, is_secret, created_at)
     SELECT
         min_id,
         max_id,
+        is_secret,
         CURRENT_TIMESTAMP
     FROM
         params
-    ON CONFLICT (user_min_id, user_max_id) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
+    ON CONFLICT (user_min_id, user_max_id, is_secret) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
     -- RETURNING also exposes a concurrent winner outside this statement's snapshot.
     DO UPDATE SET user_min_id = EXCLUDED.user_min_id
     RETURNING
-        id
+        id,
+        is_secret
 ),
 
 target_conv AS (
-    SELECT id FROM new_conv
+    SELECT id, is_secret FROM new_conv
 ),
 
 inserted_participants AS (
@@ -520,6 +526,7 @@ inserted_participants AS (
 
 SELECT
     tc.id AS conv_id,
+    tc.is_secret,
     u.id AS user_id,
     u.name,
     u.username
@@ -531,12 +538,14 @@ ORDER BY u.id
 `
 
 type GetOrCreateDirectConversationParams struct {
-	UserID  int64
-	UserID2 int64
+	UserID   int64
+	UserID2  int64
+	IsSecret bool
 }
 
 type GetOrCreateDirectConversationRow struct {
 	ConvID   int64
+	IsSecret bool
 	UserID   int64
 	Name     string
 	Username string
@@ -544,7 +553,7 @@ type GetOrCreateDirectConversationRow struct {
 
 // Base-table scans cannot see participants inserted by a sibling CTE.
 func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCreateDirectConversationParams) ([]GetOrCreateDirectConversationRow, error) {
-	rows, err := q.db.Query(ctx, getOrCreateDirectConversation, arg.UserID, arg.UserID2)
+	rows, err := q.db.Query(ctx, getOrCreateDirectConversation, arg.UserID, arg.UserID2, arg.IsSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -554,6 +563,7 @@ func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCr
 		var i GetOrCreateDirectConversationRow
 		if err := rows.Scan(
 			&i.ConvID,
+			&i.IsSecret,
 			&i.UserID,
 			&i.Name,
 			&i.Username,

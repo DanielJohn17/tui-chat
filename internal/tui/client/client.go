@@ -1,5 +1,6 @@
 package client
 
+import "github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 import "context"
 
 type UserSummary struct {
@@ -27,6 +28,9 @@ type Chat struct {
 	Time        string `json:"time"`
 	Unread      int    `json:"unread"`
 	Online      bool   `json:"online"`
+	IsSecret    bool   `json:"is_secret"`
+	CloudID     int64  `json:"cloud_id,omitempty"`
+	SecretID    int64  `json:"secret_id,omitempty"`
 }
 
 type Message struct {
@@ -38,6 +42,7 @@ type Message struct {
 	Text      string `json:"text"`
 	Timestamp string `json:"timestamp"`
 	Self      bool   `json:"self"`
+	IsSecret  bool   `json:"is_secret"`
 }
 
 // Inbound WebSocket Event Payloads
@@ -97,7 +102,7 @@ type Client interface {
 
 	// REST Data operations
 	SearchUsers(context.Context, string) ([]UserSummary, error)
-	OpenDirectConversation(context.Context, int64) (Chat, error)
+	OpenDirectConversation(context.Context, int64, ...bool) (Chat, error)
 	FetchChats() ([]Chat, error)
 	Chats() []Chat
 	SetChats([]Chat)
@@ -108,6 +113,8 @@ type Client interface {
 	Messages(chatID int64) []Message
 	AppendMessage(msg Message)
 	UpdateChatSnippet(convID int64, lastMsg, timeStr string, unreadDelta int, setExactUnread *int)
+	IsConvSecret(convID int64) bool
+	SetConvSecret(convID int64, isSecret bool)
 
 	// WebSocket operations
 	ConnectWS(eventsChan chan<- any) error
@@ -116,4 +123,14 @@ type Client interface {
 	FocusConv(convID int64) error
 	MarkRead(convID int64, messageID int64) error
 	IsWSConnected() bool
+
+	// E2EE operations
+	// SetIdentityKey stores the local X25519 identity key for use in all crypto operations.
+	SetIdentityKey(key *crypto.IdentityKey)
+	// IdentityKey returns the local identity key, or nil if not yet initialised.
+	IdentityKey() *crypto.IdentityKey
+	// UploadPublicKey publishes the local public key to the server so peers can derive shared keys.
+	UploadPublicKey(pubKey []byte) error
+	// GetPeerPublicKey fetches and caches a peer's public key from the server.
+	GetPeerPublicKey(userID int64) ([]byte, error)
 }

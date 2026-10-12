@@ -11,15 +11,7 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 		if mouseMsg.X < sidebarWidth {
 			m.sidebarView.MoveUp()
 			if sel := m.sidebarView.SelectedChat(); sel != nil {
-				m.chatView.SetActiveChat(sel.ID)
-				_ = m.client.FocusConv(sel.ID)
-				_ = m.client.MarkRead(sel.ID, 0)
-				zero := 0
-				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
-					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
-					return *m, fetchMessagesCmd(m.client, sel.ID), true
-				}
+				return *m, m.selectChat(sel), true
 			}
 		} else {
 			m.chatView.ScrollUp(3)
@@ -31,15 +23,7 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 		if mouseMsg.X < sidebarWidth {
 			m.sidebarView.MoveDown()
 			if sel := m.sidebarView.SelectedChat(); sel != nil {
-				m.chatView.SetActiveChat(sel.ID)
-				_ = m.client.FocusConv(sel.ID)
-				_ = m.client.MarkRead(sel.ID, 0)
-				zero := 0
-				m.client.UpdateChatSnippet(sel.ID, "", "", 0, &zero)
-				if len(m.client.Messages(sel.ID)) == 0 && m.chatView.FetchStatus(sel.ID) != chat.StatusLoading {
-					m.chatView.SetFetchStatus(sel.ID, chat.StatusLoading)
-					return *m, fetchMessagesCmd(m.client, sel.ID), true
-				}
+				return *m, m.selectChat(sel), true
 			}
 		} else {
 			m.chatView.ScrollDown(3)
@@ -92,16 +76,9 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 			return *m, nil, true
 		}
 		if clickedChat != nil {
-			m.chatView.SetActiveChat(clickedChat.ID)
 			m.chatView.BlurInput()
-			_ = m.client.FocusConv(clickedChat.ID)
-			_ = m.client.MarkRead(clickedChat.ID, 0)
-			zero := 0
-			m.client.UpdateChatSnippet(clickedChat.ID, "", "", 0, &zero)
-			if len(m.client.Messages(clickedChat.ID)) == 0 && m.chatView.FetchStatus(clickedChat.ID) != chat.StatusLoading {
-				m.chatView.SetFetchStatus(clickedChat.ID, chat.StatusLoading)
-				return *m, fetchMessagesCmd(m.client, clickedChat.ID), true
-			}
+			cmd := m.selectChat(clickedChat)
+			return *m, cmd, true
 		}
 		return *m, nil, true
 	}
@@ -112,6 +89,20 @@ func (m *AppModel) handleChatStateMouse(mouseMsg tea.MouseMsg, sidebarWidth, mai
 		if activeID != 0 && m.chatView.FetchStatus(activeID) == chat.StatusFailed {
 			m.chatView.SetFetchStatus(activeID, chat.StatusLoading)
 			return *m, fetchMessagesCmd(m.client, activeID), true
+		}
+		// Click on tab bar (row 2 in chat pane)
+		if mouseMsg.Y == 2 {
+			xRel := mouseMsg.X - sidebarWidth
+			sel := m.sidebarView.SelectedChat()
+			if sel != nil {
+				if xRel >= 1 && xRel <= 15 {
+					model, cmd := m.switchChatTab(sel, chat.TabCloud)
+					return model, cmd, true
+				} else if xRel >= 16 && xRel <= 32 {
+					model, cmd := m.switchChatTab(sel, chat.TabSecret)
+					return model, cmd, true
+				}
+			}
 		}
 		if mouseMsg.Y >= mainHeight-5 {
 			m.chatView.FocusInput()

@@ -50,3 +50,9 @@ RETURNING
     id,
     name,
     username;
+
+-- name: SetUserPublicKey :exec
+UPDATE users SET public_key = $1 WHERE id = $2;
+
+-- name: GetUserPublicKey :one
+SELECT public_key FROM users WHERE id = $1;

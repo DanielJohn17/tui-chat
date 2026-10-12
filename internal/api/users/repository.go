@@ -16,6 +16,8 @@ type UserRepositoryInt interface {
 	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
 	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
 	DeleteUser(ctx context.Context, id int64) (*DeleteUserResponseType, error)
+	SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error
+	GetPublicKey(ctx context.Context, userID int64) ([]byte, error)
 }
 
 type UserQuerier interface {
@@ -24,6 +26,8 @@ type UserQuerier interface {
 	GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error)
 	GetUserById(ctx context.Context, id int64) (database.GetUserByIdRow, error)
 	DeleteUser(ctx context.Context, id int64) (database.DeleteUserRow, error)
+	SetUserPublicKey(ctx context.Context, arg database.SetUserPublicKeyParams) error
+	GetUserPublicKey(ctx context.Context, id int64) ([]byte, error)
 }
 
 type UserRepository struct {
@@ -127,4 +131,12 @@ func (r *UserRepository) DeleteUser(
 		Name:     deletedUser.Name,
 		Username: deletedUser.Username,
 	}, nil
+}
+
+func (r *UserRepository) SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error {
+	return r.q.SetUserPublicKey(ctx, database.SetUserPublicKeyParams{ID: userID, PublicKey: pubKey})
+}
+
+func (r *UserRepository) GetPublicKey(ctx context.Context, userID int64) ([]byte, error) {
+	return r.q.GetUserPublicKey(ctx, userID)
 }

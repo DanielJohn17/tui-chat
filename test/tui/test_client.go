@@ -7,15 +7,18 @@ import (
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
+	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 )
 
 type TestClient struct {
-	profile     client.Profile
-	sessionPath string
-	chats       []client.Chat
-	messages    map[int64][]client.Message
-	msgID       int64
-	wsConnected bool
+	profile      client.Profile
+	sessionPath  string
+	chats        []client.Chat
+	messages     map[int64][]client.Message
+	msgID        int64
+	wsConnected  bool
+	convIsSecret map[int64]bool
+	peerPubKeys  map[int64][]byte
 }
 
 func newTestClient() *TestClient {
@@ -259,7 +262,7 @@ func (m *TestClient) SearchUsers(ctx context.Context, query string) ([]client.Us
 	return users, nil
 }
 
-func (m *TestClient) OpenDirectConversation(ctx context.Context, userID int64) (client.Chat, error) {
+func (m *TestClient) OpenDirectConversation(ctx context.Context, userID int64, isSecret ...bool) (client.Chat, error) {
 	if err := ctx.Err(); err != nil {
 		return client.Chat{}, err
 	}
@@ -389,4 +392,44 @@ func (m *TestClient) MarkRead(convID int64, messageID int64) error {
 
 func (m *TestClient) IsWSConnected() bool {
 	return m.wsConnected
+}
+
+func (m *TestClient) SetIdentityKey(key *crypto.IdentityKey) {}
+
+func (m *TestClient) IdentityKey() *crypto.IdentityKey {
+	return nil
+}
+
+func (m *TestClient) UploadPublicKey(pubKey []byte) error {
+	return nil
+}
+
+func (m *TestClient) GetPeerPublicKey(peerID int64) ([]byte, error) {
+	if m.peerPubKeys != nil {
+		if k, ok := m.peerPubKeys[peerID]; ok {
+			return k, nil
+		}
+	}
+	return nil, fmt.Errorf("public key not found")
+}
+
+func (m *TestClient) SetPeerPublicKey(peerID int64, key []byte) {
+	if m.peerPubKeys == nil {
+		m.peerPubKeys = make(map[int64][]byte)
+	}
+	m.peerPubKeys[peerID] = key
+}
+
+func (m *TestClient) IsConvSecret(convID int64) bool {
+	if m.convIsSecret == nil {
+		return false
+	}
+	return m.convIsSecret[convID]
+}
+
+func (m *TestClient) SetConvSecret(convID int64, isSecret bool) {
+	if m.convIsSecret == nil {
+		m.convIsSecret = make(map[int64]bool)
+	}
+	m.convIsSecret[convID] = isSecret
 }

@@ -29,6 +29,9 @@ type UserServiceInt interface {
 		ctx context.Context,
 		input int64,
 	) (*DeleteUserResponseType, error)
+
+	SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error
+	GetPublicKey(ctx context.Context, userID int64) ([]byte, error)
 }
 
 type UserService struct {
@@ -119,4 +122,19 @@ func (s *UserService) DeleteUser(
 	}
 
 	return deletedUser, nil
+}
+
+func (s *UserService) SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error {
+	if len(pubKey) != 32 {
+		return apierrs.NewBadRequestError("invalid public key: must be 32 bytes")
+	}
+	return s.r.SetPublicKey(ctx, userID, pubKey)
+}
+
+func (s *UserService) GetPublicKey(ctx context.Context, userID int64) ([]byte, error) {
+	pk, err := s.r.GetPublicKey(ctx, userID)
+	if err != nil || len(pk) == 0 {
+		return nil, apierrs.NewNotFoundError("public key not found")
+	}
+	return pk, nil
 }

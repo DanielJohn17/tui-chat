@@ -128,8 +128,9 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 	params GetOrCreateDirectConvType,
 ) ([]GetConvParticipantType, error) {
 	convParams := database.GetOrCreateDirectConversationParams{
-		UserID:  params.UserIDOne,
-		UserID2: params.UserIDTwo,
+		UserID:   params.UserIDOne,
+		UserID2:  params.UserIDTwo,
+		IsSecret: params.IsSecret,
 	}
 
 	convParticipants, err := r.q.GetOrCreateDirectConversation(ctx, convParams)
@@ -142,6 +143,7 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 	for i, v := range convParticipants {
 		participants[i] = GetConvParticipantType{
 			ConvID:   v.ConvID,
+			IsSecret: v.IsSecret,
 			UserID:   v.UserID,
 			Name:     v.Name,
 			Username: v.Username,
@@ -165,6 +167,7 @@ func (r *ConvRepository) GetConvsByUserID(
 	for i, v := range conversations {
 		convParticipants[i] = GetConvParticipantType{
 			ConvID:          v.ConvID,
+			IsSecret:        v.IsSecret,
 			UserID:          v.UserID,
 			Name:            v.Name,
 			Username:        v.Username,

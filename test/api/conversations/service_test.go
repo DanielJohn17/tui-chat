@@ -184,6 +184,18 @@ func (m *MockUserService) DeleteUser(
 	return nil, m.Called(ctx, input).Error(1)
 }
 
+func (m *MockUserService) SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error {
+	return m.Called(ctx, userID, pubKey).Error(0)
+}
+
+func (m *MockUserService) GetPublicKey(ctx context.Context, userID int64) ([]byte, error) {
+	args := m.Called(ctx, userID)
+	if res := args.Get(0); res != nil {
+		return res.([]byte), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // -----------------------------------------------------------------------------
 // WipeConversation Tests
 // -----------------------------------------------------------------------------
