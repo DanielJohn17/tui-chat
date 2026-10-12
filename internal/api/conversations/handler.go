@@ -30,13 +30,9 @@ var _ ConvHandlerInt = (*ConvHandler)(nil)
 func (h *ConvHandler) GetOrCreateDirectConversation(c *gin.Context) {
 	var params GetOrCreateDirectConvType
 	ctx := c.Request.Context()
-	userIDParam, exists := c.Get("userId")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
-	authUserID, ok := userIDParam.(int64)
-	if !ok {
+	userIDParam, ok := c.Get("userId")
+	authUserID, valid := userIDParam.(int64)
+	if !ok || !valid || authUserID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
@@ -60,13 +56,9 @@ func (h *ConvHandler) GetOrCreateDirectConversation(c *gin.Context) {
 func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	userIDParam, exists := c.Get("userId")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
-	userID, ok := userIDParam.(int64)
-	if !ok {
+	userIDParam, ok := c.Get("userId")
+	userID, valid := userIDParam.(int64)
+	if !ok || !valid || userID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
@@ -85,19 +77,15 @@ func (h *ConvHandler) GetConvsByUserID(c *gin.Context) {
 }
 
 func (h *ConvHandler) GetBulkChatsByUserID(c *gin.Context) {
-	userIDParam, exists := c.Get("userId")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
-
-	userID, ok := userIDParam.(int64)
-	if !ok {
+	userIDParam, ok := c.Get("userId")
+	userID, valid := userIDParam.(int64)
+	if !ok || !valid || userID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
 	ctx := c.Request.Context()
+
 	var limit int64 = 50
 
 	chats, err := h.s.GetBulkChatsByUserID(ctx, userID, limit)
@@ -110,14 +98,16 @@ func (h *ConvHandler) GetBulkChatsByUserID(c *gin.Context) {
 }
 
 func (h *ConvHandler) GetConvChats(c *gin.Context) {
-	params, exists := c.Get("params")
-	if !exists {
+	paramVal, pOk := c.Get("params")
+	params, pValid := paramVal.(types.URLParamInt)
+	if !pOk || !pValid || params.ID <= 0 {
 		helpers.WriteError(c, apierrs.NewBadRequestError("invalid conversation id"))
 		return
 	}
 
-	userIDParam, exists := c.Get("userId")
-	if !exists {
+	userIDParam, uOk := c.Get("userId")
+	userID, uValid := userIDParam.(int64)
+	if !uOk || !uValid || userID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
@@ -130,12 +120,7 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 
-	convID := params.(types.URLParamInt).ID
-	userID, ok := userIDParam.(int64)
-	if !ok {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
+	convID := params.ID
 
 	chats, err := h.s.GetConvChats(ctx, int64(convID), userID, queries)
 	if err != nil {
@@ -160,19 +145,20 @@ func (h *ConvHandler) GetConvChats(c *gin.Context) {
 }
 
 func (h *ConvHandler) WipeConversation(c *gin.Context) {
-	userIDParam, exists := c.Get("userId")
-	if !exists {
+	userIDParam, uOk := c.Get("userId")
+	userID, uValid := userIDParam.(int64)
+	if !uOk || !uValid || userID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
-	userID := userIDParam.(int64)
 
-	ConvIDParam, exists := c.Get("params")
-	if !exists {
+	convIDParam, cOk := c.Get("params")
+	convParam, cValid := convIDParam.(types.URLParamInt)
+	if !cOk || !cValid || convParam.ID <= 0 {
 		helpers.WriteError(c, apierrs.NewBadRequestError("invalid conversation id"))
 		return
 	}
-	convID := int64(ConvIDParam.(types.URLParamInt).ID)
+	convID := int64(convParam.ID)
 
 	ctx := c.Request.Context()
 

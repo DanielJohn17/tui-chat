@@ -80,14 +80,18 @@ func TestDynamicConversationSortingOnSendAndNewDM(t *testing.T) {
 	// 3. Unfocus input with Esc and create a new direct message with David
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	for _, r := range "david" {
-		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-	}
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model, debounce := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("david")})
+	model, search := model.Update(discoveryDebounce(t, debounce))
+	model, _ = model.Update(search())
+	model, open := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Contains(t, model.View(), "Opening conversation")
+	model, _ = model.Update(open())
 
-	// New chat (David) must be at index 0
-	assert.Equal(t, "david", c.Chats()[0].Username, "New DM must be prepended to top of sidebar")
-	assert.Contains(t, model.View(), "@david")
+	// Discovery reopens the server's existing conversation without fabricating a duplicate.
+	assert.Equal(t, int64(3), c.Chats()[0].ID)
+	assert.Len(t, c.Chats(), 12)
+	assert.NotContains(t, model.View(), "NEW DIRECT MESSAGE")
+	assert.Contains(t, model.View(), "@davidk")
 }
 
 func TestChatNotificationReceived(t *testing.T) {

@@ -51,26 +51,16 @@ func NewWSHanler(hub *Hub, convService conversations.ConvServiceInt) *WSHandler 
 var _ WSHandlerInt = (*WSHandler)(nil)
 
 func (h *WSHandler) HandleWS(c *gin.Context) {
-	userIDParam, exists := c.Get("userId")
-	if !exists {
+	userIDParam, uOk := c.Get("userId")
+	userID, uValid := userIDParam.(int64)
+	if !uOk || !uValid || userID <= 0 {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
-	usernameParam, exists := c.Get("username")
-	if !exists {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
-
-	userID, ok := userIDParam.(int64)
-	if !ok {
-		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
-		return
-	}
-
-	username, ok := usernameParam.(string)
-	if !ok {
+	usernameParam, nOk := c.Get("username")
+	username, nValid := usernameParam.(string)
+	if !nOk || !nValid || username == "" {
 		helpers.WriteError(c, apierrs.NewUnauthorizedError("unauthorized"))
 		return
 	}

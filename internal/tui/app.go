@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -152,11 +153,13 @@ type AppModel struct {
 	notificationText string
 	notificationID   int64
 
-	authView    auth.Model
-	sidebarView *sidebar.Model
-	chatView    chat.Model
-	profileView profile.Model
-	newDMView   modals.NewDMModel
+	authView            auth.Model
+	sidebarView         *sidebar.Model
+	chatView            chat.Model
+	profileView         profile.Model
+	newDMView           modals.NewDMModel
+	discoveryGeneration uint64
+	discoveryCancel     context.CancelFunc
 }
 
 func NewApp(c client.Client) AppModel {
@@ -341,10 +344,18 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case profile.LogoutMsg:
+		m.cancelDiscovery()
+		m.modal = ModalNone
 		_ = m.client.Logout()
 		m.state = StateAuth
 		m.authView.SetErrorMessage("Logged out successfully.")
 		return m, nil
+	case DiscoveryDebounceMsg:
+		return m.handleDiscoveryDebounce(msg)
+	case DiscoverySearchMsg:
+		return m.handleDiscoverySearch(msg)
+	case DiscoveryOpenMsg:
+		return m.handleDiscoveryOpen(msg)
 	}
 
 	// 1. Modals capture input when open

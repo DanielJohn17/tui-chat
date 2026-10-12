@@ -162,4 +162,44 @@ func (q *Queries) GetUserPublicKey(ctx context.Context, id int64) ([]byte, error
 	var public_key []byte
 	err := row.Scan(&public_key)
 	return public_key, err
+const searchUsers = `-- name: SearchUsers :many
+SELECT id, name, username
+FROM users
+WHERE id <> $1::bigint
+  AND LOWER(username) LIKE LOWER($2::text) ESCAPE '\'
+ORDER BY (LOWER(username) = LOWER($3::text)) DESC,
+         LOWER(username) COLLATE "C", username COLLATE "C", id
+LIMIT 20
+`
+
+type SearchUsersParams struct {
+	UserID  int64
+	Pattern string
+	Query   string
+}
+
+type SearchUsersRow struct {
+	ID       int64
+	Name     string
+	Username string
+}
+
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
+	rows, err := q.db.Query(ctx, searchUsers, arg.UserID, arg.Pattern, arg.Query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchUsersRow
+	for rows.Next() {
+		var i SearchUsersRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Username); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

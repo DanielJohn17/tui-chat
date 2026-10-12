@@ -1,0 +1,46 @@
+name: Sync Release to Sanity
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Git release tag to sync (leave blank for latest tag)"
+        required: false
+        default: ""
+      force_update:
+        description: "Overwrite existing fields in Sanity (title, summary, notes)"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  sync-to-sanity:
+    name: Upsert Release in Sanity CMS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare Release Data & Sync to Sanity
+        env:
+          SANITY_PROJECT_ID: ${{ secrets.SANITY_PROJECT_ID }}
+          SANITY_DATASET: ${{ secrets.SANITY_DATASET || 'production' }}
+          SANITY_API_TOKEN: ${{ secrets.SANITY_API_TOKEN }}
+          TAG_NAME: ${{ github.event.inputs.tag_name || github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+          REPO_NAME: ${{ github.repository }}
+          TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
+          FORCE_UPDATE: ${{ github.event.inputs.force_update || 'false' }}
+        run: |
+          node .github/scripts/sync-release-sanity.js

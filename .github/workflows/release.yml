@@ -71,7 +71,19 @@ jobs:
 
 
           # -------------------------------------------------------------
-          # 3. Generate SHA256 Checksums for TUI Binaries
+          # 3. Create Unversioned Binary Aliases for Direct Permalinks
+          # -------------------------------------------------------------
+          cp "dist/linetalk-${TAG_NAME}-linux-amd64" "dist/linetalk-linux-amd64"
+          cp "dist/linetalk-${TAG_NAME}-linux-arm64" "dist/linetalk-linux-arm64"
+          cp "dist/linetalk-${TAG_NAME}-linux-386"   "dist/linetalk-linux-386"
+          cp "dist/linetalk-${TAG_NAME}-windows-amd64.exe" "dist/linetalk-windows-amd64.exe"
+          cp "dist/linetalk-${TAG_NAME}-windows-arm64.exe" "dist/linetalk-windows-arm64.exe"
+          cp "dist/linetalk-${TAG_NAME}-windows-386.exe"   "dist/linetalk-windows-386.exe"
+          cp "dist/linetalk-${TAG_NAME}-darwin-amd64" "dist/linetalk-darwin-amd64"
+          cp "dist/linetalk-${TAG_NAME}-darwin-arm64" "dist/linetalk-darwin-arm64"
+
+          # -------------------------------------------------------------
+          # 4. Generate SHA256 Checksums for TUI Binaries
           # -------------------------------------------------------------
           cd dist
           sha256sum * > SHA256SUMS.txt
@@ -165,3 +177,30 @@ jobs:
 
             ./start.sh
             echo "Deployment to cPanel complete!"
+
+  sync-to-sanity:
+    name: Sync Release to Sanity CMS
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Upsert Release in Sanity CMS
+        env:
+          SANITY_PROJECT_ID: ${{ secrets.SANITY_PROJECT_ID }}
+          SANITY_DATASET: ${{ secrets.SANITY_DATASET || 'production' }}
+          SANITY_API_TOKEN: ${{ secrets.SANITY_API_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPO_NAME: ${{ github.repository }}
+          TARGET_COMMITISH: ${{ github.sha }}
+          ALLOW_EMPTY_SECRETS: "true"
+        run: |
+          node .github/scripts/sync-release-sanity.js

@@ -496,20 +496,14 @@ new_conv AS (
     FROM
         params
     ON CONFLICT (user_min_id, user_max_id) WHERE is_deleting = FALSE AND user_min_id IS NOT NULL
-    DO NOTHING
+    -- RETURNING also exposes a concurrent winner outside this statement's snapshot.
+    DO UPDATE SET user_min_id = EXCLUDED.user_min_id
     RETURNING
         id
 ),
 
 target_conv AS (
     SELECT id FROM new_conv
-    UNION ALL
-    SELECT c.id
-    FROM conversations c, params p
-    WHERE c.user_min_id = p.min_id
-      AND c.user_max_id = p.max_id
-      AND c.is_deleting = FALSE
-    LIMIT 1
 ),
 
 inserted_participants AS (
@@ -531,8 +525,9 @@ SELECT
     u.username
 FROM
     target_conv tc
-JOIN participants p ON p.conv_id = tc.id
-JOIN users u ON u.id = p.user_id
+CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS requested(id)
+JOIN users u ON u.id = requested.id
+ORDER BY u.id
 `
 
 type GetOrCreateDirectConversationParams struct {
@@ -547,6 +542,7 @@ type GetOrCreateDirectConversationRow struct {
 	Username string
 }
 
+// Base-table scans cannot see participants inserted by a sibling CTE.
 func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCreateDirectConversationParams) ([]GetOrCreateDirectConversationRow, error) {
 	rows, err := q.db.Query(ctx, getOrCreateDirectConversation, arg.UserID, arg.UserID2)
 	if err != nil {
