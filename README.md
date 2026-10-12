@@ -133,7 +133,13 @@ cd tui-chat
 ```
 
 ### 3. Environment Configuration (`.env`)
-Create a `.env` file in the project root:
+Copy the provided `.env.example` file to `.env` and adjust the variables as needed:
+
+```bash
+cp .env.example .env
+```
+
+Key variables in `.env`:
 
 ```env
 # Neon PostgreSQL Connection URI (or local database)
@@ -144,6 +150,7 @@ PORT=8080
 GO_ENV=development
 JWT_SECRET_KEY=your_development_secret_key_here
 JWT_EXP=259200
+APP_SHARED_SECRET=your_development_app_secret_here
 ```
 
 ### 4. Database Setup & Automated Migrations
