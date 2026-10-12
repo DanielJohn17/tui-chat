@@ -44,6 +44,7 @@ func RenderHelp(width, height int) string {
 	secChat := theme.StyleSubtitle.Render("MESSAGING")
 	r5 := renderRow("Enter", "Send active message")
 	r6 := renderRow("PgUp / PgDn / Wheel", "Scroll chat history")
+	rTab := renderRow("Tab / Ctrl+S", "Toggle Cloud & Secret Chat tabs")
 
 	secActions := theme.StyleSubtitle.Render("ACTIONS & MODALS")
 	r7 := renderRow("n / Click [+n]", "Start new Direct Message")
@@ -61,7 +62,7 @@ func RenderHelp(width, height int) string {
 		r1, r2, r3, r4,
 		"",
 		secChat,
-		r5, r6,
+		r5, r6, rTab,
 		"",
 		secActions,
 		r7, r8, r9, r10,

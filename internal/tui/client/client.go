@@ -28,6 +28,9 @@ type Chat struct {
 	Time        string `json:"time"`
 	Unread      int    `json:"unread"`
 	Online      bool   `json:"online"`
+	IsSecret    bool   `json:"is_secret"`
+	CloudID     int64  `json:"cloud_id,omitempty"`
+	SecretID    int64  `json:"secret_id,omitempty"`
 }
 
 type Message struct {
@@ -39,6 +42,7 @@ type Message struct {
 	Text      string `json:"text"`
 	Timestamp string `json:"timestamp"`
 	Self      bool   `json:"self"`
+	IsSecret  bool   `json:"is_secret"`
 }
 
 // Inbound WebSocket Event Payloads
@@ -98,7 +102,7 @@ type Client interface {
 
 	// REST Data operations
 	SearchUsers(context.Context, string) ([]UserSummary, error)
-	OpenDirectConversation(context.Context, int64) (Chat, error)
+	OpenDirectConversation(context.Context, int64, ...bool) (Chat, error)
 	FetchChats() ([]Chat, error)
 	Chats() []Chat
 	SetChats([]Chat)
@@ -109,6 +113,8 @@ type Client interface {
 	Messages(chatID int64) []Message
 	AppendMessage(msg Message)
 	UpdateChatSnippet(convID int64, lastMsg, timeStr string, unreadDelta int, setExactUnread *int)
+	IsConvSecret(convID int64) bool
+	SetConvSecret(convID int64, isSecret bool)
 
 	// WebSocket operations
 	ConnectWS(eventsChan chan<- any) error

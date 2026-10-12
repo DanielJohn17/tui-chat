@@ -54,6 +54,9 @@ func renderChatItem(ch client.Chat, isSelected bool, contentWidth int) string {
 	if preview == "" {
 		preview = "@" + theme.SanitizeLine(ch.Username)
 	}
+	if ch.IsSecret {
+		preview = "🔒 " + preview
+	}
 
 	var unreadBadge string
 	if ch.Unread > 0 {

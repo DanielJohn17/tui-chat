@@ -14,6 +14,7 @@ type Conversation struct {
 	CreatedAt  pgtype.Timestamptz
 	UserMinID  pgtype.Int8
 	UserMaxID  pgtype.Int8
+	IsSecret   bool
 }
 
 type Message struct {

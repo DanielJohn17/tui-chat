@@ -21,12 +21,22 @@ func (h *HTTPClient) SearchUsers(ctx context.Context, query string) ([]UserSumma
 	return data.Users, nil
 }
 
-func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64) (Chat, error) {
+func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64, isSecret ...bool) (Chat, error) {
 	self := h.Profile().ID
 	if userID <= 0 || userID == self {
 		return Chat{}, errors.New("Select another user to start a conversation")
 	}
-	body, err := json.Marshal(map[string]int64{"user_id_two": userID})
+	secret := false
+	if len(isSecret) > 0 && isSecret[0] {
+		secret = true
+	}
+	payload := map[string]any{
+		"user_id_two": userID,
+	}
+	if secret {
+		payload["is_secret"] = true
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return Chat{}, err
 	}
@@ -36,10 +46,35 @@ func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64) (
 	}
 	for _, p := range participants {
 		if p.UserID == userID && p.ConvID > 0 {
-			h.mu.RLock()
+			h.mu.Lock()
 			online := h.onlineUsers[userID]
-			h.mu.RUnlock()
-			return Chat{ID: p.ConvID, RecipientID: p.UserID, Name: p.Name, Username: p.Username, LastMessage: p.LastMessage, Time: formatFriendlyTime(p.LastMessageTime), Unread: p.UnreadCount, Online: online}, nil
+			if h.convIsSecret == nil {
+				h.convIsSecret = make(map[int64]bool)
+			}
+			h.convIsSecret[p.ConvID] = p.IsSecret
+			if h.convPeerID == nil {
+				h.convPeerID = make(map[int64]int64)
+			}
+			h.convPeerID[p.ConvID] = userID
+			h.mu.Unlock()
+
+			c := Chat{
+				ID:          p.ConvID,
+				RecipientID: p.UserID,
+				Name:        p.Name,
+				Username:    p.Username,
+				LastMessage: p.LastMessage,
+				Time:        formatFriendlyTime(p.LastMessageTime),
+				Unread:      p.UnreadCount,
+				Online:      online,
+				IsSecret:    p.IsSecret,
+			}
+			if p.IsSecret {
+				c.SecretID = p.ConvID
+			} else {
+				c.CloudID = p.ConvID
+			}
+			return c, nil
 		}
 	}
 	return Chat{}, errors.New("Server returned an invalid conversation")

@@ -103,13 +103,14 @@ func ensureIdentityKeyCmd(c client.Client) tea.Cmd {
 	return func() tea.Msg {
 		goEnv := os.Getenv("GO_ENV")
 		sessionName := os.Getenv("TUI_CHAT_SESSION")
-		keyPath := crypto.ResolveIdentityKeyPath(goEnv, sessionName)
-		
+		userID := c.Profile().ID
+		keyPath := crypto.ResolveIdentityKeyPath(goEnv, sessionName, userID)
+
 		key, err := crypto.LoadOrCreateIdentityKey(keyPath)
 		if err != nil {
 			return IdentityKeyResultMsg{Err: err}
 		}
-		
+
 		c.SetIdentityKey(key)
 		return IdentityKeyResultMsg{Key: key}
 	}
@@ -216,12 +217,12 @@ func (m AppModel) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		tea.EnterAltScreen,
 		m.authView.Init(),
-		ensureIdentityKeyCmd(m.client),
 	}
 	if m.client.IsAuthenticated() {
 		m.connStatus = statusbar.StatusConnecting
 		m.spinnerActive = true
 		cmds = append(cmds,
+			ensureIdentityKeyCmd(m.client),
 			fetchChatsCmd(m.client),
 			connectWSCmd(m.client, m.wsEventsChan),
 			m.listenWSCmd(),
@@ -282,6 +283,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case PublicKeyUploadedMsg:
+		if msg.Err != nil {
+			return m, m.triggerNotification("Security", "Failed to sync encryption key with server")
+		}
 		return m, nil
 
 	case auth.AuthSuccessMsg:
@@ -293,7 +297,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.retrySecondsLeft = 0
 		m.spinnerActive = true
 		return m, tea.Batch(
-			uploadPublicKeyCmd(m.client),
+			ensureIdentityKeyCmd(m.client),
 			fetchChatsCmd(m.client),
 			connectWSCmd(m.client, m.wsEventsChan),
 			m.listenWSCmd(),
@@ -356,6 +360,33 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleDiscoverySearch(msg)
 	case DiscoveryOpenMsg:
 		return m.handleDiscoveryOpen(msg)
+	case chat.ToggleTabMsg:
+		return m.toggleChatTab()
+	case EnsureConversationMsg:
+		if msg.Err != nil {
+			return m, m.triggerNotification("Chat", "Failed to open conversation: "+msg.Err.Error())
+		}
+		chats := m.client.Chats()
+		for i := range chats {
+			if chats[i].RecipientID == msg.RecipientID {
+				if msg.IsSecret {
+					chats[i].SecretID = msg.Chat.ID
+				} else {
+					chats[i].CloudID = msg.Chat.ID
+				}
+				break
+			}
+		}
+		m.client.SetChats(chats)
+		m.client.SetConvSecret(msg.Chat.ID, msg.IsSecret)
+		m.chatView.SetActiveChat(msg.Chat.ID)
+		_ = m.client.FocusConv(msg.Chat.ID)
+		_ = m.client.MarkRead(msg.Chat.ID, 0)
+		if len(m.client.Messages(msg.Chat.ID)) == 0 && m.chatView.FetchStatus(msg.Chat.ID) != chat.StatusLoading {
+			m.chatView.SetFetchStatus(msg.Chat.ID, chat.StatusLoading)
+			return m, fetchMessagesCmd(m.client, msg.Chat.ID)
+		}
+		return m, nil
 	}
 
 	// 1. Modals capture input when open

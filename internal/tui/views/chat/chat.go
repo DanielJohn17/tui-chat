@@ -21,9 +21,20 @@ const (
 	StatusFailed
 )
 
+type ChatTab int
+
+const (
+	TabCloud ChatTab = iota
+	TabSecret
+)
+
+type ToggleTabMsg struct{}
+
 type Model struct {
 	client       client.Client
 	activeChatID int64
+	activeTab    ChatTab
+	peerHasKey   bool
 	viewport     viewport.Model
 	input        textinput.Model
 	isFocused    bool
@@ -48,6 +59,8 @@ func New(c client.Client) Model {
 
 	return Model{
 		client:       c,
+		activeTab:    TabCloud,
+		peerHasKey:   true,
 		viewport:     vp,
 		input:        ti,
 		isFocused:    false,
@@ -114,20 +127,61 @@ func (m *Model) SetSize(w, h int) {
 	if vpWidth < 1 {
 		vpWidth = 1
 	}
-	// Reserve 2 lines for header, 3 lines for input box, 1 blank line before input, 2 lines for outer borders
-	vpHeight := h - 8
-	if vpHeight < 1 {
-		vpHeight = 1
-	}
-
 	m.viewport.Width = vpWidth
-	m.viewport.Height = vpHeight
+	m.updateViewportHeight()
+
 	inputW := vpWidth - 4
 	if inputW < 1 {
 		inputW = 1
 	}
 	m.input.Width = inputW
 	m.RefreshMessages()
+}
+
+func (m Model) ActiveTab() ChatTab {
+	return m.activeTab
+}
+
+func (m *Model) SetActiveTab(tab ChatTab) {
+	m.activeTab = tab
+	m.updateViewportHeight()
+	m.updateInputPlaceholder()
+}
+
+func (m Model) PeerHasKey() bool {
+	return m.peerHasKey
+}
+
+func (m *Model) SetPeerKeyStatus(hasKey bool) {
+	m.peerHasKey = hasKey
+	if m.activeTab == TabSecret && !hasKey {
+		m.BlurInput()
+	}
+	m.updateInputPlaceholder()
+}
+
+func (m *Model) updateInputPlaceholder() {
+	if m.activeTab == TabSecret {
+		if !m.peerHasKey {
+			m.input.Placeholder = "Message input disabled: peer has not published an encryption key"
+		} else {
+			m.input.Placeholder = "Type a secret message... (Press Enter to send, Esc to unfocus)"
+		}
+	} else {
+		m.input.Placeholder = "Type a message... (Press Enter to send, Esc to unfocus)"
+	}
+}
+
+func (m *Model) updateViewportHeight() {
+	extraLines := 9
+	if m.activeTab == TabSecret {
+		extraLines = 10
+	}
+	vpHeight := m.height - extraLines
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
+	m.viewport.Height = vpHeight
 }
 
 func (m *Model) SetActiveChat(chatID int64) {
@@ -143,6 +197,10 @@ func (m Model) ActiveChatID() int64 {
 }
 
 func (m *Model) FocusInput() {
+	if m.activeTab == TabSecret && !m.peerHasKey {
+		m.BlurInput()
+		return
+	}
 	m.isFocused = true
 	m.input.Focus()
 }
@@ -282,10 +340,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
+			case "ctrl+s":
+				return m, func() tea.Msg { return ToggleTabMsg{} }
 			case "esc":
 				m.BlurInput()
 				return m, nil
 			case "enter":
+				if m.activeTab == TabSecret && !m.peerHasKey {
+					return m, nil
+				}
 				text := strings.TrimSpace(m.input.Value())
 				if text != "" && m.activeChatID != 0 {
 					if err := m.client.SendWS(m.activeChatID, text); err != nil {
@@ -300,6 +363,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						Text:      text,
 						Timestamp: nowStr,
 						Self:      true,
+						IsSecret:  m.activeTab == TabSecret,
 					})
 					m.client.UpdateChatSnippet(m.activeChatID, text, nowStr, 0, nil)
 					m.input.Reset()
@@ -312,6 +376,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
 	} else {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+s", "tab":
+				return m, func() tea.Msg { return ToggleTabMsg{} }
+			}
+		}
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -371,10 +442,58 @@ func (m Model) View(activeChat *client.Chat) string {
 		header = theme.StyleDim.Render("No active conversation")
 	}
 
-	// 2. Viewport
+	// 2. Tab Bar
+	var tabCloudStr, tabSecretStr string
+	if contentWidth < 28 {
+		if m.activeTab == TabCloud {
+			tabCloudStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("[ 💬 ]")
+			tabSecretStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 🔒 ]")
+		} else {
+			tabCloudStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 💬 ]")
+			tabSecretStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render("[ 🔒 ]")
+		}
+	} else {
+		if m.activeTab == TabCloud {
+			tabCloudStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("[ 💬 Cloud ]")
+			tabSecretStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 🔒 Secret ]")
+		} else {
+			tabCloudStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 💬 Cloud ]")
+			tabSecretStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render("[ 🔒 Secret ]")
+		}
+	}
+	tabBar := lipgloss.JoinHorizontal(lipgloss.Center, " ", tabCloudStr, "  ", tabSecretStr)
+	if lipgloss.Width(tabBar) > contentWidth {
+		tabBar = theme.Truncate(tabBar, contentWidth)
+	}
+
+	// 3. Secret Warning / Peer Key Banner
+	var warnBanner string
+	if m.activeTab == TabSecret {
+		if !m.peerHasKey {
+			rawBanner := "🔒 Peer has not published an encryption key"
+			warnBanner = "  " + lipgloss.NewStyle().Bold(true).Foreground(theme.ColorRed).Render(theme.Truncate(rawBanner, contentWidth-2))
+		} else {
+			avail := contentWidth - 2
+			var rawBanner string
+			if avail >= 90 {
+				rawBanner = "⚠️ Secret Chat: Device-bound encryption. Key migration: https://linetalk.vercel.app/docs"
+			} else if avail >= 73 {
+				rawBanner = "⚠️ Secret Chat: Device-bound. Docs: https://linetalk.vercel.app/docs"
+			} else if avail >= 57 {
+				rawBanner = "⚠️ Secret Chat: Device-bound (linetalk.vercel.app/docs)"
+			} else if avail >= 30 {
+				rawBanner = "⚠️ Secret Chat: Device-bound"
+			} else {
+				rawBanner = "⚠️ Secret Chat"
+			}
+			warnBanner = "  " + lipgloss.NewStyle().Foreground(theme.ColorYellow).Render(theme.Truncate(rawBanner, avail))
+		}
+	}
+
+	// 4. Viewport
 	vpBox := m.viewport.View()
 
-	// 3. Input Box
+	// 5. Input Box
 	inputBorder := theme.ColorBorderDim
 	if m.isFocused {
 		inputBorder = theme.ColorCyan
@@ -400,19 +519,35 @@ func (m Model) View(activeChat *client.Chat) string {
 		boxHeight = 1
 	}
 
+	var paneContent string
+	if m.activeTab == TabSecret {
+		paneContent = lipgloss.JoinVertical(lipgloss.Left,
+			header,
+			tabBar,
+			warnBanner,
+			"",
+			vpBox,
+			"",
+			inputRendered,
+		)
+	} else {
+		paneContent = lipgloss.JoinVertical(lipgloss.Left,
+			header,
+			tabBar,
+			"",
+			vpBox,
+			"",
+			inputRendered,
+		)
+	}
+
 	pane := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorderDim).
 		Width(boxWidth).
 		Height(boxHeight).
 		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Left,
-			header,
-			"",
-			vpBox,
-			"",
-			inputRendered,
-		))
+		Render(paneContent)
 
 	return pane
 }

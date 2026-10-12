@@ -153,8 +153,9 @@ func (m *Model) SelectChatByID(id int64) {
 	m.selectedID = id
 	chats := m.client.Chats()
 	for i, ch := range chats {
-		if ch.ID == id {
+		if ch.ID == id || ch.CloudID == id || ch.SecretID == id {
 			m.selectedIndex = i
+			m.selectedID = ch.ID
 			m.ensureVisible()
 			return
 		}

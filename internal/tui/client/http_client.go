@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,9 +43,11 @@ type HTTPClient struct {
 	wsMu               sync.Mutex
 
 	// E2EE fields
-	identityKey *crypto.IdentityKey
-	peerPubKeys map[int64][32]byte // userID → cached public key
-	peerKeyMu   sync.RWMutex
+	identityKey  *crypto.IdentityKey
+	peerPubKeys  map[int64][32]byte // userID → cached public key
+	peerKeyMu    sync.RWMutex
+	convIsSecret map[int64]bool
+	convPeerID   map[int64]int64
 }
 
 func NewHTTPClient(baseURL, appSecret string) Client {
@@ -62,9 +65,11 @@ func NewHTTPClient(baseURL, appSecret string) Client {
 		httpClient: &http.Client{
 			Timeout: 8 * time.Second,
 		},
-		onlineUsers: make(map[int64]bool),
-		messages:    make(map[int64][]Message),
-		peerPubKeys: make(map[int64][32]byte),
+		onlineUsers:  make(map[int64]bool),
+		messages:     make(map[int64][]Message),
+		peerPubKeys:  make(map[int64][32]byte),
+		convIsSecret: make(map[int64]bool),
+		convPeerID:   make(map[int64]int64),
 	}
 }
 
@@ -86,6 +91,7 @@ type authData struct {
 
 type convParticipantData struct {
 	ConvID          int64  `json:"conv_id"`
+	IsSecret        bool   `json:"is_secret"`
 	UserID          int64  `json:"user_id"`
 	Name            string `json:"name"`
 	Username        string `json:"username"`
@@ -282,12 +288,34 @@ func (h *HTTPClient) Logout() error {
 	h.profile = Profile{}
 	h.chats = nil
 	h.messages = make(map[int64][]Message)
+	h.convIsSecret = make(map[int64]bool)
+	h.convPeerID = make(map[int64]int64)
 	h.mu.Unlock()
+
+	h.peerKeyMu.Lock()
+	h.identityKey = nil
+	h.peerPubKeys = make(map[int64][32]byte)
+	h.peerKeyMu.Unlock()
 
 	if sessPath != "" {
 		_ = ClearSession(sessPath)
 	}
 	return nil
+}
+
+func (h *HTTPClient) IsConvSecret(convID int64) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.convIsSecret[convID]
+}
+
+func (h *HTTPClient) SetConvSecret(convID int64, isSecret bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.convIsSecret == nil {
+		h.convIsSecret = make(map[int64]bool)
+	}
+	h.convIsSecret[convID] = isSecret
 }
 
 func (h *HTTPClient) SessionPath() string {
@@ -366,28 +394,108 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 		return nil, errors.New("Invalid server response format")
 	}
 
-	chats := make([]Chat, len(res.Data))
+	h.mu.RLock()
+	if h.sessionEpoch != epoch || h.profile.Token == "" {
+		h.mu.RUnlock()
+		return nil, errors.New("session invalidated")
+	}
+	onlineMap := make(map[int64]bool, len(h.onlineUsers))
+	for k, v := range h.onlineUsers {
+		onlineMap[k] = v
+	}
+	h.mu.RUnlock()
+
+	tempIsSecret := make(map[int64]bool)
+	tempPeerID := make(map[int64]int64)
+	contactIndex := make(map[int64]int)
+	type chatMeta struct {
+		rawTime string
+	}
+	var chatMetas []chatMeta
+	var unifiedChats []Chat
+
+	for _, c := range res.Data {
+		tempIsSecret[c.ConvID] = c.IsSecret
+		tempPeerID[c.ConvID] = c.UserID
+
+		lastMsg := c.LastMessage
+		if c.IsSecret && c.UserID != 0 && lastMsg != "" {
+			if peerPub, err := h.GetPeerPublicKey(c.UserID); err == nil {
+				var peerArr [32]byte
+				copy(peerArr[:], peerPub)
+				if idKey := h.IdentityKey(); idKey != nil {
+					if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+						if dec, err := crypto.Decrypt(symKey, lastMsg); err == nil {
+							lastMsg = dec
+						}
+					}
+				}
+			}
+		}
+
+		idx, exists := contactIndex[c.UserID]
+		if !exists {
+			ch := Chat{
+				ID:          c.ConvID,
+				RecipientID: c.UserID,
+				Name:        c.Name,
+				Username:    c.Username,
+				LastMessage: lastMsg,
+				Time:        formatFriendlyTime(c.LastMessageTime),
+				Unread:      c.UnreadCount,
+				Online:      onlineMap[c.UserID],
+				IsSecret:    c.IsSecret,
+			}
+			if c.IsSecret {
+				ch.SecretID = c.ConvID
+			} else {
+				ch.CloudID = c.ConvID
+			}
+			contactIndex[c.UserID] = len(unifiedChats)
+			unifiedChats = append(unifiedChats, ch)
+			chatMetas = append(chatMetas, chatMeta{rawTime: c.LastMessageTime})
+		} else {
+			existing := &unifiedChats[idx]
+			if c.IsSecret {
+				existing.SecretID = c.ConvID
+			} else {
+				existing.CloudID = c.ConvID
+			}
+			existing.Unread += c.UnreadCount
+			// If this conversation has the newer message, use it
+			if c.LastMessageTime >= chatMetas[idx].rawTime || existing.LastMessage == "" {
+				existing.LastMessage = lastMsg
+				existing.IsSecret = c.IsSecret
+				existing.Time = formatFriendlyTime(c.LastMessageTime)
+				chatMetas[idx].rawTime = c.LastMessageTime
+			}
+			if existing.CloudID != 0 {
+				existing.ID = existing.CloudID
+			}
+		}
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.sessionEpoch != epoch || h.profile.Token == "" {
 		return nil, errors.New("session invalidated")
 	}
-	for i, c := range res.Data {
-		timeStr := formatFriendlyTime(c.LastMessageTime)
-		chats[i] = Chat{
-			ID:          c.ConvID,
-			RecipientID: c.UserID,
-			Name:        c.Name,
-			Username:    c.Username,
-			LastMessage: c.LastMessage,
-			Time:        timeStr,
-			Unread:      c.UnreadCount,
-			Online:      h.onlineUsers[c.UserID],
-		}
-	}
-	h.chats = chats
 
-	return chats, nil
+	if h.convIsSecret == nil {
+		h.convIsSecret = make(map[int64]bool)
+	}
+	if h.convPeerID == nil {
+		h.convPeerID = make(map[int64]int64)
+	}
+	for k, v := range tempIsSecret {
+		h.convIsSecret[k] = v
+	}
+	for k, v := range tempPeerID {
+		h.convPeerID[k] = v
+	}
+	h.chats = unifiedChats
+
+	return unifiedChats, nil
 }
 
 func (h *HTTPClient) Chats() []Chat {
@@ -473,9 +581,11 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 
 	var recipientName string
 	var recipientID int64
+	var isSecret bool
 	h.mu.RLock()
+	isSecret = h.convIsSecret[chatID]
 	for _, ch := range h.chats {
-		if ch.ID == chatID {
+		if ch.ID == chatID || ch.CloudID == chatID || ch.SecretID == chatID {
 			recipientName = ch.Name
 			recipientID = ch.RecipientID
 			if recipientName == "" {
@@ -488,7 +598,7 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 
 	var symKey [32]byte
 	var hasSymKey bool
-	if recipientID != 0 {
+	if isSecret && recipientID != 0 {
 		if peerPub, err := h.GetPeerPublicKey(recipientID); err == nil {
 			var peerArr [32]byte
 			copy(peerArr[:], peerPub)
@@ -509,20 +619,21 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 		if isSelf {
 			senderName = "You"
 		}
-		
+
 		text := c.Content
-		if hasSymKey {
-			decrypted, err := crypto.Decrypt(symKey, text)
-			if err == nil {
-				text = decrypted
-			} else if errors.Is(err, crypto.ErrLegacyMessage) {
-				// use text as-is
+		if isSecret {
+			if hasSymKey {
+				decrypted, err := crypto.Decrypt(symKey, text)
+				if err == nil {
+					text = decrypted
+				} else if errors.Is(err, crypto.ErrLegacyMessage) {
+					// use text as-is
+				} else {
+					text = "[cannot decrypt — key from another device]"
+				}
 			} else {
-				text = "[legacy message — not encrypted]"
+				text = "[cannot decrypt — key from another device]"
 			}
-		} else if text != "" && !strings.Contains(text, " ") && len(text) > 20 {
-			// fallback if we have ciphertext but no key
-			text = "[legacy message — not encrypted]"
 		}
 
 		if len(text) > maxRenderTextLength {
@@ -538,6 +649,7 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 			Text:      text,
 			Timestamp: formatFriendlyTime(c.CreatedAt),
 			Self:      isSelf,
+			IsSecret:  isSecret,
 		}
 	}
 
@@ -591,18 +703,28 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 		}
 		chatsMap[ch.ID] = name
 		recipientMap[ch.ID] = ch.RecipientID
+		if ch.CloudID != 0 {
+			chatsMap[ch.CloudID] = name
+			recipientMap[ch.CloudID] = ch.RecipientID
+		}
+		if ch.SecretID != 0 {
+			chatsMap[ch.SecretID] = name
+			recipientMap[ch.SecretID] = ch.RecipientID
+		}
 	}
 	h.mu.RUnlock()
 
-	// Pre-derive symmetric keys for all conversations
+	// Pre-derive symmetric keys for all Secret conversations
 	symKeys := make(map[int64][32]byte) // map convID -> key
 	if idKey := h.IdentityKey(); idKey != nil {
 		for convID, peerID := range recipientMap {
-			if peerPub, err := h.GetPeerPublicKey(peerID); err == nil {
-				var peerArr [32]byte
-				copy(peerArr[:], peerPub)
-				if key, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
-					symKeys[convID] = key
+			if h.convIsSecret[convID] {
+				if peerPub, err := h.GetPeerPublicKey(peerID); err == nil {
+					var peerArr [32]byte
+					copy(peerArr[:], peerPub)
+					if key, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
+						symKeys[convID] = key
+					}
 				}
 			}
 		}
@@ -650,17 +772,20 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 		}
 
 		text := c.Content
-		if symKey, ok := symKeys[c.ConvID]; ok {
-			decrypted, err := crypto.Decrypt(symKey, text)
-			if err == nil {
-				text = decrypted
-			} else if errors.Is(err, crypto.ErrLegacyMessage) {
-				// keep text as-is
+		isSecret := h.convIsSecret[c.ConvID]
+		if isSecret {
+			if symKey, ok := symKeys[c.ConvID]; ok {
+				decrypted, err := crypto.Decrypt(symKey, text)
+				if err == nil {
+					text = decrypted
+				} else if errors.Is(err, crypto.ErrLegacyMessage) {
+					// keep text as-is
+				} else {
+					text = "[cannot decrypt — key from another device]"
+				}
 			} else {
-				text = "[legacy message — not encrypted]"
+				text = "[cannot decrypt — key from another device]"
 			}
-		} else if text != "" && !strings.Contains(text, " ") && len(text) > 20 {
-			text = "[legacy message — not encrypted]"
 		}
 
 		if len(text) > maxRenderTextLength {
@@ -675,6 +800,7 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 			Text:      text,
 			Timestamp: formatFriendlyTime(c.CreatedAt),
 			Self:      isSelf,
+			IsSecret:  isSecret,
 		}
 		// prepend to reverse chronological API order to oldest-first
 		grouped[c.ConvID] = append([]Message{msg}, grouped[c.ConvID]...)
@@ -729,10 +855,12 @@ func (h *HTTPClient) UpdateChatSnippet(convID int64, lastMsg, timeStr string, un
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	isSecret := h.convIsSecret[convID]
 	for i := range h.chats {
-		if h.chats[i].ID == convID {
+		if h.chats[i].ID == convID || h.chats[i].CloudID == convID || h.chats[i].SecretID == convID {
 			if lastMsg != "" {
 				h.chats[i].LastMessage = lastMsg
+				h.chats[i].IsSecret = isSecret
 			}
 			if timeStr != "" {
 				h.chats[i].Time = timeStr
@@ -943,11 +1071,12 @@ func (h *HTTPClient) IsWSConnected() bool {
 }
 
 func (h *HTTPClient) SendWS(convID int64, text string) error {
-	// 1. Find recipient ID
+	// 1. Find recipient ID and secret status
 	h.mu.RLock()
+	isSecret := h.convIsSecret[convID]
 	var recipientID int64
 	for _, c := range h.chats {
-		if c.ID == convID {
+		if c.ID == convID || c.CloudID == convID || c.SecretID == convID {
 			recipientID = c.RecipientID
 			break
 		}
@@ -958,30 +1087,35 @@ func (h *HTTPClient) SendWS(convID int64, text string) error {
 		return errors.New("chat not found")
 	}
 
-	// 2. Fetch peer public key
-	peerPub, err := h.GetPeerPublicKey(recipientID)
-	if err != nil {
-		return fmt.Errorf("failed to get peer public key: %w", err)
-	}
+	content := text
 
-	// 3. Derive symmetric key
-	var peerPubArr [32]byte
-	copy(peerPubArr[:], peerPub)
+	if isSecret {
+		// 2. Fetch peer public key
+		peerPub, err := h.GetPeerPublicKey(recipientID)
+		if err != nil {
+			return fmt.Errorf("failed to get peer public key: %w", err)
+		}
 
-	idKey := h.IdentityKey()
-	if idKey == nil {
-		return errors.New("identity key not loaded")
-	}
+		// 3. Derive symmetric key
+		var peerPubArr [32]byte
+		copy(peerPubArr[:], peerPub)
 
-	symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerPubArr)
-	if err != nil {
-		return fmt.Errorf("failed to derive key: %w", err)
-	}
+		idKey := h.IdentityKey()
+		if idKey == nil {
+			return errors.New("identity key not loaded")
+		}
 
-	// 4. Encrypt
-	encrypted, err := crypto.Encrypt(symKey, text)
-	if err != nil {
-		return fmt.Errorf("encryption failed: %w", err)
+		symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerPubArr)
+		if err != nil {
+			return fmt.Errorf("failed to derive key: %w", err)
+		}
+
+		// 4. Encrypt
+		encrypted, err := crypto.Encrypt(symKey, text)
+		if err != nil {
+			return fmt.Errorf("encryption failed: %w", err)
+		}
+		content = encrypted
 	}
 
 	h.wsMu.Lock()
@@ -993,7 +1127,7 @@ func (h *HTTPClient) SendWS(convID int64, text string) error {
 
 	payload, _ := json.Marshal(map[string]any{
 		"conv_id": convID,
-		"content": encrypted,
+		"content": content,
 	})
 
 	inbound := wsInboundEnvelope{
@@ -1159,11 +1293,13 @@ func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
 		return nil, errors.New("invalid public key response")
 	}
 
-	var pubKeyBytes [32]byte
-	_, err = fmt.Sscanf(res.Data.PublicKey, "%x", &pubKeyBytes)
-	if err != nil {
-		return nil, errors.New("invalid hex in public key response")
+	decoded, err := hex.DecodeString(res.Data.PublicKey)
+	if err != nil || len(decoded) != 32 {
+		return nil, errors.New("invalid hex in public key response: expected 32 bytes")
 	}
+
+	var pubKeyBytes [32]byte
+	copy(pubKeyBytes[:], decoded)
 
 	h.peerKeyMu.Lock()
 	h.peerPubKeys[userID] = pubKeyBytes

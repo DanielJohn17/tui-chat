@@ -27,7 +27,7 @@ func (c *discoveryClient) SearchUsers(ctx context.Context, query string) ([]clie
 	return c.search(ctx, query)
 }
 
-func (c *discoveryClient) OpenDirectConversation(ctx context.Context, id int64) (client.Chat, error) {
+func (c *discoveryClient) OpenDirectConversation(ctx context.Context, id int64, isSecret ...bool) (client.Chat, error) {
 	return c.open(ctx, id)
 }
 
