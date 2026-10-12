@@ -144,12 +144,12 @@ async function run() {
     isPublished: true,
     commitHash: commitHash,
     downloads: {
-      linux_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-linux-amd64`,
-      linux_arm64: `https://github.com/${repo}/releases/download/${tag}/linetalk-linux-arm64`,
-      darwin_arm64: `https://github.com/${repo}/releases/download/${tag}/linetalk-darwin-arm64`,
-      darwin_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-darwin-amd64`,
-      windows_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-windows-amd64.exe`,
-      go_install: `go install github.com/${repo}/cmd/linetalk@${tag}`
+      linux_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-${tag}-linux-amd64`,
+      linux_arm64: `https://github.com/${repo}/releases/download/${tag}/linetalk-${tag}-linux-arm64`,
+      darwin_arm64: `https://github.com/${repo}/releases/download/${tag}/linetalk-${tag}-darwin-arm64`,
+      darwin_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-${tag}-darwin-amd64`,
+      windows_amd64: `https://github.com/${repo}/releases/download/${tag}/linetalk-${tag}-windows-amd64.exe`,
+      go_install: `go install github.com/${repo}/cmd/tui@${tag}`
     }
   };
 

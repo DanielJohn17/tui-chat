@@ -94,28 +94,59 @@ LineTalk is a lightweight, keyboard-driven terminal application engineered for p
 
 Zero dependencies required. Download and run the standalone executable for your operating system directly from **[GitHub Releases](https://github.com/DanielJohn17/tui-chat/releases)**:
 
-### Linux (x86_64 / ARM64)
+### Option 1: Automated Install (Latest Release)
+
+#### Linux & macOS
 ```bash
-curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/linetalk-linux-amd64
+# Detect latest version, OS, and architecture
+VERSION=$(curl -s https://api.github.com/repos/DanielJohn17/tui-chat/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+
+curl -L -o linetalk "https://github.com/DanielJohn17/tui-chat/releases/download/${VERSION}/linetalk-${VERSION}-${OS}-${ARCH}"
 chmod +x linetalk
 ./linetalk
 ```
 
-### macOS (Apple Silicon / Intel)
+---
+
+### Option 2: Versioned Direct Downloads (e.g. `v1.1.0`)
+
+#### Linux (x86_64 / ARM64)
 ```bash
-curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/latest/download/linetalk-darwin-arm64
+# Linux x86_64 (amd64)
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/download/v1.1.0/linetalk-v1.1.0-linux-amd64
+chmod +x linetalk
+./linetalk
+
+# Linux ARM64
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/download/v1.1.0/linetalk-v1.1.0-linux-arm64
 chmod +x linetalk
 ./linetalk
 ```
 
-### Windows (PowerShell / Command Prompt)
-Download **`linetalk-windows-amd64.exe`** from [Releases](https://github.com/DanielJohn17/tui-chat/releases) and launch:
+#### macOS (Apple Silicon / Intel)
+```bash
+# Apple Silicon (M1/M2/M3/M4 - ARM64)
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/download/v1.1.0/linetalk-v1.1.0-darwin-arm64
+chmod +x linetalk
+./linetalk
+
+# Intel (x86_64)
+curl -L -o linetalk https://github.com/DanielJohn17/tui-chat/releases/download/v1.1.0/linetalk-v1.1.0-darwin-amd64
+chmod +x linetalk
+./linetalk
+```
+
+#### Windows (PowerShell)
 ```powershell
-.\linetalk-windows-amd64.exe
+# Windows x86_64 (amd64)
+Invoke-WebRequest -Uri "https://github.com/DanielJohn17/tui-chat/releases/download/v1.1.0/linetalk-v1.1.0-windows-amd64.exe" -OutFile "linetalk.exe"
+.\linetalk.exe
 ```
 
 > [!TIP]
-> Pre-built binaries are pre-configured with the production API endpoint out-of-the-box. No setup or `.env` configuration is needed for general users!
+> Pre-built binaries are pre-configured with the production API endpoint out-of-the-box. No setup or `.env` configuration is needed for general users! All releases and checksums are available on the **[Releases Page](https://github.com/DanielJohn17/tui-chat/releases)**.
 
 ---
 
@@ -208,6 +239,7 @@ LineTalk is designed for fluid, 100% keyboard-driven interaction:
 | <kbd>i</kbd> / <kbd>Enter</kbd> | Global | Focus message input box (**Typing Mode**) |
 | <kbd>Esc</kbd> | Typing Mode | Unfocus message input box (**Navigation Mode**) |
 | <kbd>Enter</kbd> | Typing Mode | Send message |
+| <kbd>Tab</kbd> / <kbd>Ctrl+S</kbd> | Global | Switch active chat mode (**💬 Cloud** ↔ **🔒 Secret**) |
 | <kbd>n</kbd> | Navigation | Open **New Direct Message** modal |
 | <kbd>p</kbd> | Navigation | Open **Profile & Identity** screen |
 | <kbd>?</kbd> / <kbd>Ctrl+H</kbd> / <kbd>F1</kbd> | Global | Open **Interactive Keybinding Help** |
