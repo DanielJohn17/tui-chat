@@ -9,6 +9,8 @@ import (
 	"github.com/DanielJohn17/tui-chat/internal/api/config"
 	"github.com/DanielJohn17/tui-chat/internal/api/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestServer(expectedSecret string) *gin.Engine {
@@ -29,100 +31,82 @@ func setupTestServer(expectedSecret string) *gin.Engine {
 	return r
 }
 
-func TestClientSecretAuth_MissingHeader(t *testing.T) {
+func TestClientSecretAuth(t *testing.T) {
 	const secret = "test-secret-min-32-characters-for-testing"
 	r := setupTestServer(secret)
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/protected", nil)
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403 Forbidden, got %d", w.Code)
+	tests := []struct {
+		name         string
+		path         string
+		headerKey    string
+		headerVal    string
+		expectedCode int
+		expectedErr  string
+	}{
+		{
+			name:         "missing header returns 403 Forbidden",
+			path:         "/api/v1/protected",
+			expectedCode: http.StatusForbidden,
+			expectedErr:  "Forbidden: missing client secret header",
+		},
+		{
+			name:         "invalid secret returns 403 Forbidden",
+			path:         "/api/v1/protected",
+			headerKey:    config.ClientSecretHeader,
+			headerVal:    "wrong-client-secret-value",
+			expectedCode: http.StatusForbidden,
+			expectedErr:  "Forbidden: invalid client secret",
+		},
+		{
+			name:         "valid secret with primary header returns 200 OK",
+			path:         "/api/v1/protected",
+			headerKey:    config.ClientSecretHeader,
+			headerVal:    secret,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "valid secret with alternative header returns 200 OK",
+			path:         "/api/v1/protected",
+			headerKey:    config.AltClientSecretHeader,
+			headerVal:    secret,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "health probe bypasses auth",
+			path:         "/health",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "healthz probe bypasses auth",
+			path:         "/healthz",
+			expectedCode: http.StatusOK,
+		},
 	}
 
-	var resp map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, tt.path, nil)
+			require.NoError(t, err)
+
+			if tt.headerKey != "" {
+				req.Header.Set(tt.headerKey, tt.headerVal)
+			}
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedCode, w.Code)
+			if tt.expectedErr != "" {
+				var resp map[string]any
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.Equal(t, false, resp["success"])
+				assert.Equal(t, tt.expectedErr, resp["error"])
+			}
+		})
 	}
 
-	if resp["success"] != false || resp["error"] != "Forbidden: missing client secret header" {
-		t.Fatalf("unexpected error payload: %v", resp)
-	}
-}
-
-func TestClientSecretAuth_InvalidSecret(t *testing.T) {
-	const secret = "test-secret-min-32-characters-for-testing"
-	r := setupTestServer(secret)
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/protected", nil)
-	req.Header.Set(config.ClientSecretHeader, "wrong-client-secret-value")
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403 Forbidden, got %d", w.Code)
-	}
-
-	var resp map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	if resp["success"] != false || resp["error"] != "Forbidden: invalid client secret" {
-		t.Fatalf("unexpected error payload: %v", resp)
-	}
-}
-
-func TestClientSecretAuth_ValidSecret_PrimaryHeader(t *testing.T) {
-	const secret = "test-secret-min-32-characters-for-testing"
-	r := setupTestServer(secret)
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/protected", nil)
-	req.Header.Set(config.ClientSecretHeader, secret)
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200 OK, got %d (body: %s)", w.Code, w.Body.String())
-	}
-}
-
-func TestClientSecretAuth_ValidSecret_AltHeader(t *testing.T) {
-	const secret = "test-secret-min-32-characters-for-testing"
-	r := setupTestServer(secret)
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/protected", nil)
-	req.Header.Set(config.AltClientSecretHeader, secret)
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200 OK, got %d (body: %s)", w.Code, w.Body.String())
-	}
-}
-
-func TestClientSecretAuth_HealthProbesBypass(t *testing.T) {
-	const secret = "test-secret-min-32-characters-for-testing"
-	r := setupTestServer(secret)
-
-	for _, probePath := range []string{"/health", "/healthz"} {
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, probePath, nil)
-		r.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected status 200 OK for %s without secret, got %d", probePath, w.Code)
-		}
-	}
-}
-
-func TestClientSecretAuth_PanicOnEmptyExpectedSecret(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic on empty expectedSecret, got none")
-		}
-	}()
-
-	_ = middleware.ClientSecretAuth("")
+	t.Run("panic on empty expected secret", func(t *testing.T) {
+		assert.Panics(t, func() {
+			middleware.ClientSecretAuth("")
+		})
+	})
 }

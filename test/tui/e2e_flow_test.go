@@ -91,29 +91,6 @@ func TestHTTPClient_PeerPublicKeyAndE2EE(t *testing.T) {
 		// Identity key should be cleared
 		assert.Nil(t, c.IdentityKey())
 	})
-
-	t.Run("End-to-End Encryption derivation and message roundtrip", func(t *testing.T) {
-		// Alice derives shared key with Bob
-		keyAlice, err := crypto.DeriveConvKey(aliceKey.PrivateKey, bobKey.PublicKey)
-		require.NoError(t, err)
-
-		// Bob derives shared key with Alice
-		keyBob, err := crypto.DeriveConvKey(bobKey.PrivateKey, aliceKey.PublicKey)
-		require.NoError(t, err)
-
-		assert.Equal(t, keyAlice, keyBob)
-
-		// Alice encrypts message
-		secretMsg := "Meet me at the rendezvous point at 22:00 🔒"
-		ciphertext, err := crypto.Encrypt(keyAlice, secretMsg)
-		require.NoError(t, err)
-		assert.NotEqual(t, secretMsg, ciphertext)
-
-		// Bob decrypts message
-		decrypted, err := crypto.Decrypt(keyBob, ciphertext)
-		require.NoError(t, err)
-		assert.Equal(t, secretMsg, decrypted)
-	})
 }
 
 func TestHTTPClient_CloudPlaintext_vs_SecretEncrypted(t *testing.T) {

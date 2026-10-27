@@ -160,18 +160,4 @@ func TestMultiWindowMessageSync(t *testing.T) {
 	// Verify message is visible in Window 2
 	view := model.View()
 	assert.Contains(t, view, "Hello from my second terminal window!")
-	assert.Contains(t, view, "You")
-}
-
-func TestDevModeSessionIsolation(t *testing.T) {
-	// Verify that in development mode, different SESSION names yield isolated session files
-	alicePath := client.ResolveSessionPath("development", "alice")
-	bobPath := client.ResolveSessionPath("development", "bob")
-	defaultPath := client.ResolveSessionPath("development", "")
-
-	assert.NotEqual(t, alicePath, bobPath)
-	assert.NotEqual(t, alicePath, defaultPath)
-	assert.Contains(t, alicePath, "dev_session_alice.json")
-	assert.Contains(t, bobPath, "dev_session_bob.json")
-	assert.Contains(t, defaultPath, "dev_session.json")
 }

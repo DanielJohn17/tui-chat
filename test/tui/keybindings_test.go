@@ -16,37 +16,30 @@ func TestHelpKeybindings(t *testing.T) {
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 	assert.NotContains(t, model.View(), "HELP DESK")
 
-	// 2. '?' MUST open Help Desk
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
-	assert.Contains(t, model.View(), "HELP DESK")
+	// 2. '?' and Ctrl+H open Help Desk; Esc closes it
+	for _, openKey := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'?'}},
+		{Type: tea.KeyCtrlH},
+	} {
+		model, _ = model.Update(openKey)
+		assert.Contains(t, model.View(), "HELP DESK")
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		assert.NotContains(t, model.View(), "HELP DESK")
+	}
 
-	// 3. Esc closes Help Desk
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	assert.NotContains(t, model.View(), "HELP DESK")
-
-	// 4. Ctrl+H MUST open Help Desk
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlH})
-	assert.Contains(t, model.View(), "HELP DESK")
-}
-
-func TestCtrlHInInputModeOpensHelp(t *testing.T) {
-	model := authenticatedApp()
-
-	// 1. Focus input mode via 'i'
+	// 3. Test input mode: Ctrl+H and F1 open Help Desk while typing
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
 	assert.Contains(t, model.View(), "INPUT MODE")
 
-	// 2. Press Ctrl+H while in input mode
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlH})
-	assert.Contains(t, model.View(), "HELP DESK", "Ctrl+H in input mode must open Help Desk modal")
-
-	// 3. Press Esc to close Help Desk modal
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	assert.NotContains(t, model.View(), "HELP DESK", "Esc must close Help Desk modal")
-
-	// 4. Press F1 while in input mode
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyF1})
-	assert.Contains(t, model.View(), "HELP DESK", "F1 in input mode must open Help Desk modal")
+	for _, openKey := range []tea.KeyMsg{
+		{Type: tea.KeyCtrlH},
+		{Type: tea.KeyF1},
+	} {
+		model, _ = model.Update(openKey)
+		assert.Contains(t, model.View(), "HELP DESK")
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		assert.NotContains(t, model.View(), "HELP DESK")
+	}
 }
 
 func TestUTF8EmojiTruncation(t *testing.T) {

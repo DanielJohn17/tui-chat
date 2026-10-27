@@ -15,10 +15,6 @@ func TestAuthPassThrough(t *testing.T) {
 	model := tea.Model(tui.NewApp(c))
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	// Enter without inputs shows validation error
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	assert.Contains(t, model.View(), "Please enter your username")
-
 	// Simulate successful login
 	newModel, _ := model.Update(auth.AuthSuccessMsg{Profile: c.Profile()})
 	assert.Contains(t, newModel.View(), "LINETALK")

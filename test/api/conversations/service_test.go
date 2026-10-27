@@ -482,66 +482,44 @@ func TestCreateMessage_ConversationDeletingOrNotFound(t *testing.T) {
 	assert.Equal(t, "conversation does not exist or is currently being deleted", apiErr.Message)
 }
 
-func TestGetBulkChatsByUserID_Success(t *testing.T) {
+func TestGetBulkChatsByUserID(t *testing.T) {
 	expected := []conversations.BulkChatsResponseType{
-		{
-			ID:        1,
-			SenderID:  10,
-			ConvID:    100,
-			Content:   "Hello in bulk",
-			CreatedAt: "2026-09-24T12:00:00Z",
-			UpdatedAt: "2026-09-24T12:00:00Z",
-		},
+		{ID: 1, SenderID: 10, ConvID: 100, Content: "Hello in bulk"},
 	}
-	repo := new(MockConvRepo)
-	repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(expected, nil)
+	t.Run("Success", func(t *testing.T) {
+		repo := new(MockConvRepo)
+		repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(expected, nil)
+		s := conversations.NewConvService(repo, new(MockUserService))
+		chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
+		require.NoError(t, err)
+		assert.Equal(t, expected, chats)
+	})
 
-	s := conversations.NewConvService(repo, new(MockUserService))
-	chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
-
-	require.NoError(t, err)
-	assert.Equal(t, expected, chats)
+	t.Run("Error", func(t *testing.T) {
+		repo := new(MockConvRepo)
+		repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(nil, errors.New("db error"))
+		s := conversations.NewConvService(repo, new(MockUserService))
+		chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
+		require.Error(t, err)
+		assert.Nil(t, chats)
+	})
 }
 
-func TestGetBulkChatsByUserID_Error(t *testing.T) {
-	repo := new(MockConvRepo)
-	repo.On("GetBulkChatsByUserID", mock.Anything, int64(1), int64(50)).Return(nil, errors.New("db error"))
+func TestGetUnreadCountAndMarkAsRead(t *testing.T) {
+	t.Run("GetUnreadCount", func(t *testing.T) {
+		repo := new(MockConvRepo)
+		repo.On("GetUnreadCount", mock.Anything, int64(10), int64(20)).Return(3, nil)
+		s := conversations.NewConvService(repo, new(MockUserService))
+		count, err := s.GetUnreadCount(context.Background(), 10, 20)
+		require.NoError(t, err)
+		assert.Equal(t, 3, count)
+	})
 
-	s := conversations.NewConvService(repo, new(MockUserService))
-	chats, err := s.GetBulkChatsByUserID(context.Background(), 1, 50)
-
-	require.Error(t, err)
-	assert.Nil(t, chats)
-}
-
-func TestGetUnreadCount_Success(t *testing.T) {
-	repo := new(MockConvRepo)
-	repo.On("GetUnreadCount", mock.Anything, int64(10), int64(20)).Return(3, nil)
-
-	s := conversations.NewConvService(repo, new(MockUserService))
-	count, err := s.GetUnreadCount(context.Background(), 10, 20)
-
-	require.NoError(t, err)
-	assert.Equal(t, 3, count)
-}
-
-func TestGetUnreadCount_Error(t *testing.T) {
-	repo := new(MockConvRepo)
-	repo.On("GetUnreadCount", mock.Anything, int64(10), int64(20)).Return(0, errors.New("db error"))
-
-	s := conversations.NewConvService(repo, new(MockUserService))
-	count, err := s.GetUnreadCount(context.Background(), 10, 20)
-
-	require.Error(t, err)
-	assert.Equal(t, 0, count)
-}
-
-func TestMarkAsRead(t *testing.T) {
-	repo := new(MockConvRepo)
-	repo.On("MarkAsRead", mock.Anything, int64(100), int64(10), int64(20)).Return(nil)
-
-	s := conversations.NewConvService(repo, new(MockUserService))
-	s.MarkAsRead(context.Background(), 100, 10, 20)
-
-	repo.AssertExpectations(t)
+	t.Run("MarkAsRead", func(t *testing.T) {
+		repo := new(MockConvRepo)
+		repo.On("MarkAsRead", mock.Anything, int64(100), int64(10), int64(20)).Return(nil)
+		s := conversations.NewConvService(repo, new(MockUserService))
+		s.MarkAsRead(context.Background(), 100, 10, 20)
+		repo.AssertExpectations(t)
+	})
 }

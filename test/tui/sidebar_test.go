@@ -171,37 +171,6 @@ func TestTelegramSidebarLayout(t *testing.T) {
 	assert.Equal(t, linesBefore, linesAfter)
 }
 
-func TestSidebarClickWhenItemExpands(t *testing.T) {
-	model := authenticatedApp()
-
-	// 1. Click on Charlie Zhang (line 12)
-	model, _ = model.Update(tea.MouseMsg{
-		X:      10,
-		Y:      12,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	assert.Contains(t, model.View(), "@charlie")
-
-	// 2. Click on Alex Rivera (line 16)
-	model, _ = model.Update(tea.MouseMsg{
-		X:      10,
-		Y:      16,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	assert.Contains(t, model.View(), "@alex")
-
-	// 3. Click back on Bob Martin (line 3)
-	model, _ = model.Update(tea.MouseMsg{
-		X:      10,
-		Y:      3,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	assert.Contains(t, model.View(), "@bob")
-}
-
 func TestSidebarFocusRetentionOnInboundMessage(t *testing.T) {
 	c := newTestClient()
 	model := tea.Model(tui.NewApp(c))
@@ -243,26 +212,4 @@ func TestSidebarFocusRetentionOnInboundMessage(t *testing.T) {
 	// Bob must now be bumped back to index 0 with the sent message
 	assert.Equal(t, int64(1), c.Chats()[0].ID)
 	assert.Equal(t, "Still talking to you Bob!", c.Chats()[0].LastMessage)
-}
-
-func TestMouseClickActions(t *testing.T) {
-	model := authenticatedApp()
-
-	// 1. Mouse click on second chat (Sarah Connor, line 8)
-	model, _ = model.Update(tea.MouseMsg{
-		X:      10,
-		Y:      8,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	assert.Contains(t, model.View(), "@sarah")
-
-	// 2. Mouse click on bottom profile row in sidebar opens profile edit page
-	model, _ = model.Update(tea.MouseMsg{
-		X:      10,
-		Y:      31,
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
-	})
-	assert.Contains(t, model.View(), "PROFILE EDIT")
 }

@@ -104,12 +104,6 @@ func TestChatTabs_SidebarSecretBadge(t *testing.T) {
 	assert.Contains(t, view, "🔒 Top secret message")
 }
 
-func TestChatTabs_CannotDecryptKeyFromAnotherDevice(t *testing.T) {
-	// Verify that error string "[cannot decrypt — key from another device]" is used
-	errMsg := "[cannot decrypt — key from another device]"
-	assert.True(t, strings.Contains(errMsg, "key from another device"))
-}
-
 func TestChatTabs_SecretModeZeroWrappingAcrossWidths(t *testing.T) {
 	widths := []int{45, 50, 60, 70, 90, 110, 140}
 	for _, w := range widths {

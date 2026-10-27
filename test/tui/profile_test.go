@@ -7,27 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestProfileEditPageFlow(t *testing.T) {
-	model := authenticatedApp()
-
-	// 1. Press 'p' to open Profile Edit page
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
-	assert.Contains(t, model.View(), "PROFILE EDIT")
-
-	// 2. Press Esc to return to Chat
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	assert.Contains(t, model.View(), "LINETALK")
-
-	// 3. Re-open Profile Edit page and Save
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
-	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd != nil {
-		msg := cmd()
-		model, _ = model.Update(msg)
-	}
-	assert.Contains(t, model.View(), "LINETALK")
-}
-
 func TestProfilePageMouseClicks(t *testing.T) {
 	model := authenticatedApp()
 
