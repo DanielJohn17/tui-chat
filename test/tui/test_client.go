@@ -433,3 +433,16 @@ func (m *TestClient) SetConvSecret(convID int64, isSecret bool) {
 	}
 	m.convIsSecret[convID] = isSecret
 }
+
+func (m *TestClient) FindChatByConvID(convID int64) (client.Chat, bool) {
+	for _, ch := range m.chats {
+		if ch.ID == convID || ch.CloudID == convID || ch.SecretID == convID {
+			return ch, true
+		}
+	}
+	return client.Chat{}, false
+}
+
+func (m *TestClient) DecryptMessage(peerID int64, ciphertext string) string {
+	return ciphertext
+}

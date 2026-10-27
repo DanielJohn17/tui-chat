@@ -115,6 +115,7 @@ type Client interface {
 	UpdateChatSnippet(convID int64, lastMsg, timeStr string, unreadDelta int, setExactUnread *int)
 	IsConvSecret(convID int64) bool
 	SetConvSecret(convID int64, isSecret bool)
+	FindChatByConvID(convID int64) (Chat, bool)
 
 	// WebSocket operations
 	ConnectWS(eventsChan chan<- any) error
@@ -133,4 +134,6 @@ type Client interface {
 	UploadPublicKey(pubKey []byte) error
 	// GetPeerPublicKey fetches and caches a peer's public key from the server.
 	GetPeerPublicKey(userID int64) ([]byte, error)
+	// DecryptMessage derives the shared secret with peerID and decrypts ciphertext, handling legacy and fallback formats.
+	DecryptMessage(peerID int64, ciphertext string) string
 }

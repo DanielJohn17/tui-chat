@@ -420,17 +420,7 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 
 		lastMsg := c.LastMessage
 		if c.IsSecret && c.UserID != 0 && lastMsg != "" {
-			if peerPub, err := h.GetPeerPublicKey(c.UserID); err == nil {
-				var peerArr [32]byte
-				copy(peerArr[:], peerPub)
-				if idKey := h.IdentityKey(); idKey != nil {
-					if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
-						if dec, err := crypto.Decrypt(symKey, lastMsg); err == nil {
-							lastMsg = dec
-						}
-					}
-				}
-			}
+			lastMsg = h.DecryptMessage(c.UserID, lastMsg)
 		}
 
 		idx, exists := contactIndex[c.UserID]
@@ -517,6 +507,17 @@ func (h *HTTPClient) SetChats(chats []Chat) {
 	h.chats = chats
 }
 
+func (h *HTTPClient) FindChatByConvID(convID int64) (Chat, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, ch := range h.chats {
+		if ch.ID == convID || ch.CloudID == convID || ch.SecretID == convID {
+			return ch, true
+		}
+	}
+	return Chat{}, false
+}
+
 func (h *HTTPClient) SetUserOnline(userID int64, online bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -582,32 +583,16 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 	var recipientName string
 	var recipientID int64
 	var isSecret bool
+
 	h.mu.RLock()
 	isSecret = h.convIsSecret[chatID]
-	for _, ch := range h.chats {
-		if ch.ID == chatID || ch.CloudID == chatID || ch.SecretID == chatID {
-			recipientName = ch.Name
-			recipientID = ch.RecipientID
-			if recipientName == "" {
-				recipientName = ch.Username
-			}
-			break
-		}
-	}
 	h.mu.RUnlock()
 
-	var symKey [32]byte
-	var hasSymKey bool
-	if isSecret && recipientID != 0 {
-		if peerPub, err := h.GetPeerPublicKey(recipientID); err == nil {
-			var peerArr [32]byte
-			copy(peerArr[:], peerPub)
-			if idKey := h.IdentityKey(); idKey != nil {
-				if key, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
-					symKey = key
-					hasSymKey = true
-				}
-			}
+	if ch, ok := h.FindChatByConvID(chatID); ok {
+		recipientName = ch.Name
+		recipientID = ch.RecipientID
+		if recipientName == "" {
+			recipientName = ch.Username
 		}
 	}
 
@@ -622,18 +607,7 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 
 		text := c.Content
 		if isSecret {
-			if hasSymKey {
-				decrypted, err := crypto.Decrypt(symKey, text)
-				if err == nil {
-					text = decrypted
-				} else if errors.Is(err, crypto.ErrLegacyMessage) {
-					// use text as-is
-				} else {
-					text = "[cannot decrypt — key from another device]"
-				}
-			} else {
-				text = "[cannot decrypt — key from another device]"
-			}
+			text = h.DecryptMessage(recipientID, text)
 		}
 
 		if len(text) > maxRenderTextLength {
@@ -1071,21 +1045,15 @@ func (h *HTTPClient) IsWSConnected() bool {
 }
 
 func (h *HTTPClient) SendWS(convID int64, text string) error {
-	// 1. Find recipient ID and secret status
 	h.mu.RLock()
 	isSecret := h.convIsSecret[convID]
-	var recipientID int64
-	for _, c := range h.chats {
-		if c.ID == convID || c.CloudID == convID || c.SecretID == convID {
-			recipientID = c.RecipientID
-			break
-		}
-	}
 	h.mu.RUnlock()
 
-	if recipientID == 0 {
+	ch, ok := h.FindChatByConvID(convID)
+	if !ok || ch.RecipientID == 0 {
 		return errors.New("chat not found")
 	}
+	recipientID := ch.RecipientID
 
 	content := text
 
@@ -1306,4 +1274,35 @@ func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
 	h.peerKeyMu.Unlock()
 
 	return pubKeyBytes[:], nil
+}
+
+func (h *HTTPClient) DecryptMessage(peerID int64, ciphertext string) string {
+	if ciphertext == "" || peerID == 0 {
+		return ciphertext
+	}
+	peerPub, err := h.GetPeerPublicKey(peerID)
+	if err != nil {
+		return "[cannot decrypt — key from another device]"
+	}
+	var peerArr [32]byte
+	copy(peerArr[:], peerPub)
+
+	idKey := h.IdentityKey()
+	if idKey == nil {
+		return "[cannot decrypt — key from another device]"
+	}
+
+	symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr)
+	if err != nil {
+		return "[cannot decrypt — key from another device]"
+	}
+
+	decrypted, err := crypto.Decrypt(symKey, ciphertext)
+	if err == nil {
+		return decrypted
+	}
+	if errors.Is(err, crypto.ErrLegacyMessage) {
+		return ciphertext
+	}
+	return "[cannot decrypt — key from another device]"
 }

@@ -1,13 +1,11 @@
 package tui
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
-	"github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -71,15 +69,11 @@ func (m *AppModel) triggerNotification(sender, content string) tea.Cmd {
 func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 	senderName := "Recipient"
 	var peerID int64
-	chats := m.client.Chats()
-	for _, ch := range chats {
-		if ch.ID == p.ConvID || ch.CloudID == p.ConvID || ch.SecretID == p.ConvID {
-			peerID = ch.RecipientID
-			senderName = ch.Name
-			if senderName == "" {
-				senderName = ch.Username
-			}
-			break
+	if ch, ok := m.client.FindChatByConvID(p.ConvID); ok {
+		peerID = ch.RecipientID
+		senderName = ch.Name
+		if senderName == "" {
+			senderName = ch.Username
 		}
 	}
 	isSelf := p.SenderID == m.client.Profile().ID
@@ -91,25 +85,7 @@ func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 	isSecret := m.client.IsConvSecret(p.ConvID)
 	text := p.Content
 	if isSecret && peerID != 0 {
-		if peerPub, err := m.client.GetPeerPublicKey(peerID); err == nil {
-			var peerArr [32]byte
-			copy(peerArr[:], peerPub)
-			if idKey := m.client.IdentityKey(); idKey != nil {
-				if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
-					if dec, err := crypto.Decrypt(symKey, text); err == nil {
-						text = dec
-					} else if !errors.Is(err, crypto.ErrLegacyMessage) {
-						text = "[cannot decrypt — key from another device]"
-					}
-				} else {
-					text = "[cannot decrypt — key from another device]"
-				}
-			} else {
-				text = "[cannot decrypt — key from another device]"
-			}
-		} else {
-			text = "[cannot decrypt — key from another device]"
-		}
+		text = m.client.DecryptMessage(peerID, text)
 	}
 
 	// Check if message is already stored in client memory (avoids duplication on sender window)
@@ -172,25 +148,7 @@ func (m *AppModel) handleWSChatNotification(p client.WSChatNotificationPayload) 
 	isSecret := m.client.IsConvSecret(p.ConvID)
 	text := p.Content
 	if isSecret {
-		if peerPub, err := m.client.GetPeerPublicKey(p.SenderID); err == nil {
-			var peerArr [32]byte
-			copy(peerArr[:], peerPub)
-			if idKey := m.client.IdentityKey(); idKey != nil {
-				if symKey, err := crypto.DeriveConvKey(idKey.PrivateKey, peerArr); err == nil {
-					if dec, err := crypto.Decrypt(symKey, text); err == nil {
-						text = dec
-					} else if !errors.Is(err, crypto.ErrLegacyMessage) {
-						text = "[cannot decrypt — key from another device]"
-					}
-				} else {
-					text = "[cannot decrypt — key from another device]"
-				}
-			} else {
-				text = "[cannot decrypt — key from another device]"
-			}
-		} else {
-			text = "[cannot decrypt — key from another device]"
-		}
+		text = m.client.DecryptMessage(p.SenderID, text)
 	}
 
 	// 1. Check if conversation exists in sidebar list; if not, create/prepend it!
