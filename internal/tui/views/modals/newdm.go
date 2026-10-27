@@ -1,6 +1,7 @@
 package modals
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
@@ -22,8 +23,8 @@ type NewDMModel struct {
 
 func NewDM() NewDMModel {
 	ti := textinput.New()
-	ti.Placeholder = "Search username"
-	ti.CharLimit = 20
+	ti.Placeholder = "Search by @username or paste invite link..."
+	ti.CharLimit = 64
 	ti.Prompt = "@"
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(theme.ColorMagenta).Bold(true)
 	ti.TextStyle = lipgloss.NewStyle().Foreground(theme.ColorWhite)
@@ -31,7 +32,7 @@ func NewDM() NewDMModel {
 }
 
 func (m *NewDMModel) SetSize(w, h int) {
-	m.input.Width = max(1, min(56, w)-5)
+	m.input.Width = max(1, min(70, w-10))
 }
 
 func (m *NewDMModel) Reset() {
@@ -104,23 +105,26 @@ func (m NewDMModel) View(width, height int) string {
 	if width < 1 || height < 1 {
 		return ""
 	}
-	// Width includes horizontal padding; borders add two more cells.
 	border := width >= 6 && height >= 7
-	innerWidth := min(56, width)
+	targetW := 74
+	if width < targetW {
+		targetW = width
+	}
+	if targetW < 1 {
+		targetW = 1
+	}
+
+	innerWidth := targetW
 	availableHeight := height
 	if border {
 		innerWidth -= 4
 		availableHeight -= 2
 	}
-	m.input.Width = max(1, innerWidth-1)
-	input := m.input.View()
-	if lipgloss.Width(input) > innerWidth {
-		input = theme.Truncate(theme.StripANSI(input), innerWidth)
+	if innerWidth < 1 {
+		innerWidth = 1
 	}
-	lines := []string{
-		theme.StyleTitle.Render(theme.Truncate("NEW DIRECT MESSAGE", innerWidth)),
-		input,
-	}
+
+	// Status text logic
 	status := "Type at least 2 characters"
 	switch {
 	case m.opening:
@@ -130,34 +134,142 @@ func (m NewDMModel) View(width, height int) string {
 	case m.loading:
 		status = "Searching..."
 	case m.searched && len(m.results) == 0:
-		status = "No results"
+		status = "No results found matching query"
 	case len(m.results) > 0:
-		status = "Select a user"
+		status = fmt.Sprintf("Select a user (%d found)", len(m.results))
 	}
-	style := theme.StyleDim
+
+	statusStyle := theme.StyleDim
 	if m.errorMsg != "" {
-		style = theme.StyleError
+		statusStyle = theme.StyleError
+	} else if m.loading {
+		statusStyle = lipgloss.NewStyle().Foreground(theme.ColorYellow)
+	} else if len(m.results) > 0 {
+		statusStyle = theme.StyleSubtitle
 	}
-	lines = append(lines, style.Render(theme.Truncate(theme.SanitizeLine(status), innerWidth)))
-	visible := max(0, availableHeight-4)
-	start := max(0, m.selected-visible+1)
-	for i := start; i < len(m.results) && i < start+visible; i++ {
-		user := m.results[i]
-		prefix := "  "
-		style := lipgloss.NewStyle().Foreground(theme.ColorCyan)
-		if i == m.selected {
-			prefix = "> "
-			style = style.Foreground(theme.ColorMagenta).Bold(true)
+
+	var lines []string
+
+	// Compact mode for small terminals
+	if availableHeight < 12 {
+		m.input.Width = max(1, innerWidth-2)
+		input := m.input.View()
+		if lipgloss.Width(input) > innerWidth {
+			input = theme.Truncate(theme.StripANSI(input), innerWidth)
 		}
-		lines = append(lines, style.Render(theme.Truncate(prefix+theme.SanitizeLine(user.Name)+" @"+theme.SanitizeLine(user.Username), innerWidth)))
+		lines = []string{
+			theme.StyleTitle.Render(theme.Truncate("NEW DIRECT MESSAGE", innerWidth)),
+			input,
+			statusStyle.Render(theme.Truncate(theme.SanitizeLine(status), innerWidth)),
+		}
+
+		visible := max(0, availableHeight-4)
+		start := max(0, m.selected-visible+1)
+		for i := start; i < len(m.results) && i < start+visible; i++ {
+			user := m.results[i]
+			prefix := "  "
+			style := lipgloss.NewStyle().Foreground(theme.ColorCyan)
+			if i == m.selected {
+				prefix = "> "
+				style = style.Foreground(theme.ColorMagenta).Bold(true)
+			}
+			item := prefix + theme.SanitizeLine(user.Name) + " @" + theme.SanitizeLine(user.Username)
+			if user.InviteToken != "" {
+				item += " [Invite]"
+			}
+			if user.Bio != "" {
+				item += " • " + theme.SanitizeLine(user.Bio)
+			}
+			lines = append(lines, style.Render(theme.Truncate(item, innerWidth)))
+		}
+		lines = append(lines, theme.StyleDim.Render(theme.Truncate("Up/Down: Select  Enter: Open  Esc: Cancel", innerWidth)))
+	} else {
+		// Rich inviting mode for standard terminals
+		titleHeader := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(
+			theme.StyleTitle.Render("◈ NEW DIRECT MESSAGE ◈"),
+		)
+		lines = append(lines, titleHeader, "")
+
+		// Bordered search input container (Width innerWidth-2 so outer width with borders equals innerWidth)
+		m.input.Width = max(1, innerWidth-6)
+		searchBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.ColorCyan).
+			Width(innerWidth-2).
+			Padding(0, 1).
+			Render(m.input.View())
+		lines = append(lines, strings.Split(searchBox, "\n")...)
+		lines = append(lines, "")
+
+		// Status banner
+		lines = append(lines, statusStyle.Render(theme.Truncate(status, innerWidth)))
+
+		// Friendly tips when search has not yet yielded results
+		if !m.searched && !m.loading && len(m.results) == 0 && availableHeight >= 16 {
+			lines = append(lines,
+				"",
+				theme.StyleDim.Render("💡 How to connect:"),
+				theme.StyleDim.Render("  • Type @username to search public users in directory"),
+				theme.StyleDim.Render("  • Paste an invite link (tui://invite/...) to connect with private users"),
+			)
+		}
+
+		// Results list
+		if len(m.results) > 0 {
+			lines = append(lines, "")
+			overhead := len(lines) + 2 // reserve space for footer & separator
+			visible := max(1, availableHeight-overhead)
+			start := max(0, m.selected-visible+1)
+
+			for i := start; i < len(m.results) && i < start+visible; i++ {
+				user := m.results[i]
+				var prefix string
+				nameStyle := lipgloss.NewStyle().Foreground(theme.ColorWhite)
+				handleStyle := lipgloss.NewStyle().Foreground(theme.ColorCyan)
+
+				if i == m.selected {
+					prefix = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render("▶ ")
+					nameStyle = nameStyle.Bold(true)
+					handleStyle = handleStyle.Bold(true)
+				} else {
+					prefix = "  "
+				}
+
+				nameView := nameStyle.Render(theme.SanitizeLine(user.Name))
+				handleView := handleStyle.Render("@" + theme.SanitizeLine(user.Username))
+
+				var badgeView string
+				if user.InviteToken != "" {
+					badgeView = " " + lipgloss.NewStyle().Bold(true).Foreground(theme.ColorBlack).Background(theme.ColorGreen).Render(" INVITE ")
+				}
+
+				var bioView string
+				if user.Bio != "" {
+					bioView = " " + theme.StyleDim.Render("• "+theme.SanitizeLine(user.Bio))
+				}
+
+				itemLine := prefix + nameView + " " + handleView + badgeView + bioView
+				lines = append(lines, theme.Truncate(itemLine, innerWidth))
+			}
+		}
+
+		lines = append(lines,
+			"",
+			theme.StyleDim.Render(theme.Truncate("↑↓: Navigate  •  Enter: Open Chat  •  Esc: Cancel", innerWidth)),
+		)
 	}
-	lines = append(lines, theme.StyleDim.Render(theme.Truncate("Up/Down: Select  Enter: Open  Esc: Cancel", innerWidth)))
+
 	if len(lines) > availableHeight {
 		lines = lines[:availableHeight]
 	}
+
 	boxStyle := lipgloss.NewStyle().Width(innerWidth)
 	if border {
-		boxStyle = boxStyle.Width(innerWidth+2).Border(lipgloss.RoundedBorder()).BorderForeground(theme.ColorCyan).Padding(0, 1)
+		boxStyle = boxStyle.
+			Width(innerWidth+2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.ColorCyan).
+			Padding(0, 1)
 	}
 	box := boxStyle.Render(strings.Join(lines, "\n"))
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)

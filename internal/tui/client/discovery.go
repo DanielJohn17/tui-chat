@@ -21,20 +21,40 @@ func (h *HTTPClient) SearchUsers(ctx context.Context, query string) ([]UserSumma
 	return data.Users, nil
 }
 
-func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64, isSecret ...bool) (Chat, error) {
-	self := h.Profile().ID
-	if userID <= 0 || userID == self {
-		return Chat{}, errors.New("Select another user to start a conversation")
+func (h *HTTPClient) ResolveInviteToken(ctx context.Context, token string) (UserSummary, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return UserSummary{}, errors.New("empty invite token")
 	}
+	var user UserSummary
+	if err := h.discoveryRequest(ctx, http.MethodGet, "/api/v1/users/invite/"+url.PathEscape(token), nil, &user); err != nil {
+		return UserSummary{}, err
+	}
+	user.InviteToken = token
+	return user, nil
+}
+
+func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64, isSecret ...bool) (Chat, error) {
 	secret := false
 	if len(isSecret) > 0 && isSecret[0] {
 		secret = true
 	}
+	return h.OpenDirectConversationWithToken(ctx, userID, secret, "")
+}
+
+func (h *HTTPClient) OpenDirectConversationWithToken(ctx context.Context, userID int64, isSecret bool, inviteToken string) (Chat, error) {
+	self := h.Profile().ID
+	if userID <= 0 || userID == self {
+		return Chat{}, errors.New("Select another user to start a conversation")
+	}
 	payload := map[string]any{
 		"user_id_two": userID,
 	}
-	if secret {
+	if isSecret {
 		payload["is_secret"] = true
+	}
+	if inviteToken != "" {
+		payload["invite_token"] = inviteToken
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -63,6 +83,7 @@ func (h *HTTPClient) OpenDirectConversation(ctx context.Context, userID int64, i
 				RecipientID: p.UserID,
 				Name:        p.Name,
 				Username:    p.Username,
+				Bio:         p.Bio,
 				LastMessage: p.LastMessage,
 				Time:        formatFriendlyTime(p.LastMessageTime),
 				Unread:      p.UnreadCount,

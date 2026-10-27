@@ -130,6 +130,29 @@ func (q *Queries) DeleteMessagesAsBatch(ctx context.Context, arg DeleteMessagesA
 	return result.RowsAffected(), nil
 }
 
+const directConversationExists = `-- name: DirectConversationExists :one
+SELECT EXISTS (
+  SELECT 1 FROM conversations
+  WHERE user_min_id = LEAST($1::bigint, $2::bigint)
+    AND user_max_id = GREATEST($1::bigint, $2::bigint)
+    AND is_secret = $3::boolean
+    AND is_deleting = FALSE
+)
+`
+
+type DirectConversationExistsParams struct {
+	UserID   int64
+	UserID2  int64
+	IsSecret bool
+}
+
+func (q *Queries) DirectConversationExists(ctx context.Context, arg DirectConversationExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, directConversationExists, arg.UserID, arg.UserID2, arg.IsSecret)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getBulkChatsByUserID = `-- name: GetBulkChatsByUserID :many
 WITH
   user_convs AS (
@@ -401,6 +424,7 @@ SELECT
   u.id AS user_id,
   u.name,
   u.username,
+  u.bio,
   COALESCE(lm.content, '') AS last_message,
   COALESCE(lm.created_at, tc.created_at) AS last_message_time,
   COALESCE(unread.count, 0)::int AS unread_count
@@ -447,6 +471,7 @@ type GetConversationsByUserIdRow struct {
 	UserID          int64
 	Name            string
 	Username        string
+	Bio             string
 	LastMessage     string
 	LastMessageTime pgtype.Timestamptz
 	UnreadCount     int32
@@ -467,6 +492,7 @@ func (q *Queries) GetConversationsByUserId(ctx context.Context, userID int64) ([
 			&i.UserID,
 			&i.Name,
 			&i.Username,
+			&i.Bio,
 			&i.LastMessage,
 			&i.LastMessageTime,
 			&i.UnreadCount,
@@ -529,7 +555,8 @@ SELECT
     tc.is_secret,
     u.id AS user_id,
     u.name,
-    u.username
+    u.username,
+    u.bio
 FROM
     target_conv tc
 CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS requested(id)
@@ -549,6 +576,7 @@ type GetOrCreateDirectConversationRow struct {
 	UserID   int64
 	Name     string
 	Username string
+	Bio      string
 }
 
 // Base-table scans cannot see participants inserted by a sibling CTE.
@@ -567,6 +595,7 @@ func (q *Queries) GetOrCreateDirectConversation(ctx context.Context, arg GetOrCr
 			&i.UserID,
 			&i.Name,
 			&i.Username,
+			&i.Bio,
 		); err != nil {
 			return nil, err
 		}

@@ -97,8 +97,11 @@ func TestProfileBioPersistence(t *testing.T) {
 		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
 
-	// 3. Save profile
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab}) // focus Save button
+	// 3. Save profile (Tab 4 times: Privacy -> Copy -> Regen -> Save)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
@@ -109,4 +112,63 @@ func TestProfileBioPersistence(t *testing.T) {
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
 	view := model.View()
 	assert.Contains(t, view, "Building Go TUIs")
+}
+
+func TestProfilePrivacyToggleAndInviteRegen(t *testing.T) {
+	model := authenticatedApp()
+
+	// Open profile edit page via 'p'
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	view := model.View()
+	assert.Contains(t, view, "Privacy:")
+	assert.Contains(t, view, "[●] Public (Searchable)")
+	assert.Contains(t, view, "tui://invite/inv_alice_test_token_123")
+
+	// Tab to Privacy field (0=Name, 1=Username, 2=Bio, 3=Privacy)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+
+	// Toggle privacy via Space
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	view = model.View()
+	assert.Contains(t, view, "[●] Invite-Only")
+
+	// Tab to Copy button (focus 4)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view = model.View()
+	assert.Contains(t, view, "Link copied")
+
+	// Tab to Regen button (focus 5)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view = model.View()
+	assert.Contains(t, view, "tui://invite/inv_test_regenerated")
+	assert.Contains(t, view, "New invite link generated")
+
+	// Tab to Save button (focus 6)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		msg := cmd()
+		model, _ = model.Update(msg)
+	}
+	assert.Contains(t, model.View(), "LINETALK")
+}
+
+func TestProfileCopyInviteLinkHotkey(t *testing.T) {
+	model := authenticatedApp()
+
+	// Open profile edit page via 'p'
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	// Navigate out of text fields (tab 3 times to Privacy)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+
+	// Press 'c' to copy invite link
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	view := model.View()
+	assert.Contains(t, view, "Link copied")
 }

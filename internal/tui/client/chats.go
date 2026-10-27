@@ -14,6 +14,7 @@ type convParticipantData struct {
 	UserID          int64  `json:"user_id"`
 	Name            string `json:"name"`
 	Username        string `json:"username"`
+	Bio             string `json:"bio"`
 	LastMessage     string `json:"last_message"`
 	LastMessageTime string `json:"last_message_time"`
 	UnreadCount     int    `json:"unread_count"`
@@ -126,6 +127,7 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 				RecipientID: c.UserID,
 				Name:        c.Name,
 				Username:    c.Username,
+				Bio:         c.Bio,
 				LastMessage: lastMsg,
 				Time:        formatFriendlyTime(c.LastMessageTime),
 				Unread:      c.UnreadCount,

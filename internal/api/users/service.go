@@ -2,6 +2,8 @@ package users
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
 	"unicode/utf8"
 
@@ -23,6 +25,22 @@ type UserServiceInt interface {
 	GetUserByID(
 		ctx context.Context,
 		input int64,
+	) (*GetUserResponseType, error)
+
+	GetUserByInviteToken(
+		ctx context.Context,
+		inviteToken string,
+	) (*PublicUser, error)
+
+	UpdateProfile(
+		ctx context.Context,
+		userID int64,
+		input UpdateUserProfileRequest,
+	) (*GetUserResponseType, error)
+
+	RegenerateInviteToken(
+		ctx context.Context,
+		userID int64,
 	) (*GetUserResponseType, error)
 
 	DeleteUser(
@@ -85,14 +103,7 @@ func (s *UserService) GetUserByUsername(
 		return nil, apierrs.NewNotFoundError(err.Error())
 	}
 
-	userResp := &GetUserResponseType{
-		ID:       user.ID,
-		Name:     user.Name,
-		Password: user.Password,
-		Username: user.Username,
-	}
-
-	return userResp, nil
+	return user, nil
 }
 
 func (s *UserService) GetUserByID(
@@ -104,6 +115,60 @@ func (s *UserService) GetUserByID(
 		return nil, apierrs.NewNotFoundError(err.Error())
 	}
 
+	return user, nil
+}
+
+func (s *UserService) GetUserByInviteToken(ctx context.Context, inviteToken string) (*PublicUser, error) {
+	inviteToken = strings.TrimSpace(inviteToken)
+	if inviteToken == "" {
+		return nil, apierrs.NewBadRequestError("invite token is required")
+	}
+	user, err := s.r.GetUserByInviteToken(ctx, inviteToken)
+	if err != nil {
+		return nil, apierrs.NewNotFoundError("invalid or expired invite link")
+	}
+	return &PublicUser{
+		ID:       user.ID,
+		Name:     user.Name,
+		Username: user.Username,
+		Bio:      user.Bio,
+	}, nil
+}
+
+func (s *UserService) UpdateProfile(ctx context.Context, userID int64, input UpdateUserProfileRequest) (*GetUserResponseType, error) {
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, apierrs.NewBadRequestError("name cannot be empty")
+	}
+	if utf8.RuneCountInString(name) > 150 {
+		return nil, apierrs.NewBadRequestError("name must be at most 150 characters")
+	}
+	bio := strings.TrimSpace(input.Bio)
+	if utf8.RuneCountInString(bio) > 255 {
+		return nil, apierrs.NewBadRequestError("bio must be at most 255 characters")
+	}
+	if input.IsSearchable == nil {
+		return nil, apierrs.NewBadRequestError("is_searchable is required")
+	}
+
+	user, err := s.r.UpdateUserProfile(ctx, userID, name, bio, *input.IsSearchable)
+	if err != nil {
+		return nil, apierrs.NewInternalServerError("failed to update profile", err)
+	}
+	return user, nil
+}
+
+func (s *UserService) RegenerateInviteToken(ctx context.Context, userID int64) (*GetUserResponseType, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return nil, apierrs.NewInternalServerError("failed to generate invite token", err)
+	}
+	token := hex.EncodeToString(b)
+
+	user, err := s.r.RegenerateInviteToken(ctx, userID, token)
+	if err != nil {
+		return nil, apierrs.NewInternalServerError("failed to save new invite token", err)
+	}
 	return user, nil
 }
 

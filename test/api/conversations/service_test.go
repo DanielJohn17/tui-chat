@@ -51,6 +51,11 @@ func (m *MockConvRepo) GetOrCreateDirectConversation(
 	return nil, args.Error(1)
 }
 
+func (m *MockConvRepo) DirectConversationExists(ctx context.Context, userIDOne, userIDTwo int64, isSecret bool) (bool, error) {
+	args := m.Called(ctx, userIDOne, userIDTwo, isSecret)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockConvRepo) GetConvsByUserID(
 	ctx context.Context,
 	input int64,
@@ -192,6 +197,30 @@ func (m *MockUserService) GetPublicKey(ctx context.Context, userID int64) ([]byt
 	args := m.Called(ctx, userID)
 	if res := args.Get(0); res != nil {
 		return res.([]byte), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserService) GetUserByInviteToken(ctx context.Context, inviteToken string) (*users.PublicUser, error) {
+	args := m.Called(ctx, inviteToken)
+	if res := args.Get(0); res != nil {
+		return res.(*users.PublicUser), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserService) UpdateProfile(ctx context.Context, userID int64, input users.UpdateUserProfileRequest) (*users.GetUserResponseType, error) {
+	args := m.Called(ctx, userID, input)
+	if res := args.Get(0); res != nil {
+		return res.(*users.GetUserResponseType), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserService) RegenerateInviteToken(ctx context.Context, userID int64) (*users.GetUserResponseType, error) {
+	args := m.Called(ctx, userID)
+	if res := args.Get(0); res != nil {
+		return res.(*users.GetUserResponseType), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -379,9 +408,98 @@ func TestGetOrCreateDirectConversation_Success(t *testing.T) {
 	uService.On("GetUserByID", mock.Anything, int64(10)).
 		Return(&users.GetUserResponseType{ID: 10}, nil)
 	uService.On("GetUserByID", mock.Anything, int64(20)).
-		Return(&users.GetUserResponseType{ID: 20}, nil)
+		Return(&users.GetUserResponseType{ID: 20, IsSearchable: true}, nil)
 
 	repo := new(MockConvRepo)
+	repo.On("GetOrCreateDirectConversation", mock.Anything, input).Return(expected, nil)
+
+	s := conversations.NewConvService(repo, uService)
+	participants, err := s.GetOrCreateDirectConversation(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, participants)
+}
+
+func TestGetOrCreateDirectConversation_InviteOnly_NoToken_Forbidden(t *testing.T) {
+	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20}
+
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).
+		Return(&users.GetUserResponseType{ID: 20, IsSearchable: false, InviteToken: "inv_secret123"}, nil)
+
+	repo := new(MockConvRepo)
+	repo.On("DirectConversationExists", mock.Anything, int64(10), int64(20), false).Return(false, nil)
+
+	s := conversations.NewConvService(repo, uService)
+	_, err := s.GetOrCreateDirectConversation(context.Background(), input)
+
+	var apiErr *apierrs.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 403, apiErr.Code)
+	assert.Contains(t, apiErr.Message, "invite-only")
+}
+
+func TestGetOrCreateDirectConversation_InviteOnly_InvalidToken_Forbidden(t *testing.T) {
+	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20, InviteToken: "wrong_token"}
+
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).
+		Return(&users.GetUserResponseType{ID: 20, IsSearchable: false, InviteToken: "inv_secret123"}, nil)
+
+	repo := new(MockConvRepo)
+	repo.On("DirectConversationExists", mock.Anything, int64(10), int64(20), false).Return(false, nil)
+
+	s := conversations.NewConvService(repo, uService)
+	_, err := s.GetOrCreateDirectConversation(context.Background(), input)
+
+	var apiErr *apierrs.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 403, apiErr.Code)
+}
+
+func TestGetOrCreateDirectConversation_InviteOnly_ValidToken_Success(t *testing.T) {
+	expected := []conversations.GetConvParticipantType{
+		{ConvID: 1, UserID: 10, Name: "User 10", Username: "user10"},
+		{ConvID: 1, UserID: 20, Name: "User 20", Username: "user20"},
+	}
+	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20, InviteToken: "inv_secret123"}
+
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).
+		Return(&users.GetUserResponseType{ID: 20, IsSearchable: false, InviteToken: "inv_secret123"}, nil)
+
+	repo := new(MockConvRepo)
+	repo.On("DirectConversationExists", mock.Anything, int64(10), int64(20), false).Return(false, nil)
+	repo.On("GetOrCreateDirectConversation", mock.Anything, input).Return(expected, nil)
+
+	s := conversations.NewConvService(repo, uService)
+	participants, err := s.GetOrCreateDirectConversation(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, participants)
+}
+
+func TestGetOrCreateDirectConversation_InviteOnly_ExistingConv_AllowedWithoutToken(t *testing.T) {
+	expected := []conversations.GetConvParticipantType{
+		{ConvID: 1, UserID: 10, Name: "User 10", Username: "user10"},
+		{ConvID: 1, UserID: 20, Name: "User 20", Username: "user20"},
+	}
+	input := conversations.GetOrCreateDirectConvType{UserIDOne: 10, UserIDTwo: 20}
+
+	uService := new(MockUserService)
+	uService.On("GetUserByID", mock.Anything, int64(10)).
+		Return(&users.GetUserResponseType{ID: 10}, nil)
+	uService.On("GetUserByID", mock.Anything, int64(20)).
+		Return(&users.GetUserResponseType{ID: 20, IsSearchable: false, InviteToken: "inv_secret123"}, nil)
+
+	repo := new(MockConvRepo)
+	repo.On("DirectConversationExists", mock.Anything, int64(10), int64(20), false).Return(true, nil)
 	repo.On("GetOrCreateDirectConversation", mock.Anything, input).Return(expected, nil)
 
 	s := conversations.NewConvService(repo, uService)

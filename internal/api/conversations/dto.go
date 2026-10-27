@@ -1,9 +1,10 @@
 package conversations
 
 type GetOrCreateDirectConvType struct {
-	UserIDOne int64 `json:"-"`
-	UserIDTwo int64 `json:"user_id_two" validate:"required,gte=1"`
-	IsSecret  bool  `json:"is_secret"`
+	UserIDOne   int64  `json:"-"`
+	UserIDTwo   int64  `json:"user_id_two" validate:"required,gte=1"`
+	IsSecret    bool   `json:"is_secret"`
+	InviteToken string `json:"invite_token,omitempty"`
 }
 
 type GetConvParticipantType struct {
@@ -12,6 +13,7 @@ type GetConvParticipantType struct {
 	UserID          int64  `json:"user_id"`
 	Name            string `json:"name"`
 	Username        string `json:"username"`
+	Bio             string `json:"bio"`
 	LastMessage     string `json:"last_message,omitempty"`
 	LastMessageTime string `json:"last_message_time,omitempty"`
 	UnreadCount     int    `json:"unread_count"`

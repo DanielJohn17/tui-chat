@@ -21,6 +21,8 @@ type ConvRepositoryInt interface {
 		input GetOrCreateDirectConvType,
 	) ([]GetConvParticipantType, error)
 
+	DirectConversationExists(ctx context.Context, userIDOne, userIDTwo int64, isSecret bool) (bool, error)
+
 	GetConvsByUserID(ctx context.Context, input int64) []GetConvParticipantType
 
 	GetBulkChatsByUserID(ctx context.Context, userID, limit int64) ([]BulkChatsResponseType, error)
@@ -66,6 +68,11 @@ type ConvQuerier interface {
 		ctx context.Context,
 		arg database.GetOrCreateDirectConversationParams,
 	) ([]database.GetOrCreateDirectConversationRow, error)
+
+	DirectConversationExists(
+		ctx context.Context,
+		arg database.DirectConversationExistsParams,
+	) (bool, error)
 
 	GetConversationsByUserId(
 		ctx context.Context,
@@ -147,10 +154,19 @@ func (r *ConvRepository) GetOrCreateDirectConversation(
 			UserID:   v.UserID,
 			Name:     v.Name,
 			Username: v.Username,
+			Bio:      v.Bio,
 		}
 	}
 
 	return participants, nil
+}
+
+func (r *ConvRepository) DirectConversationExists(ctx context.Context, userIDOne, userIDTwo int64, isSecret bool) (bool, error) {
+	return r.q.DirectConversationExists(ctx, database.DirectConversationExistsParams{
+		UserID:   userIDOne,
+		UserID2:  userIDTwo,
+		IsSecret: isSecret,
+	})
 }
 
 func (r *ConvRepository) GetConvsByUserID(
@@ -171,6 +187,7 @@ func (r *ConvRepository) GetConvsByUserID(
 			UserID:          v.UserID,
 			Name:            v.Name,
 			Username:        v.Username,
+			Bio:             v.Bio,
 			LastMessage:     v.LastMessage,
 			LastMessageTime: v.LastMessageTime.Time.Format(time.RFC3339),
 			UnreadCount:     int(v.UnreadCount),

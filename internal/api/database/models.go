@@ -34,22 +34,28 @@ type Participant struct {
 }
 
 type User struct {
-	ID        int64
-	Name      string
-	Username  string
-	Password  string
-	PublicKey []byte
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID           int64
+	Name         string
+	Username     string
+	Password     string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	PublicKey    []byte
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
 }
 
 type UsersArchive struct {
-	ID        int64
-	Name      string
-	Username  string
-	Password  string
-	PublicKey []byte
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
-	DeletedAt pgtype.Timestamptz
+	ID           int64
+	Name         string
+	Username     string
+	Password     string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	DeletedAt    pgtype.Timestamptz
+	PublicKey    []byte
+	Bio          string
+	IsSearchable bool
+	InviteToken  pgtype.Text
 }

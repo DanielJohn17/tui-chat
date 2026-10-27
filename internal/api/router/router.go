@@ -50,6 +50,10 @@ func NewRouter(h Handlers, ctx context.Context) *gin.Engine {
 	subRouter.Use(middleware.Auth())
 	{
 		// users routes
+		subRouter.GET("/users/me", h.User.GetMe)
+		subRouter.PUT("/users/me", h.User.UpdateProfile)
+		subRouter.POST("/users/me/invite-token", h.User.RegenerateInviteToken)
+		subRouter.GET("/users/invite/:token", h.User.GetUserByInviteToken)
 		subRouter.GET("/users/search", middleware.RateLimiter(ctx, 60, 20), h.User.SearchUsers)
 		subRouter.GET(
 			"/users/:id",

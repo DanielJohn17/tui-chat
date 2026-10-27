@@ -4,19 +4,23 @@ import "github.com/DanielJohn17/tui-chat/internal/tui/crypto"
 import "context"
 
 type UserSummary struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
+	Bio         string `json:"bio,omitempty"`
+	InviteToken string `json:"invite_token,omitempty"`
 }
 
 type Profile struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Bio       string `json:"bio,omitempty"`
-	Password  string `json:"password,omitempty"`
-	Token     string `json:"token,omitempty"`
-	CreatedAt string `json:"created_at,omitempty"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	Username     string `json:"username"`
+	Bio          string `json:"bio,omitempty"`
+	IsSearchable bool   `json:"is_searchable"`
+	InviteToken  string `json:"invite_token,omitempty"`
+	Password     string `json:"password,omitempty"`
+	Token        string `json:"token,omitempty"`
+	CreatedAt    string `json:"created_at,omitempty"`
 }
 
 type Chat struct {
@@ -24,6 +28,7 @@ type Chat struct {
 	RecipientID int64  `json:"recipient_id"`
 	Name        string `json:"name"`
 	Username    string `json:"username"`
+	Bio         string `json:"bio,omitempty"`
 	LastMessage string `json:"last_message"`
 	Time        string `json:"time"`
 	Unread      int    `json:"unread"`
@@ -97,12 +102,17 @@ type Client interface {
 	Profile() Profile
 	SetProfile(Profile)
 	UpdateProfile(Profile)
+	SaveProfile(name, bio string, isSearchable bool) (*Profile, error)
+	RegenerateInviteToken() (*Profile, error)
+	FetchProfile() (*Profile, error)
 	SessionPath() string
 	SetSessionPath(string)
 
 	// REST Data operations
 	SearchUsers(context.Context, string) ([]UserSummary, error)
+	ResolveInviteToken(context.Context, string) (UserSummary, error)
 	OpenDirectConversation(context.Context, int64, ...bool) (Chat, error)
+	OpenDirectConversationWithToken(ctx context.Context, userID int64, isSecret bool, inviteToken string) (Chat, error)
 	FetchChats() ([]Chat, error)
 	Chats() []Chat
 	SetChats([]Chat)

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -75,9 +76,32 @@ func (m *AppModel) handleDiscoveryDebounce(msg DiscoveryDebounceMsg) (tea.Model,
 	}
 	c := m.client
 	return *m, func() tea.Msg {
+		raw := strings.TrimSpace(msg.Query)
+		token := extractInviteToken(raw)
+		if token != "" {
+			resolved, err := c.ResolveInviteToken(msg.Context, token)
+			if err == nil && resolved.ID > 0 {
+				return DiscoverySearchMsg{Generation: msg.Generation, Users: []client.UserSummary{resolved}, Err: nil}
+			}
+		}
+
 		users, err := c.SearchUsers(msg.Context, msg.Query)
 		return DiscoverySearchMsg{Generation: msg.Generation, Users: users, Err: err}
 	}
+}
+
+func extractInviteToken(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "tui://invite/") {
+		return strings.TrimPrefix(raw, "tui://invite/")
+	}
+	if idx := strings.Index(raw, "/invite/"); idx != -1 {
+		return raw[idx+len("/invite/"):]
+	}
+	if len(raw) == 32 || strings.HasPrefix(raw, "inv_") {
+		return raw
+	}
+	return ""
 }
 
 func (m *AppModel) handleDiscoverySearch(msg DiscoverySearchMsg) (tea.Model, tea.Cmd) {
@@ -102,7 +126,13 @@ func (m *AppModel) submitNewDM() (tea.Model, tea.Cmd) {
 	m.newDMView.StartOpening()
 	c := m.client
 	return *m, func() tea.Msg {
-		opened, err := c.OpenDirectConversation(ctx, user.ID)
+		var opened client.Chat
+		var err error
+		if user.InviteToken != "" {
+			opened, err = c.OpenDirectConversationWithToken(ctx, user.ID, false, user.InviteToken)
+		} else {
+			opened, err = c.OpenDirectConversation(ctx, user.ID)
+		}
 		return DiscoveryOpenMsg{Generation: generation, Chat: opened, Err: err}
 	}
 }

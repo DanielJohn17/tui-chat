@@ -55,6 +55,15 @@ func (m *MockUserService) GetUserByID(ctx context.Context, id int64) (*users.Get
 func (m *MockUserService) DeleteUser(ctx context.Context, id int64) (*users.DeleteUserResponseType, error) {
 	return nil, nil
 }
+func (m *MockUserService) GetUserByInviteToken(ctx context.Context, inviteToken string) (*users.PublicUser, error) {
+	return nil, nil
+}
+func (m *MockUserService) UpdateProfile(ctx context.Context, userID int64, input users.UpdateUserProfileRequest) (*users.GetUserResponseType, error) {
+	return nil, nil
+}
+func (m *MockUserService) RegenerateInviteToken(ctx context.Context, userID int64) (*users.GetUserResponseType, error) {
+	return nil, nil
+}
 func (m *MockUserService) SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error {
 	return m.Called(ctx, userID, pubKey).Error(0)
 }
@@ -259,6 +268,15 @@ func (m *MockUserRepo) GetUserByID(ctx context.Context, id int64) (*users.GetUse
 	return nil, nil
 }
 func (m *MockUserRepo) DeleteUser(ctx context.Context, id int64) (*users.DeleteUserResponseType, error) {
+	return nil, nil
+}
+func (m *MockUserRepo) GetUserByInviteToken(ctx context.Context, inviteToken string) (*users.GetUserResponseType, error) {
+	return nil, nil
+}
+func (m *MockUserRepo) UpdateUserProfile(ctx context.Context, id int64, name, bio string, isSearchable bool) (*users.GetUserResponseType, error) {
+	return nil, nil
+}
+func (m *MockUserRepo) RegenerateInviteToken(ctx context.Context, id int64, token string) (*users.GetUserResponseType, error) {
 	return nil, nil
 }
 func (m *MockUserRepo) SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error {

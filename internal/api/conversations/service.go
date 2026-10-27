@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,8 +101,23 @@ func (s *ConvService) GetOrCreateDirectConversation(
 		return nil, apierrs.NewNotFoundError("user one not found: " + err.Error())
 	}
 	// Check User 2
-	if _, err := s.u.GetUserByID(ctx, input.UserIDTwo); err != nil {
+	userTwo, err := s.u.GetUserByID(ctx, input.UserIDTwo)
+	if err != nil {
 		return nil, apierrs.NewNotFoundError("user two not found: " + err.Error())
+	}
+
+	// If User 2 is invite-only, require an existing conversation or a valid invite token
+	if !userTwo.IsSearchable {
+		exists, err := s.r.DirectConversationExists(ctx, input.UserIDOne, input.UserIDTwo, input.IsSecret)
+		if err != nil {
+			return nil, apierrs.NewInternalServerError(err.Error(), err)
+		}
+		if !exists {
+			token := strings.TrimSpace(input.InviteToken)
+			if token == "" || token != userTwo.InviteToken {
+				return nil, apierrs.NewForbiddenError("user is invite-only; valid invite token required")
+			}
+		}
 	}
 
 	participants, err := s.r.GetOrCreateDirectConversation(ctx, input)

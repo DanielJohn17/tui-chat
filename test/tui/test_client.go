@@ -190,11 +190,14 @@ func newTestClient() *TestClient {
 
 	return &TestClient{
 		profile: client.Profile{
-			ID:        101,
-			Name:      "Alice Walker",
-			Username:  "alice",
-			Token:     "",
-			CreatedAt: "2026-09-01",
+			ID:           101,
+			Name:         "Alice Walker",
+			Username:     "alice",
+			Bio:          "Hacking in the terminal 🚀",
+			IsSearchable: true,
+			InviteToken:  "inv_alice_test_token_123",
+			Token:        "",
+			CreatedAt:    "2026-09-01",
 		},
 		chats:       chats,
 		messages:    messages,
@@ -445,4 +448,34 @@ func (m *TestClient) FindChatByConvID(convID int64) (client.Chat, bool) {
 
 func (m *TestClient) DecryptMessage(peerID int64, ciphertext string) string {
 	return ciphertext
+}
+
+func (m *TestClient) SaveProfile(name, bio string, isSearchable bool) (*client.Profile, error) {
+	m.profile.Name = name
+	m.profile.Bio = bio
+	m.profile.IsSearchable = isSearchable
+	return &m.profile, nil
+}
+
+func (m *TestClient) RegenerateInviteToken() (*client.Profile, error) {
+	m.profile.InviteToken = "inv_test_regenerated"
+	return &m.profile, nil
+}
+
+func (m *TestClient) FetchProfile() (*client.Profile, error) {
+	return &m.profile, nil
+}
+
+func (m *TestClient) ResolveInviteToken(ctx context.Context, token string) (client.UserSummary, error) {
+	return client.UserSummary{
+		ID:          999,
+		Name:        "Invited Friend",
+		Username:    "friend",
+		Bio:         "Joined via link",
+		InviteToken: token,
+	}, nil
+}
+
+func (m *TestClient) OpenDirectConversationWithToken(ctx context.Context, userID int64, isSecret bool, inviteToken string) (client.Chat, error) {
+	return m.OpenDirectConversation(ctx, userID, isSecret)
 }

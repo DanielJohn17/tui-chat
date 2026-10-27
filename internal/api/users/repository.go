@@ -15,6 +15,9 @@ type UserRepositoryInt interface {
 	CreateUser(ctx context.Context, user CreateUserType) (*CreateUserResponseType, error)
 	GetUserByUsername(ctx context.Context, username string) (*GetUserResponseType, error)
 	GetUserByID(ctx context.Context, id int64) (*GetUserResponseType, error)
+	GetUserByInviteToken(ctx context.Context, inviteToken string) (*GetUserResponseType, error)
+	UpdateUserProfile(ctx context.Context, id int64, name, bio string, isSearchable bool) (*GetUserResponseType, error)
+	RegenerateInviteToken(ctx context.Context, id int64, token string) (*GetUserResponseType, error)
 	DeleteUser(ctx context.Context, id int64) (*DeleteUserResponseType, error)
 	SetPublicKey(ctx context.Context, userID int64, pubKey []byte) error
 	GetPublicKey(ctx context.Context, userID int64) ([]byte, error)
@@ -25,6 +28,9 @@ type UserQuerier interface {
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error)
 	GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error)
 	GetUserById(ctx context.Context, id int64) (database.GetUserByIdRow, error)
+	GetUserByInviteToken(ctx context.Context, inviteToken string) (database.GetUserByInviteTokenRow, error)
+	UpdateUserProfile(ctx context.Context, arg database.UpdateUserProfileParams) (database.UpdateUserProfileRow, error)
+	RegenerateInviteToken(ctx context.Context, arg database.RegenerateInviteTokenParams) (database.RegenerateInviteTokenRow, error)
 	DeleteUser(ctx context.Context, id int64) (database.DeleteUserRow, error)
 	SetUserPublicKey(ctx context.Context, arg database.SetUserPublicKeyParams) error
 	GetUserPublicKey(ctx context.Context, id int64) ([]byte, error)
@@ -52,7 +58,12 @@ func (r *UserRepository) SearchUsers(ctx context.Context, userID int64, query st
 	}
 	result := make([]PublicUser, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, PublicUser{ID: row.ID, Name: row.Name, Username: row.Username})
+		result = append(result, PublicUser{
+			ID:       row.ID,
+			Name:     row.Name,
+			Username: row.Username,
+			Bio:      row.Bio,
+		})
 	}
 	return result, nil
 }
@@ -74,11 +85,14 @@ func (r *UserRepository) CreateUser(
 	}
 
 	return &CreateUserResponseType{
-		ID:        createdUser.ID,
-		Name:      createdUser.Name,
-		Username:  createdUser.Username,
-		CreatedAt: createdUser.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: createdUser.UpdatedAt.Time.Format(time.RFC3339),
+		ID:           createdUser.ID,
+		Name:         createdUser.Name,
+		Username:     createdUser.Username,
+		Bio:          createdUser.Bio,
+		IsSearchable: createdUser.IsSearchable,
+		InviteToken:  createdUser.InviteToken,
+		CreatedAt:    createdUser.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    createdUser.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
 }
 
@@ -93,10 +107,15 @@ func (r *UserRepository) GetUserByUsername(
 	}
 
 	return &GetUserResponseType{
-		ID:       user.ID,
-		Name:     user.Name,
-		Password: user.Password,
-		Username: user.Username,
+		ID:           user.ID,
+		Name:         user.Name,
+		Password:     user.Password,
+		Username:     user.Username,
+		Bio:          user.Bio,
+		IsSearchable: user.IsSearchable,
+		InviteToken:  user.InviteToken,
+		CreatedAt:    user.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
 }
 
@@ -108,11 +127,89 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*GetUserRes
 	}
 
 	return &GetUserResponseType{
-		ID:        user.ID,
-		Name:      user.Name,
-		Username:  user.Username,
-		CreatedAt: user.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: user.UpdatedAt.Time.Format(time.RFC3339),
+		ID:           user.ID,
+		Name:         user.Name,
+		Username:     user.Username,
+		Bio:          user.Bio,
+		IsSearchable: user.IsSearchable,
+		InviteToken:  user.InviteToken,
+		CreatedAt:    user.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt.Time.Format(time.RFC3339),
+	}, nil
+}
+
+func (r *UserRepository) GetUserByInviteToken(ctx context.Context, inviteToken string) (*GetUserResponseType, error) {
+	user, err := r.q.GetUserByInviteToken(ctx, inviteToken)
+	if err != nil {
+		log.Printf("=>>GetUserByInviteToken: %v\n", err)
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return &GetUserResponseType{
+		ID:           user.ID,
+		Name:         user.Name,
+		Username:     user.Username,
+		Bio:          user.Bio,
+		IsSearchable: user.IsSearchable,
+		InviteToken:  user.InviteToken,
+		CreatedAt:    user.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt.Time.Format(time.RFC3339),
+	}, nil
+}
+
+func (r *UserRepository) UpdateUserProfile(
+	ctx context.Context,
+	id int64,
+	name string,
+	bio string,
+	isSearchable bool,
+) (*GetUserResponseType, error) {
+	updated, err := r.q.UpdateUserProfile(ctx, database.UpdateUserProfileParams{
+		ID:           id,
+		Name:         name,
+		Bio:          bio,
+		IsSearchable: isSearchable,
+	})
+	if err != nil {
+		log.Printf("=>>UpdateUserProfile: %v\n", err)
+		return nil, fmt.Errorf("error updating profile")
+	}
+
+	return &GetUserResponseType{
+		ID:           updated.ID,
+		Name:         updated.Name,
+		Username:     updated.Username,
+		Bio:          updated.Bio,
+		IsSearchable: updated.IsSearchable,
+		InviteToken:  updated.InviteToken,
+		CreatedAt:    updated.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    updated.UpdatedAt.Time.Format(time.RFC3339),
+	}, nil
+}
+
+func (r *UserRepository) RegenerateInviteToken(
+	ctx context.Context,
+	id int64,
+	token string,
+) (*GetUserResponseType, error) {
+	updated, err := r.q.RegenerateInviteToken(ctx, database.RegenerateInviteTokenParams{
+		ID:          id,
+		InviteToken: token,
+	})
+	if err != nil {
+		log.Printf("=>>RegenerateInviteToken: %v\n", err)
+		return nil, fmt.Errorf("error regenerating invite token")
+	}
+
+	return &GetUserResponseType{
+		ID:           updated.ID,
+		Name:         updated.Name,
+		Username:     updated.Username,
+		Bio:          updated.Bio,
+		IsSearchable: updated.IsSearchable,
+		InviteToken:  updated.InviteToken,
+		CreatedAt:    updated.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:    updated.UpdatedAt.Time.Format(time.RFC3339),
 	}, nil
 }
 

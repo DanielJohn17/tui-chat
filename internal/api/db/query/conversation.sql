@@ -46,7 +46,8 @@ SELECT
     tc.is_secret,
     u.id AS user_id,
     u.name,
-    u.username
+    u.username,
+    u.bio
 FROM
     target_conv tc
 -- Base-table scans cannot see participants inserted by a sibling CTE.
@@ -72,6 +73,7 @@ SELECT
   u.id AS user_id,
   u.name,
   u.username,
+  u.bio,
   COALESCE(lm.content, '') AS last_message,
   COALESCE(lm.created_at, tc.created_at) AS last_message_time,
   COALESCE(unread.count, 0)::int AS unread_count
@@ -320,3 +322,13 @@ FROM
   AND p2.user_id <> sqlc.arg(user_id)
 WHERE
   p1.user_id = sqlc.arg(user_id);
+
+-- name: DirectConversationExists :one
+SELECT EXISTS (
+  SELECT 1 FROM conversations
+  WHERE user_min_id = LEAST(sqlc.arg(user_id)::bigint, sqlc.arg(user_id_2)::bigint)
+    AND user_max_id = GREATEST(sqlc.arg(user_id)::bigint, sqlc.arg(user_id_2)::bigint)
+    AND is_secret = sqlc.arg(is_secret)::boolean
+    AND is_deleting = FALSE
+);
+

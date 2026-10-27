@@ -31,6 +31,18 @@ func RenderProfile(prof client.Profile, width, height int) string {
 	rUser := renderField("Username:", "@"+prof.Username)
 	rID := renderField("User ID:", fmt.Sprintf("#%d", prof.ID))
 
+	bioText := prof.Bio
+	if bioText == "" {
+		bioText = "No bio set"
+	}
+	rBio := renderField("Bio:", theme.Truncate(bioText, boxWidth-16))
+
+	privacyText := "Public (Searchable)"
+	if !prof.IsSearchable {
+		privacyText = "Invite-Only"
+	}
+	rPrivacy := renderField("Privacy:", privacyText)
+
 	tokenPreview := "None"
 	if len(prof.Token) > 16 {
 		tokenPreview = prof.Token[:8] + "..." + prof.Token[len(prof.Token)-8:]
@@ -53,6 +65,8 @@ func RenderProfile(prof client.Profile, width, height int) string {
 		"",
 		rName,
 		rUser,
+		rBio,
+		rPrivacy,
 		rID,
 		rToken,
 		rCreated,

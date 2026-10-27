@@ -50,14 +50,14 @@ func TestSearchSQL(t *testing.T) {
 		id := add(prefix + "literal")
 		rows, err := r.SearchUsers(ctx, self, prefix)
 		require.NoError(t, err)
-		require.Equal(t, []users.PublicUser{{ID: id, Name: prefix + "literal", Username: prefix + "literal"}}, rows)
+		require.Equal(t, []users.PublicUser{{ID: id, Name: prefix + "literal", Username: prefix + "literal", Bio: ""}}, rows)
 	}
 	rows, err := r.SearchUsers(ctx, self, "no-matches")
 	require.NoError(t, err)
 	require.NotNil(t, rows)
 	require.Empty(t, rows)
 	// If the query selected password, PostgreSQL would reject this restricted role.
-	_, err = tx.Exec(ctx, `CREATE ROLE discovery_query_test; GRANT SELECT (id, name, username) ON users TO discovery_query_test; SET LOCAL ROLE discovery_query_test`)
+	_, err = tx.Exec(ctx, `CREATE ROLE discovery_query_test; GRANT SELECT (id, name, username, bio, is_searchable) ON users TO discovery_query_test; SET LOCAL ROLE discovery_query_test`)
 	require.NoError(t, err)
 	_, err = r.SearchUsers(ctx, self, "zzdiscovery")
 	require.NoError(t, err)

@@ -132,7 +132,7 @@ func TestSearchRoute(t *testing.T) {
 	require.Zero(t, calls)
 	w := request(" Al ", "Bearer "+token, config.ENV.AppSharedSecret)
 	require.Equal(t, http.StatusOK, w.Code)
-	require.JSONEq(t, `{"success":true,"data":{"users":[{"id":8,"name":"Alice","username":"alice"}]}}`, w.Body.String())
+	require.JSONEq(t, `{"success":true,"data":{"users":[{"id":8,"name":"Alice","username":"alice","bio":""}]}}`, w.Body.String())
 	w = request("none", "Bearer "+token, config.ENV.AppSharedSecret)
 	require.JSONEq(t, `{"success":true,"data":{"users":[]}}`, w.Body.String())
 	w = request("a", "Bearer "+token, config.ENV.AppSharedSecret)

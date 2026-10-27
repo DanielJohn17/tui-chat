@@ -20,6 +20,9 @@ RETURNING
     id,
     name,
     username,
+    bio,
+    is_searchable,
+    invite_token,
     created_at,
     updated_at
 `
@@ -31,11 +34,14 @@ type CreateUserParams struct {
 }
 
 type CreateUserRow struct {
-	ID        int64
-	Name      string
-	Username  string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID           int64
+	Name         string
+	Username     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
@@ -45,6 +51,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.ID,
 		&i.Name,
 		&i.Username,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -79,6 +88,9 @@ SELECT
     id,
     name,
     username,
+    bio,
+    is_searchable,
+    invite_token,
     created_at,
     updated_at
 FROM
@@ -88,11 +100,14 @@ WHERE
 `
 
 type GetUserByIdRow struct {
-	ID        int64
-	Name      string
-	Username  string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID           int64
+	Name         string
+	Username     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }
 
 func (q *Queries) GetUserById(ctx context.Context, id int64) (GetUserByIdRow, error) {
@@ -102,6 +117,52 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) (GetUserByIdRow, er
 		&i.ID,
 		&i.Name,
 		&i.Username,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByInviteToken = `-- name: GetUserByInviteToken :one
+SELECT
+    id,
+    name,
+    username,
+    bio,
+    is_searchable,
+    invite_token,
+    created_at,
+    updated_at
+FROM
+    users
+WHERE
+    invite_token = $1
+`
+
+type GetUserByInviteTokenRow struct {
+	ID           int64
+	Name         string
+	Username     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserByInviteToken(ctx context.Context, inviteToken string) (GetUserByInviteTokenRow, error) {
+	row := q.db.QueryRow(ctx, getUserByInviteToken, inviteToken)
+	var i GetUserByInviteTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Username,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -113,7 +174,12 @@ SELECT
     id,
     name,
     username,
-    password
+    password,
+    bio,
+    is_searchable,
+    invite_token,
+    created_at,
+    updated_at
 FROM
     users
 WHERE
@@ -121,10 +187,15 @@ WHERE
 `
 
 type GetUserByUsernameRow struct {
-	ID       int64
-	Name     string
-	Username string
-	Password string
+	ID           int64
+	Name         string
+	Username     string
+	Password     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
@@ -135,22 +206,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 		&i.Name,
 		&i.Username,
 		&i.Password,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const setUserPublicKey = `-- name: SetUserPublicKey :exec
-UPDATE users SET public_key = $1 WHERE id = $2
-`
-
-type SetUserPublicKeyParams struct {
-	PublicKey []byte
-	ID        int64
-}
-
-func (q *Queries) SetUserPublicKey(ctx context.Context, arg SetUserPublicKeyParams) error {
-	_, err := q.db.Exec(ctx, setUserPublicKey, arg.PublicKey, arg.ID)
-	return err
 }
 
 const getUserPublicKey = `-- name: GetUserPublicKey :one
@@ -164,10 +226,61 @@ func (q *Queries) GetUserPublicKey(ctx context.Context, id int64) ([]byte, error
 	return public_key, err
 }
 
+const regenerateInviteToken = `-- name: RegenerateInviteToken :one
+UPDATE users
+SET
+    invite_token = $2,
+    updated_at = NOW()
+WHERE
+    id = $1
+RETURNING
+    id,
+    name,
+    username,
+    bio,
+    is_searchable,
+    invite_token,
+    created_at,
+    updated_at
+`
+
+type RegenerateInviteTokenParams struct {
+	ID          int64
+	InviteToken string
+}
+
+type RegenerateInviteTokenRow struct {
+	ID           int64
+	Name         string
+	Username     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) RegenerateInviteToken(ctx context.Context, arg RegenerateInviteTokenParams) (RegenerateInviteTokenRow, error) {
+	row := q.db.QueryRow(ctx, regenerateInviteToken, arg.ID, arg.InviteToken)
+	var i RegenerateInviteTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Username,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const searchUsers = `-- name: SearchUsers :many
-SELECT id, name, username
+SELECT id, name, username, bio
 FROM users
 WHERE id <> $1::bigint
+  AND is_searchable = TRUE
   AND LOWER(username) LIKE LOWER($2::text) ESCAPE '\'
 ORDER BY (LOWER(username) = LOWER($3::text)) DESC,
          LOWER(username) COLLATE "C", username COLLATE "C", id
@@ -184,6 +297,7 @@ type SearchUsersRow struct {
 	ID       int64
 	Name     string
 	Username string
+	Bio      string
 }
 
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
@@ -195,7 +309,12 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Sea
 	var items []SearchUsersRow
 	for rows.Next() {
 		var i SearchUsersRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.Username); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Username,
+			&i.Bio,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -204,4 +323,77 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Sea
 		return nil, err
 	}
 	return items, nil
+}
+
+const setUserPublicKey = `-- name: SetUserPublicKey :exec
+UPDATE users SET public_key = $1 WHERE id = $2
+`
+
+type SetUserPublicKeyParams struct {
+	PublicKey []byte
+	ID        int64
+}
+
+func (q *Queries) SetUserPublicKey(ctx context.Context, arg SetUserPublicKeyParams) error {
+	_, err := q.db.Exec(ctx, setUserPublicKey, arg.PublicKey, arg.ID)
+	return err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET
+    name = $2,
+    bio = $3,
+    is_searchable = $4,
+    updated_at = NOW()
+WHERE
+    id = $1
+RETURNING
+    id,
+    name,
+    username,
+    bio,
+    is_searchable,
+    invite_token,
+    created_at,
+    updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID           int64
+	Name         string
+	Bio          string
+	IsSearchable bool
+}
+
+type UpdateUserProfileRow struct {
+	ID           int64
+	Name         string
+	Username     string
+	Bio          string
+	IsSearchable bool
+	InviteToken  string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UpdateUserProfileRow, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile,
+		arg.ID,
+		arg.Name,
+		arg.Bio,
+		arg.IsSearchable,
+	)
+	var i UpdateUserProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Username,
+		&i.Bio,
+		&i.IsSearchable,
+		&i.InviteToken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

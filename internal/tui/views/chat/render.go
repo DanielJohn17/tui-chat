@@ -22,14 +22,37 @@ func renderHeader(activeChat *client.Chat, isFocused bool, contentWidth int) str
 	if contentWidth < 30 {
 		nameW = 8
 	}
-	leftTitle := lipgloss.JoinHorizontal(lipgloss.Center,
+	var bioSnippet string
+	if activeChat.Bio != "" && contentWidth >= 50 {
+		maxBioW := contentWidth - 35
+		if maxBioW > 25 {
+			maxBioW = 25
+		}
+		if maxBioW >= 8 {
+			cleanBio := theme.Truncate(theme.SanitizeLine(activeChat.Bio), maxBioW)
+			bioSnippet = theme.StyleDim.Render("• " + cleanBio)
+		}
+	}
+
+	leftParts := []string{
 		dot, " ",
 		theme.StyleSubtitle.Render(theme.Truncate(theme.SanitizeLine(activeChat.Name), nameW)), " ",
-		lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.Truncate(theme.SanitizeLine(activeChat.Username), nameW)),
-	)
+		lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@" + theme.Truncate(theme.SanitizeLine(activeChat.Username), nameW)),
+	}
+	if bioSnippet != "" {
+		leftParts = append(leftParts, " ", bioSnippet)
+	}
+	leftTitle := lipgloss.JoinHorizontal(lipgloss.Center, leftParts...)
 
 	if lipgloss.Width(leftTitle) > contentWidth {
-		leftTitle = theme.Truncate(theme.SanitizeLine(activeChat.Name), contentWidth)
+		leftTitle = lipgloss.JoinHorizontal(lipgloss.Center,
+			dot, " ",
+			theme.StyleSubtitle.Render(theme.Truncate(theme.SanitizeLine(activeChat.Name), nameW)), " ",
+			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.Truncate(theme.SanitizeLine(activeChat.Username), nameW)),
+		)
+		if lipgloss.Width(leftTitle) > contentWidth {
+			leftTitle = theme.Truncate(theme.SanitizeLine(activeChat.Name), contentWidth)
+		}
 	}
 
 	var focusHint string

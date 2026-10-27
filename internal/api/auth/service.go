@@ -59,12 +59,15 @@ func (s *AuthService) Register(ctx context.Context,
 	}
 
 	newData := &UserResponseType{
-		ID:        userRegisterd.ID,
-		Name:      userRegisterd.Name,
-		Username:  userRegisterd.Username,
-		Token:     token,
-		CreatedAt: userRegisterd.CreatedAt,
-		UpdatedAt: userRegisterd.UpdatedAt,
+		ID:           userRegisterd.ID,
+		Name:         userRegisterd.Name,
+		Username:     userRegisterd.Username,
+		Bio:          userRegisterd.Bio,
+		IsSearchable: userRegisterd.IsSearchable,
+		InviteToken:  userRegisterd.InviteToken,
+		Token:        token,
+		CreatedAt:    userRegisterd.CreatedAt,
+		UpdatedAt:    userRegisterd.UpdatedAt,
 	}
 	return newData, nil
 }
@@ -91,10 +94,15 @@ func (s *AuthService) Login(
 	}
 
 	userLogin := &UserResponseType{
-		ID:       user.ID,
-		Name:     user.Name,
-		Username: user.Username,
-		Token:    token,
+		ID:           user.ID,
+		Name:         user.Name,
+		Username:     user.Username,
+		Bio:          user.Bio,
+		IsSearchable: user.IsSearchable,
+		InviteToken:  user.InviteToken,
+		Token:        token,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 
 	return userLogin, nil
