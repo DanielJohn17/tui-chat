@@ -1,9 +1,6 @@
 package chat
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/DanielJohn17/tui-chat/internal/tui/client"
 	"github.com/DanielJohn17/tui-chat/internal/tui/theme"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -11,24 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-type FetchStatus int
-
-const (
-	StatusIdle FetchStatus = iota
-	StatusLoading
-	StatusSuccess
-	StatusFailed
-)
-
-type ChatTab int
-
-const (
-	TabCloud ChatTab = iota
-	TabSecret
-)
-
-type ToggleTabMsg struct{}
 
 type Model struct {
 	client       client.Client
@@ -160,30 +139,6 @@ func (m *Model) SetPeerKeyStatus(hasKey bool) {
 	m.updateInputPlaceholder()
 }
 
-func (m *Model) updateInputPlaceholder() {
-	if m.activeTab == TabSecret {
-		if !m.peerHasKey {
-			m.input.Placeholder = "Message input disabled: peer has not published an encryption key"
-		} else {
-			m.input.Placeholder = "Type a secret message... (Press Enter to send, Esc to unfocus)"
-		}
-	} else {
-		m.input.Placeholder = "Type a message... (Press Enter to send, Esc to unfocus)"
-	}
-}
-
-func (m *Model) updateViewportHeight() {
-	extraLines := 9
-	if m.activeTab == TabSecret {
-		extraLines = 10
-	}
-	vpHeight := m.height - extraLines
-	if vpHeight < 1 {
-		vpHeight = 1
-	}
-	m.viewport.Height = vpHeight
-}
-
 func (m *Model) SetActiveChat(chatID int64) {
 	if m.activeChatID != chatID {
 		m.activeChatID = chatID
@@ -194,123 +149,6 @@ func (m *Model) SetActiveChat(chatID int64) {
 
 func (m Model) ActiveChatID() int64 {
 	return m.activeChatID
-}
-
-func (m *Model) FocusInput() {
-	if m.activeTab == TabSecret && !m.peerHasKey {
-		m.BlurInput()
-		return
-	}
-	m.isFocused = true
-	m.input.Focus()
-}
-
-func (m *Model) BlurInput() {
-	m.isFocused = false
-	m.input.Blur()
-}
-
-func (m Model) IsInputFocused() bool {
-	return m.isFocused
-}
-
-func (m Model) InputValue() string {
-	return m.input.Value()
-}
-
-func (m *Model) RefreshMessages() {
-	if m.activeChatID == 0 {
-		m.viewport.SetContent("No conversation selected.")
-		return
-	}
-
-	status := StatusIdle
-	if m.convStatus != nil {
-		status = m.convStatus[m.activeChatID]
-	}
-
-	messages := m.client.Messages(m.activeChatID)
-
-	// Loading state when messages are not yet in memory
-	if status == StatusLoading && len(messages) == 0 {
-		sp := m.spinnerFrame
-		if sp == "" {
-			sp = "⠋"
-		}
-		loadingText := lipgloss.JoinHorizontal(lipgloss.Center,
-			lipgloss.NewStyle().Foreground(theme.ColorYellow).Bold(true).Render(sp),
-			" ",
-			theme.StyleDim.Render("Loading conversation messages..."),
-		)
-		m.viewport.SetContent("\n\n  " + loadingText)
-		return
-	}
-
-	// Error / Failure state when fetching failed
-	if status == StatusFailed && len(messages) == 0 {
-		errDetail := m.convErrors[m.activeChatID]
-		errMsg := "Failed to load messages"
-		if errDetail != "" {
-			errMsg = fmt.Sprintf("Failed to load messages: %s", errDetail)
-		}
-		errTitle := lipgloss.NewStyle().Foreground(theme.ColorRed).Bold(true).Render("✖ " + errMsg)
-		retryHint := theme.StyleDim.Render("Press [ r ] to retry  •  Click to reload")
-		errBox := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(theme.ColorRed).
-			Padding(1, 2).
-			Render(lipgloss.JoinVertical(lipgloss.Center, errTitle, "", retryHint))
-		m.viewport.SetContent("\n  " + errBox)
-		return
-	}
-
-	if len(messages) == 0 {
-		m.viewport.SetContent(theme.StyleDim.Render("\n  No messages yet. Send a message to break the ice!"))
-		return
-	}
-
-	var sb strings.Builder
-	contentWidth := m.viewport.Width - 2
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
-
-	for _, msg := range messages {
-		var senderTag, row string
-		timeTag := theme.StyleDim.Render(msg.Timestamp)
-		cleanText := theme.SanitizeText(msg.Text)
-
-		if msg.Self {
-			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("You")
-			header := fmt.Sprintf("%s  %s", senderTag, timeTag)
-			body := lipgloss.NewStyle().
-				Foreground(theme.ColorWhite).
-				Width(contentWidth).
-				Render(cleanText)
-			row = fmt.Sprintf("  %s\n  %s\n", header, body)
-		} else {
-			cleanSender := theme.SanitizeLine(msg.Sender)
-			senderTag = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render(cleanSender)
-			header := fmt.Sprintf("%s  %s", senderTag, timeTag)
-			body := lipgloss.NewStyle().
-				Foreground(theme.ColorWhite).
-				Width(contentWidth).
-				Render(cleanText)
-			row = fmt.Sprintf("  %s\n  %s\n", header, body)
-		}
-		sb.WriteString(row + "\n")
-	}
-
-	m.viewport.SetContent(sb.String())
-	m.viewport.GotoBottom()
-}
-
-func (m *Model) ScrollUp(lines int) {
-	m.viewport.LineUp(lines)
-}
-
-func (m *Model) ScrollDown(lines int) {
-	m.viewport.LineDown(lines)
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -337,40 +175,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	if m.isFocused {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "ctrl+s":
-				return m, func() tea.Msg { return ToggleTabMsg{} }
-			case "esc":
-				m.BlurInput()
-				return m, nil
-			case "enter":
-				if m.activeTab == TabSecret && !m.peerHasKey {
-					return m, nil
-				}
-				text := strings.TrimSpace(m.input.Value())
-				if text != "" && m.activeChatID != 0 {
-					if err := m.client.SendWS(m.activeChatID, text); err != nil {
-						// Do not append message or clear input on SendWS failure
-						return m, nil
-					}
-					nowStr := "now"
-					m.client.AppendMessage(client.Message{
-						ConvID:    m.activeChatID,
-						SenderID:  m.client.Profile().ID,
-						Sender:    "You",
-						Text:      text,
-						Timestamp: nowStr,
-						Self:      true,
-						IsSecret:  m.activeTab == TabSecret,
-					})
-					m.client.UpdateChatSnippet(m.activeChatID, text, nowStr, 0, nil)
-					m.input.Reset()
-					m.RefreshMessages()
-					m.viewport.GotoBottom()
-				}
-				return m, nil
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if newM, keyCmd, handled := m.handleInputKey(keyMsg); handled {
+				return newM, keyCmd
 			}
 		}
 		m.input, cmd = m.input.Update(msg)
@@ -396,120 +203,12 @@ func (m Model) View(activeChat *client.Chat) string {
 		contentWidth = 1
 	}
 
-	// 1. Chat Header
-	var header string
-	if activeChat != nil {
-		var dot string
-		if activeChat.Online {
-			dot = theme.StyleSuccess.Render("●")
-		} else {
-			dot = theme.StyleDim.Render("○")
-		}
-
-		nameW := 14
-		if contentWidth < 30 {
-			nameW = 8
-		}
-		leftTitle := lipgloss.JoinHorizontal(lipgloss.Center,
-			dot, " ",
-			theme.StyleSubtitle.Render(theme.Truncate(theme.SanitizeLine(activeChat.Name), nameW)), " ",
-			lipgloss.NewStyle().Foreground(theme.ColorMagenta).Render("@"+theme.Truncate(theme.SanitizeLine(activeChat.Username), nameW)),
-		)
-
-		if lipgloss.Width(leftTitle) > contentWidth {
-			leftTitle = theme.Truncate(theme.SanitizeLine(activeChat.Name), contentWidth)
-		}
-
-		var focusHint string
-		if contentWidth >= 35 {
-			if m.isFocused {
-				focusHint = theme.StyleDim.Render("[Esc: unfocus]")
-			} else {
-				focusHint = theme.StyleDim.Render("[i: focus]")
-			}
-		}
-
-		hSpaces := contentWidth - lipgloss.Width(leftTitle) - lipgloss.Width(focusHint)
-		if hSpaces < 1 {
-			hSpaces = 1
-		}
-		if focusHint != "" && lipgloss.Width(leftTitle)+lipgloss.Width(focusHint)+1 <= contentWidth {
-			header = lipgloss.JoinHorizontal(lipgloss.Center, leftTitle, lipgloss.NewStyle().Width(hSpaces).Render(""), focusHint)
-		} else {
-			header = leftTitle
-		}
-	} else {
-		header = theme.StyleDim.Render("No active conversation")
-	}
-
-	// 2. Tab Bar
-	var tabCloudStr, tabSecretStr string
-	if contentWidth < 28 {
-		if m.activeTab == TabCloud {
-			tabCloudStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("[ 💬 ]")
-			tabSecretStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 🔒 ]")
-		} else {
-			tabCloudStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 💬 ]")
-			tabSecretStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render("[ 🔒 ]")
-		}
-	} else {
-		if m.activeTab == TabCloud {
-			tabCloudStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorCyan).Render("[ 💬 Cloud ]")
-			tabSecretStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 🔒 Secret ]")
-		} else {
-			tabCloudStr = lipgloss.NewStyle().Foreground(theme.ColorDimText).Render("[ 💬 Cloud ]")
-			tabSecretStr = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorMagenta).Render("[ 🔒 Secret ]")
-		}
-	}
-	tabBar := lipgloss.JoinHorizontal(lipgloss.Center, " ", tabCloudStr, "  ", tabSecretStr)
-	if lipgloss.Width(tabBar) > contentWidth {
-		tabBar = theme.Truncate(tabBar, contentWidth)
-	}
-
-	// 3. Secret Warning / Peer Key Banner
-	var warnBanner string
-	if m.activeTab == TabSecret {
-		if !m.peerHasKey {
-			rawBanner := "🔒 Peer has not published an encryption key"
-			warnBanner = "  " + lipgloss.NewStyle().Bold(true).Foreground(theme.ColorRed).Render(theme.Truncate(rawBanner, contentWidth-2))
-		} else {
-			avail := contentWidth - 2
-			var rawBanner string
-			if avail >= 90 {
-				rawBanner = "⚠️ Secret Chat: Device-bound encryption. Key migration: https://linetalk.vercel.app/docs"
-			} else if avail >= 73 {
-				rawBanner = "⚠️ Secret Chat: Device-bound. Docs: https://linetalk.vercel.app/docs"
-			} else if avail >= 57 {
-				rawBanner = "⚠️ Secret Chat: Device-bound (linetalk.vercel.app/docs)"
-			} else if avail >= 30 {
-				rawBanner = "⚠️ Secret Chat: Device-bound"
-			} else {
-				rawBanner = "⚠️ Secret Chat"
-			}
-			warnBanner = "  " + lipgloss.NewStyle().Foreground(theme.ColorYellow).Render(theme.Truncate(rawBanner, avail))
-		}
-	}
-
-	// 4. Viewport
+	header := renderHeader(activeChat, m.isFocused, contentWidth)
+	tabBar := renderTabBar(m.activeTab, contentWidth)
+	warnBanner := renderSecretWarningBanner(m.activeTab, m.peerHasKey, contentWidth)
 	vpBox := m.viewport.View()
+	inputRendered := renderInputBox(m.input.View(), m.isFocused, contentWidth)
 
-	// 5. Input Box
-	inputBorder := theme.ColorBorderDim
-	if m.isFocused {
-		inputBorder = theme.ColorCyan
-	}
-	inputBoxWidth := contentWidth - 2
-	if inputBoxWidth < 1 {
-		inputBoxWidth = 1
-	}
-	inputRendered := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(inputBorder).
-		Width(inputBoxWidth).
-		Padding(0, 1).
-		Render(m.input.View())
-
-	// Assemble Pane
 	boxWidth := m.width - 2
 	if boxWidth < 1 {
 		boxWidth = 1
