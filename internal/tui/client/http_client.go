@@ -420,7 +420,9 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 
 		lastMsg := c.LastMessage
 		if c.IsSecret && c.UserID != 0 && lastMsg != "" {
-			lastMsg = h.DecryptMessage(c.UserID, lastMsg)
+			if dec := h.DecryptMessage(c.UserID, lastMsg); !strings.HasPrefix(dec, "[cannot decrypt") {
+				lastMsg = dec
+			}
 		}
 
 		idx, exists := contactIndex[c.UserID]
@@ -594,6 +596,15 @@ func (h *HTTPClient) FetchMessages(chatID int64) ([]Message, error) {
 		if recipientName == "" {
 			recipientName = ch.Username
 		}
+		if !isSecret && ch.SecretID == chatID {
+			isSecret = true
+		}
+	}
+
+	if recipientID == 0 {
+		h.mu.RLock()
+		recipientID = h.convPeerID[chatID]
+		h.mu.RUnlock()
 	}
 
 	n := len(res.Data)
