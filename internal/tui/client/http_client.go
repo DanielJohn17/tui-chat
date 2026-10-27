@@ -420,9 +420,7 @@ func (h *HTTPClient) FetchChats() ([]Chat, error) {
 
 		lastMsg := c.LastMessage
 		if c.IsSecret && c.UserID != 0 && lastMsg != "" {
-			if dec := h.DecryptMessage(c.UserID, lastMsg); !strings.HasPrefix(dec, "[cannot decrypt") {
-				lastMsg = dec
-			}
+			lastMsg = h.DecryptMessage(c.UserID, lastMsg)
 		}
 
 		idx, exists := contactIndex[c.UserID]
@@ -759,18 +757,11 @@ func (h *HTTPClient) FetchBulkMessages() (map[int64][]Message, error) {
 		text := c.Content
 		isSecret := h.convIsSecret[c.ConvID]
 		if isSecret {
-			if symKey, ok := symKeys[c.ConvID]; ok {
-				decrypted, err := crypto.Decrypt(symKey, text)
-				if err == nil {
-					text = decrypted
-				} else if errors.Is(err, crypto.ErrLegacyMessage) {
-					// keep text as-is
-				} else {
-					text = "[cannot decrypt — key from another device]"
-				}
-			} else {
-				text = "[cannot decrypt — key from another device]"
+			peerID := recipientMap[c.ConvID]
+			if peerID == 0 {
+				peerID = h.convPeerID[c.ConvID]
 			}
+			text = h.DecryptMessage(peerID, text)
 		}
 
 		if len(text) > maxRenderTextLength {
@@ -1235,14 +1226,7 @@ func (h *HTTPClient) UploadPublicKey(pubKey []byte) error {
 	return nil
 }
 
-func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
-	h.peerKeyMu.RLock()
-	cached, ok := h.peerPubKeys[userID]
-	h.peerKeyMu.RUnlock()
-	if ok {
-		return cached[:], nil
-	}
-
+func (h *HTTPClient) fetchPeerPublicKeyFromAPI(userID int64) ([]byte, error) {
 	req, err := h.newRequest(http.MethodGet, fmt.Sprintf("/api/v1/keys/%d", userID), nil)
 	if err != nil {
 		return nil, err
@@ -1287,6 +1271,17 @@ func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
 	return pubKeyBytes[:], nil
 }
 
+func (h *HTTPClient) GetPeerPublicKey(userID int64) ([]byte, error) {
+	h.peerKeyMu.RLock()
+	cached, ok := h.peerPubKeys[userID]
+	h.peerKeyMu.RUnlock()
+	if ok {
+		return cached[:], nil
+	}
+
+	return h.fetchPeerPublicKeyFromAPI(userID)
+}
+
 func (h *HTTPClient) DecryptMessage(peerID int64, ciphertext string) string {
 	if ciphertext == "" || peerID == 0 {
 		return ciphertext
@@ -1315,5 +1310,18 @@ func (h *HTTPClient) DecryptMessage(peerID int64, ciphertext string) string {
 	if errors.Is(err, crypto.ErrLegacyMessage) {
 		return ciphertext
 	}
+
+	// If decryption failed, peer may have uploaded a new identity key.
+	// Invalidate cache and fetch the latest key from the server once.
+	if freshPub, err := h.fetchPeerPublicKeyFromAPI(peerID); err == nil && !bytes.Equal(freshPub, peerPub) {
+		var freshArr [32]byte
+		copy(freshArr[:], freshPub)
+		if freshSymKey, err := crypto.DeriveConvKey(idKey.PrivateKey, freshArr); err == nil {
+			if freshDec, err := crypto.Decrypt(freshSymKey, ciphertext); err == nil {
+				return freshDec
+			}
+		}
+	}
+
 	return "[cannot decrypt — key from another device]"
 }

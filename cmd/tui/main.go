@@ -72,6 +72,11 @@ func main() {
 		}
 	}
 
+	_ = os.Setenv("GO_ENV", goEnv)
+	if sessionName != "" {
+		_ = os.Setenv("SESSION", sessionName)
+	}
+
 	c := client.NewHTTPClient(apiURL, appSecret)
 
 	sessionPath := client.ResolveSessionPath(goEnv, sessionName)

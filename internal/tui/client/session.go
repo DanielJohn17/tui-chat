@@ -1,12 +1,14 @@
 package client
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // ResolveSessionPath determines the session file location based on the environment and session identifier.
@@ -73,6 +75,7 @@ func sanitizeSessionName(name string) string {
 
 // LoadSession reads and unmarshals the persisted session from the given file path.
 // If the file does not exist, it returns (nil, os.ErrNotExist).
+// If the stored token has expired, the session file is automatically removed to prevent 401 loops.
 func LoadSession(sessionPath string) (*Profile, error) {
 	if sessionPath == "" {
 		return nil, errors.New("empty session path")
@@ -92,7 +95,37 @@ func LoadSession(sessionPath string) (*Profile, error) {
 		return nil, errors.New("empty session token")
 	}
 
+	if isTokenExpired(prof.Token) {
+		_ = ClearSession(sessionPath)
+		return nil, errors.New("session token expired")
+	}
+
 	return &prof, nil
+}
+
+// isTokenExpired inspects a JWT payload for an exp claim without verifying signature.
+func isTokenExpired(tokenStr string) bool {
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		payloadBytes, err = base64.URLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return false
+		}
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return false
+	}
+	if claims.Exp > 0 && time.Now().Unix() >= claims.Exp {
+		return true
+	}
+	return false
 }
 
 // SaveSession securely writes the profile session to the given file path.

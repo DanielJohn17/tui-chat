@@ -80,6 +80,13 @@ func (m *AppModel) handleWSChatMessage(p client.WSChatMessagePayload) tea.Cmd {
 	if isSelf {
 		senderName = "You"
 	}
+	if peerID == 0 {
+		if !isSelf && p.SenderID != 0 {
+			peerID = p.SenderID
+		} else if isSelf && p.RecipientID != 0 {
+			peerID = p.RecipientID
+		}
+	}
 
 	// Decrypt content only if conversation is secret
 	isSecret := m.client.IsConvSecret(p.ConvID)

@@ -102,7 +102,13 @@ func connectWSCmd(c client.Client, eventsChan chan any) tea.Cmd {
 func ensureIdentityKeyCmd(c client.Client) tea.Cmd {
 	return func() tea.Msg {
 		goEnv := os.Getenv("GO_ENV")
-		sessionName := os.Getenv("TUI_CHAT_SESSION")
+		sessionName := os.Getenv("SESSION")
+		if sessionName == "" {
+			sessionName = os.Getenv("TUI_SESSION")
+		}
+		if sessionName == "" {
+			sessionName = os.Getenv("TUI_CHAT_SESSION")
+		}
 		userID := c.Profile().ID
 		keyPath := crypto.ResolveIdentityKeyPath(goEnv, sessionName, userID)
 

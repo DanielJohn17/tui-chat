@@ -10,8 +10,8 @@ import (
 
 type UserToken struct {
 	jwt.RegisteredClaims
-	ID       int64
-	Username string
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
 }
 
 var (
@@ -27,9 +27,9 @@ func init() {
 func CreateToken(user UserToken) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":    user.ID,
-		"email": user.Username,
-		"exp":   time.Now().Add(time.Second * time.Duration(jwtExp)).Unix(),
+		"id":       user.ID,
+		"username": user.Username,
+		"exp":      time.Now().Add(time.Second * time.Duration(jwtExp)).Unix(),
 	})
 
 	tokenString, err := token.SignedString(secretKey)

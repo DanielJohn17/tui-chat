@@ -50,6 +50,24 @@ func LoadOrCreateIdentityKey(path string) (*IdentityKey, error) {
 		return nil, fmt.Errorf("crypto/identity: failed to read key file: %w", err)
 	}
 
+	// Check if a base identity_<uid>.key exists in the same directory to avoid regenerating
+	// and invalidating existing message history when launching under a session flag
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	nameWithoutExt := strings.TrimSuffix(base, ext)
+	parts := strings.Split(nameWithoutExt, "_")
+	if len(parts) >= 3 {
+		fallbackName := fmt.Sprintf("%s_%s%s", parts[0], parts[len(parts)-1], ext)
+		fallbackPath := filepath.Join(dir, fallbackName)
+		if fallbackData, fErr := os.ReadFile(fallbackPath); fErr == nil {
+			if k, pErr := parseIdentityKey(fallbackData); pErr == nil {
+				_ = SaveIdentityKey(path, k)
+				return k, nil
+			}
+		}
+	}
+
 	// Generate a new key and persist it
 	key, err := GenerateIdentityKey()
 	if err != nil {
