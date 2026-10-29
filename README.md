@@ -19,6 +19,7 @@ LineTalk is a lightweight, keyboard-driven terminal application engineered for p
 
 [**Explore Features**](#-key-features) •
 [**Quick Start**](#-quick-start-pre-built-binaries) •
+[**Account Migration**](#-migrating-account--e2ee-keys-to-a-new-pc) •
 [**Local Development**](#-local-development-setup) •
 [**Multi-Session Testing**](#-multi-window-session-testing) •
 [**Keybindings**](#-keyboard-shortcuts) •
@@ -147,6 +148,76 @@ Invoke-WebRequest -Uri "https://github.com/DanielJohn17/tui-chat/releases/downlo
 
 > [!TIP]
 > Pre-built binaries are pre-configured with the production API endpoint out-of-the-box. No setup or `.env` configuration is needed for general users! All releases and checksums are available on the **[Releases Page](https://github.com/DanielJohn17/tui-chat/releases)**.
+
+---
+
+## 📦 Migrating Account & E2EE Keys to a New PC
+
+LineTalk stores user session tokens and identity profiles locally on your computer with zero third-party telemetry. When migrating to a new machine, transfer your local session directory to maintain seamless authentication and conversation continuity without needing to re-login.
+
+### 📍 Storage Locations by Operating System
+
+| Platform | Session Directory | Config File Path |
+| :--- | :--- | :--- |
+| **Linux** | `~/.config/tui-chat/` | `~/.config/tui-chat/session.json` |
+| **macOS** | `~/.config/tui-chat/` | `~/.config/tui-chat/session.json` |
+| **Windows** | `%APPDATA%\tui-chat\` | `C:\Users\<User>\AppData\Roaming\tui-chat\session.json` |
+
+---
+
+### 1. Linux & macOS Migration
+
+#### Step A: Export from Old PC
+```bash
+# Create an archive of your session directory
+tar -czvf linetalk_backup.tar.gz -C ~/.config tui-chat
+
+# Or transfer directly over secure SSH to your new machine:
+scp -r ~/.config/tui-chat user@new-pc:~/.config/
+```
+
+#### Step B: Restore on New PC
+```bash
+# Ensure target config directory exists
+mkdir -p ~/.config
+
+# Extract backup archive
+tar -xzvf linetalk_backup.tar.gz -C ~/.config/
+
+# Launch LineTalk with your existing session
+linetalk
+```
+
+---
+
+### 2. Windows Migration (PowerShell)
+
+#### Step A: Export from Old PC
+In PowerShell:
+```powershell
+# Create a zip backup of the session directory
+Compress-Archive -Path "$env:APPDATA\tui-chat" -DestinationPath "$HOME\linetalk_backup.zip"
+```
+
+#### Step B: Restore on New PC
+In PowerShell:
+```powershell
+# Ensure target AppData directory exists
+if (!(Test-Path "$env:APPDATA\tui-chat")) { New-Item -ItemType Directory -Path "$env:APPDATA\tui-chat" -Force }
+
+# Extract session file to AppData
+Expand-Archive -Path "$HOME\linetalk_backup.zip" -DestinationPath "$env:APPDATA" -Force
+
+# Launch LineTalk
+.\linetalk.exe
+```
+
+---
+
+### 3. Cross-Platform Migration (e.g., Windows ➔ Linux/macOS)
+The `session.json` file format is 100% platform-agnostic JSON:
+* **Windows to Linux/macOS**: Copy `%APPDATA%\tui-chat\session.json` to `~/.config/tui-chat/session.json`.
+* **Linux/macOS to Windows**: Copy `~/.config/tui-chat/session.json` to `$env:APPDATA\tui-chat\session.json`.
 
 ---
 
